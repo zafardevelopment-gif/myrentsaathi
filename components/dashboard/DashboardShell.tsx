@@ -16,6 +16,7 @@ export default function DashboardShell({
   const { user, hydrated } = useAuth();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -26,19 +27,15 @@ export default function DashboardShell({
     }
   }, [hydrated, user, role, router]);
 
-  // Wait until localStorage has been read before rendering anything
   if (!hydrated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-brand-500 font-bold">Loading...</div>
+        <div className="text-brand-500 font-bold text-sm">Loading...</div>
       </div>
     );
   }
 
-  // Not logged in or wrong role — redirect is in flight
-  if (!user || user.role !== role) {
-    return null;
-  }
+  if (!user || user.role !== role) return null;
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -46,10 +43,14 @@ export default function DashboardShell({
         role={role}
         collapsed={collapsed}
         onToggle={() => setCollapsed(!collapsed)}
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
       />
+
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <DashHeader />
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto max-w-[1000px] w-full mx-auto">
+        <DashHeader onMenuClick={() => setMobileOpen(true)} />
+        {/* pb-20 on mobile so content isn't hidden behind bottom nav */}
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto max-w-[1000px] w-full mx-auto pb-24 md:pb-6">
           {children}
         </main>
       </div>
