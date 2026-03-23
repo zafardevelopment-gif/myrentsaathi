@@ -2,43 +2,42 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  MockAuthProvider,
-  useAuth,
-  type MockRole,
-} from "@/components/providers/MockAuthProvider";
+import { useAuth, type MockRole } from "@/components/providers/MockAuthProvider";
 import Sidebar from "./Sidebar";
 import DashHeader from "./DashHeader";
 
-function DashboardContent({
+export default function DashboardShell({
   role,
   children,
 }: {
   role: MockRole;
   children: React.ReactNode;
 }) {
-  const { user, login } = useAuth();
+  const { user, hydrated } = useAuth();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Auto-login with the role from the URL
-  useEffect(() => {
-    if (mounted && !user) {
-      login(role);
+    if (!hydrated) return;
+    if (!user) {
+      router.push("/");
+    } else if (user.role !== role) {
+      router.push(`/${user.role}`);
     }
-  }, [mounted, user, role, login]);
+  }, [hydrated, user, role, router]);
 
-  if (!mounted) {
+  // Wait until localStorage has been read before rendering anything
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-brand-500 font-bold">Loading...</div>
       </div>
     );
+  }
+
+  // Not logged in or wrong role — redirect is in flight
+  if (!user || user.role !== role) {
+    return null;
   }
 
   return (
@@ -55,19 +54,5 @@ function DashboardContent({
         </main>
       </div>
     </div>
-  );
-}
-
-export default function DashboardShell({
-  role,
-  children,
-}: {
-  role: MockRole;
-  children: React.ReactNode;
-}) {
-  return (
-    <MockAuthProvider>
-      <DashboardContent role={role}>{children}</DashboardContent>
-    </MockAuthProvider>
   );
 }
