@@ -21,7 +21,12 @@ export default function DashboardShell({
   useEffect(() => {
     if (!hydrated) return;
     if (!user) {
-      router.push("/");
+      // Redirect unauthenticated users based on role
+      if (role === "superadmin") {
+        router.push("/superadmin/login");
+      } else {
+        router.push("/");
+      }
     } else if (user.role !== role) {
       const dest = user.role === "superadmin" ? "/superadmin" : `/${user.role}`;
       router.push(dest);

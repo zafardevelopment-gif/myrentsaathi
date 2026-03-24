@@ -15,7 +15,7 @@ export type DBUser = {
   password: string | null;
 };
 
-// ─── LOGIN ────────────────────────────────────────────────────
+// ─── LOGIN (by email) ────────────────────────────────────────
 
 export async function dbLogin(email: string, password: string): Promise<{
   success: boolean;
@@ -31,6 +31,32 @@ export async function dbLogin(email: string, password: string): Promise<{
 
   if (error || !data) {
     return { success: false, error: "No account found with this email." };
+  }
+
+  if (data.password !== password) {
+    return { success: false, error: "Incorrect password." };
+  }
+
+  return { success: true, user: data as DBUser };
+}
+
+// ─── LOGIN (Superadmin by User ID) ────────────────────────────
+
+export async function superAdminLogin(userId: string, password: string): Promise<{
+  success: boolean;
+  user?: DBUser;
+  error?: string;
+}> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, email, full_name, phone, role, password")
+    .eq("admin_user_id", userId.trim())
+    .eq("role", "superadmin")
+    .eq("is_active", true)
+    .single();
+
+  if (error || !data) {
+    return { success: false, error: "Invalid User ID or account not found." };
   }
 
   if (data.password !== password) {
