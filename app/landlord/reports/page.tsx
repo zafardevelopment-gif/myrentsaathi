@@ -1,60 +1,95 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
 import { formatCurrency } from "@/lib/utils";
-import { MOCK_FLATS, MOCK_RENT_PAYMENTS, MOCK_MAINT_PAYMENTS } from "@/lib/mockData";
+import { useAuth } from "@/components/providers/MockAuthProvider";
+import { getLandlordOverviewStats, getAllLandlordRentPayments, type LandlordRentPayment } from "@/lib/landlord-data";
 
 export default function LandlordReports() {
-  const myFlats = MOCK_FLATS.filter((f) => f.ownerId === "U2");
-  const occupiedFlats = myFlats.filter((f) => f.status === "occupied");
-  const totalRent = occupiedFlats.reduce((a, f) => a + f.rent, 0);
-  const maintPaid = MOCK_MAINT_PAYMENTS.filter((m) => m.payerId === "U2" && m.status === "paid").reduce((a, m) => a + m.amount, 0);
-  const netIncome = totalRent - maintPaid;
+  const { user } = useAuth();
+  const [stats, setStats] = useState({ totalFlats: 0, occupiedFlats: 0, expectedRent: 0, collectedRent: 0, overdueRent: 0 });
+  const [payments, setPayments] = useState<LandlordRentPayment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.email) return;
+    async function load() {
+      const [s, p] = await Promise.all([
+        getLandlordOverviewStats(user!.email),
+        getAllLandlordRentPayments(user!.email),
+      ]);
+      setStats(s);
+      setPayments(p);
+      setLoading(false);
+    }
+    load().catch(() => setLoading(false));
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[...Array(4)].map((_, i) => <div key={i} className="h-20 bg-warm-100 rounded-[14px] animate-pulse" />)}
+      </div>
+    );
+  }
+
+  // Group payments by month for property-wise current month view
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonthPayments = payments.filter((p) => p.month_year === currentMonth);
+
+  // YTD totals
+  const ytdCollected = payments.filter((p) => p.status === "paid").reduce((a, p) => a + (p.amount || 0), 0);
 
   return (
     <div>
       <h2 className="text-[15px] font-extrabold text-ink mb-4">📊 Financial Reports</h2>
 
       <div className="flex gap-2.5 flex-wrap mb-5">
-        <StatCard icon="💰" label="Monthly Rent Income" value={formatCurrency(totalRent)} />
-        <StatCard icon="🏢" label="Maintenance Paid" value={formatCurrency(maintPaid)} accent="text-yellow-600" />
-        <StatCard icon="📈" label="Net Income" value={formatCurrency(netIncome)} accent="text-green-700" />
+        <StatCard icon="💰" label="Expected This Month" value={formatCurrency(stats.expectedRent)} />
+        <StatCard icon="✅" label="Collected" value={formatCurrency(stats.collectedRent)} accent="text-green-700" />
+        <StatCard icon="⚠️" label="Overdue" value={formatCurrency(stats.overdueRent)} accent="text-red-600" />
       </div>
 
-      {/* Property-wise income */}
-      <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
-        <div className="text-sm font-extrabold text-ink mb-4">Property-wise Income — March 2026</div>
-        {occupiedFlats.map((flat) => {
-          const rp = MOCK_RENT_PAYMENTS.find((r) => r.flatNo === flat.flatNo);
-          const isPaid = rp?.status === "paid";
-          return (
-            <div key={flat.id} className="mb-4">
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-sm font-semibold text-ink">{flat.flatNo} — {flat.type}</span>
-                <span className={`text-sm font-extrabold ${isPaid ? "text-green-700" : "text-red-600"}`}>
-                  {isPaid ? formatCurrency(rp?.amount || 0) : "Overdue"}
-                </span>
+      {/* Property-wise income this month */}
+      {currentMonthPayments.length > 0 && (
+        <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
+          <div className="text-sm font-extrabold text-ink mb-4">
+            Property-wise Income — {new Date(currentMonth + "-01").toLocaleString("en-IN", { month: "long", year: "numeric" })}
+          </div>
+          {currentMonthPayments.map((p) => {
+            const flat = p.flat as { flat_number: string; block: string | null } | null;
+            const flatLabel = flat ? `Flat ${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : "—";
+            const isPaid = p.status === "paid";
+            return (
+              <div key={p.id} className="mb-4">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-sm font-semibold text-ink">{flatLabel}</span>
+                  <span className={`text-sm font-extrabold ${isPaid ? "text-green-700" : "text-red-600"}`}>
+                    {isPaid ? formatCurrency(p.amount) : "Overdue"}
+                  </span>
+                </div>
+                <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${isPaid ? "bg-green-500" : "bg-red-400"}`}
+                    style={{ width: isPaid ? "100%" : "0%" }}
+                  />
+                </div>
               </div>
-              <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${isPaid ? "bg-green-500" : "bg-red-400"}`}
-                  style={{ width: isPaid ? "100%" : "0%" }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Yearly overview */}
+      {/* Summary */}
       <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
-        <div className="text-sm font-extrabold text-ink mb-3">FY 2025–26 Summary</div>
+        <div className="text-sm font-extrabold text-ink mb-3">All-time Summary</div>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Total Rent Collected (YTD)", value: formatCurrency(totalRent * 8) },
-            { label: "Maintenance Expenses (YTD)", value: formatCurrency(maintPaid * 8) },
-            { label: "Vacancy Loss", value: formatCurrency(22000 * 3) },
-            { label: "Net Profit (YTD)", value: formatCurrency((totalRent - maintPaid) * 8), highlight: true },
+            { label: "Total Flats", value: String(stats.totalFlats) },
+            { label: "Occupied Flats", value: String(stats.occupiedFlats) },
+            { label: "Total Collected (All Time)", value: formatCurrency(ytdCollected), highlight: true },
+            { label: "Total Transactions", value: String(payments.length) },
           ].map((d) => (
             <div key={d.label} className="bg-warm-50 rounded-xl p-3">
               <div className="text-[10px] text-ink-muted">{d.label}</div>

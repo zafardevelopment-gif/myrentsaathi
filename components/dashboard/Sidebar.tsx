@@ -12,6 +12,17 @@ interface NavItem {
 }
 
 const NAV_ITEMS: Record<MockRole, NavItem[]> = {
+  superadmin: [
+    { icon: "📊", label: "Overview",      href: "/superadmin" },
+    { icon: "🏢", label: "Societies",     href: "/superadmin/societies" },
+    { icon: "💰", label: "Revenue",       href: "/superadmin/revenue" },
+    { icon: "👥", label: "Users",         href: "/superadmin/users" },
+    { icon: "📋", label: "Subscriptions", href: "/superadmin/subscriptions" },
+    { icon: "🤝", label: "Agents",        href: "/superadmin/agents" },
+    { icon: "🏷️", label: "Promos",       href: "/superadmin/promos" },
+    { icon: "💬", label: "Support",       href: "/superadmin/support" },
+    { icon: "⚙️", label: "Settings",     href: "/superadmin/settings" },
+  ],
   admin: [
     { icon: "📊", label: "Overview",   href: "/admin" },
     { icon: "🏢", label: "Flats",      href: "/admin/flats" },
@@ -33,6 +44,7 @@ const NAV_ITEMS: Record<MockRole, NavItem[]> = {
     { icon: "🏢", label: "Society Dues", href: "/landlord/society-dues" },
     { icon: "📄", label: "Agreements",   href: "/landlord/agreements" },
     { icon: "🚫", label: "Complaints",   href: "/landlord/complaints" },
+    { icon: "🗳️", label: "Polls",       href: "/landlord/polls" },
     { icon: "📊", label: "Reports",      href: "/landlord/reports" },
     { icon: "⚙️", label: "Settings",    href: "/landlord/settings" },
   ],
@@ -41,6 +53,7 @@ const NAV_ITEMS: Record<MockRole, NavItem[]> = {
     { icon: "💰", label: "Payments",   href: "/tenant/payments" },
     { icon: "🚫", label: "Complaints", href: "/tenant/complaints" },
     { icon: "📢", label: "Notices",    href: "/tenant/notices" },
+    { icon: "🗳️", label: "Polls",     href: "/tenant/polls" },
     { icon: "📁", label: "Documents",  href: "/tenant/documents" },
     { icon: "👤", label: "Profile",    href: "/tenant/profile" },
   ],
@@ -48,6 +61,7 @@ const NAV_ITEMS: Record<MockRole, NavItem[]> = {
     { icon: "🚫", label: "My Tickets", href: "/board" },
     { icon: "📋", label: "Approvals",  href: "/board/approvals" },
     { icon: "📢", label: "Notices",    href: "/board/notices" },
+    { icon: "🗳️", label: "Polls",     href: "/board/polls" },
   ],
 };
 
@@ -74,9 +88,10 @@ export default function Sidebar({
   const router = useRouter();
   const items = NAV_ITEMS[role] || [];
 
+  const rootHref = role === "superadmin" ? "/superadmin" : `/${role}`;
   const isActive = (item: NavItem) =>
     pathname === item.href ||
-    (item.href !== `/${role}` && pathname.startsWith(item.href));
+    (item.href !== rootHref && pathname.startsWith(item.href));
 
   const handleLogout = () => {
     logout();

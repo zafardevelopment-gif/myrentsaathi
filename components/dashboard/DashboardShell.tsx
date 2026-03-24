@@ -23,7 +23,8 @@ export default function DashboardShell({
     if (!user) {
       router.push("/");
     } else if (user.role !== role) {
-      router.push(`/${user.role}`);
+      const dest = user.role === "superadmin" ? "/superadmin" : `/${user.role}`;
+      router.push(dest);
     }
   }, [hydrated, user, role, router]);
 

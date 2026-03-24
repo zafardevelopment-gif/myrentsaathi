@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 
-export type MockRole = "admin" | "board" | "landlord" | "tenant";
+export type MockRole = "admin" | "board" | "landlord" | "tenant" | "superadmin";
 
 interface MockUser {
   role: MockRole;
@@ -25,10 +25,11 @@ export const DEMO_CREDENTIALS: {
   role: MockRole;
   name: string;
 }[] = [
-  { email: "admin@greenvalley.com",  password: "Admin@123",    role: "admin",    name: "Society Admin"   },
-  { email: "suresh@greenvalley.com", password: "Board@123",    role: "board",    name: "Suresh Kumar"    },
-  { email: "vikram@gmail.com",       password: "Landlord@123", role: "landlord", name: "Vikram Malhotra" },
-  { email: "rajesh@gmail.com",       password: "Tenant@123",   role: "tenant",   name: "Rajesh Sharma"   },
+  { email: "admin@greenvalley.com",        password: "Admin@123",    role: "admin",      name: "Society Admin"    },
+  { email: "suresh@greenvalley.com",       password: "Board@123",    role: "board",      name: "Suresh Kumar"     },
+  { email: "vikram@gmail.com",             password: "Landlord@123", role: "landlord",   name: "Vikram Malhotra"  },
+  { email: "rajesh@gmail.com",             password: "Tenant@123",   role: "tenant",     name: "Rajesh Sharma"    },
+  { email: "superadmin@myrentsaathi.com",  password: "Super@123",    role: "superadmin", name: "Platform Owner"   },
 ];
 
 const AuthContext = createContext<AuthContextType>({
@@ -48,7 +49,7 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem("mrs_user");
       if (stored) {
         const parsed = JSON.parse(stored) as MockUser;
-        if (["admin", "board", "landlord", "tenant"].includes(parsed.role)) {
+        if (["admin", "board", "landlord", "tenant", "superadmin"].includes(parsed.role)) {
           setUser(parsed);
         }
       }
@@ -68,7 +69,7 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
     if (!match) {
       return { success: false, error: "Invalid email or password." };
     }
-    const newUser: MockUser = { role: match.role, name: match.name, email: match.email };
+    const newUser: MockUser = { role: match.role as MockRole, name: match.name, email: match.email };
     setUser(newUser);
     localStorage.setItem("mrs_user", JSON.stringify(newUser));
     return { success: true };

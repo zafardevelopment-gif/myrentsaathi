@@ -1,29 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
-import StatusBadge from "@/components/dashboard/StatusBadge";
 import { formatCurrency } from "@/lib/utils";
-import {
-  MOCK_FLATS,
-  MOCK_USERS,
-  MOCK_RENT_PAYMENTS,
-  MOCK_SOCIETIES,
-  MOCK_MAINT_PAYMENTS,
-} from "@/lib/mockData";
+import { useAuth } from "@/components/providers/MockAuthProvider";
+import { getLandlordOverviewStats, getLandlordRentPayments, type LandlordRentPayment } from "@/lib/landlord-data";
 
 export default function LandlordOverview() {
-  const myFlats = MOCK_FLATS.filter((f) => f.ownerId === "U2");
-  const landlord = MOCK_USERS.find((u) => u.id === "U2")!;
-  const occupiedFlats = myFlats.filter((f) => f.status === "occupied");
-  const totalRentExpected = occupiedFlats.reduce((a, f) => a + f.rent, 0);
-  const rentPaid = MOCK_RENT_PAYMENTS.filter((r) => r.status === "paid").reduce((a, r) => a + r.amount, 0);
-  const rentOverdue = MOCK_RENT_PAYMENTS.filter((r) => r.status === "overdue").reduce((a, r) => a + r.expected, 0);
+  const { user } = useAuth();
+  const [stats, setStats] = useState<{
+    totalFlats: number; occupiedFlats: number;
+    expectedRent: number; collectedRent: number; overdueRent: number;
+  } | null>(null);
+  const [payments, setPayments] = useState<LandlordRentPayment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const alerts = [
-    { text: "Priya Mehta rent ₹35,000 OVERDUE — Flat A-502", color: "border-l-red-500", action: "Send Reminder", accentBtn: "bg-red-500" },
-    { text: "Sunshine Towers Flat 1502 is VACANT — list it", color: "border-l-yellow-500", action: "List Property", accentBtn: "bg-brand-500" },
-    { text: "Society maintenance due for B-301 (vacant flat)", color: "border-l-yellow-500", action: "Pay Now", accentBtn: "bg-brand-500" },
-  ];
+  useEffect(() => {
+    if (!user?.email) return;
+    async function load() {
+      const [s, p] = await Promise.all([
+        getLandlordOverviewStats(user!.email),
+        getLandlordRentPayments(user!.email),
+      ]);
+      setStats(s);
+      setPayments(p);
+      setLoading(false);
+    }
+    load().catch(() => setLoading(false));
+  }, [user]);
+
+  const initials = user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2) ?? "?";
+  const collectionPct = stats && stats.expectedRent > 0
+    ? Math.round((stats.collectedRent / stats.expectedRent) * 100)
+    : 0;
+  const currentMonthLabel = new Date().toLocaleString("en-IN", { month: "long", year: "numeric" });
+
+  const overduePayments = payments.filter((p) => p.status === "overdue");
+  const vacantFlatsCount = stats ? stats.totalFlats - stats.occupiedFlats : 0;
 
   return (
     <div>
@@ -32,53 +45,77 @@ export default function LandlordOverview() {
         <div className="flex justify-between items-start gap-3 flex-wrap">
           <div>
             <div className="text-xs opacity-60 mb-1">Welcome back,</div>
-            <div className="text-xl font-extrabold">{landlord.name}</div>
-            <div className="text-xs opacity-60 mt-0.5">{myFlats.length} Properties · Landlord</div>
+            <div className="text-xl font-extrabold">{user?.name ?? "Landlord"}</div>
+            <div className="text-xs opacity-60 mt-0.5">
+              {loading ? "…" : `${stats?.totalFlats ?? 0} Properties`} · Landlord
+            </div>
           </div>
           <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-xl font-extrabold flex-shrink-0">
-            {landlord.name.split(" ").map((n) => n[0]).join("")}
+            {initials}
           </div>
         </div>
       </div>
 
       {/* Stats */}
       <div className="flex gap-2.5 flex-wrap mb-5">
-        <StatCard icon="🏠" label="Properties" value={String(myFlats.length)} sub={`${occupiedFlats.length} occupied`} />
-        <StatCard icon="💰" label="Expected" value={formatCurrency(totalRentExpected)} sub="This month" />
-        <StatCard icon="✅" label="Collected" value={formatCurrency(rentPaid)} accent="text-green-700" />
-        <StatCard icon="⏰" label="Overdue" value={formatCurrency(rentOverdue)} accent="text-red-600" />
+        <StatCard icon="🏠" label="Properties" value={loading ? "…" : String(stats?.totalFlats ?? 0)} sub={loading ? undefined : `${stats?.occupiedFlats ?? 0} occupied`} />
+        <StatCard icon="💰" label="Expected" value={loading ? "…" : formatCurrency(stats?.expectedRent ?? 0)} sub={currentMonthLabel} />
+        <StatCard icon="✅" label="Collected" value={loading ? "…" : formatCurrency(stats?.collectedRent ?? 0)} accent="text-green-700" />
+        <StatCard icon="⏰" label="Overdue" value={loading ? "…" : formatCurrency(stats?.overdueRent ?? 0)} accent="text-red-600" />
       </div>
 
       {/* Collection bar */}
-      <div className="bg-white rounded-[14px] p-4 border border-border-default mb-5">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-bold text-ink">March Rent Collection</span>
-          <span className="text-sm font-extrabold text-brand-500">
-            {totalRentExpected > 0 ? Math.round((rentPaid / totalRentExpected) * 100) : 0}%
-          </span>
+      {!loading && stats && stats.expectedRent > 0 && (
+        <div className="bg-white rounded-[14px] p-4 border border-border-default mb-5">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-bold text-ink">{currentMonthLabel} Rent Collection</span>
+            <span className="text-sm font-extrabold text-brand-500">{collectionPct}%</span>
+          </div>
+          <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-brand-500 rounded-full transition-all"
+              style={{ width: `${collectionPct}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-2 text-[11px] text-ink-muted">
+            <span>{formatCurrency(stats.collectedRent)} collected</span>
+            <span>{formatCurrency(stats.expectedRent)} total</span>
+          </div>
         </div>
-        <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-brand-500 rounded-full transition-all"
-            style={{ width: `${totalRentExpected > 0 ? Math.round((rentPaid / totalRentExpected) * 100) : 0}%` }}
-          />
-        </div>
-        <div className="flex justify-between mt-2 text-[11px] text-ink-muted">
-          <span>{formatCurrency(rentPaid)} collected</span>
-          <span>{formatCurrency(totalRentExpected)} total</span>
-        </div>
-      </div>
+      )}
 
       {/* Alerts */}
-      <h3 className="text-[15px] font-extrabold text-ink mb-3">⚡ Alerts</h3>
-      {alerts.map((a, i) => (
-        <div key={i} className={`bg-white rounded-[14px] p-4 border border-border-default border-l-4 ${a.color} mb-1.5 flex justify-between items-center gap-3`}>
-          <span className="text-xs text-ink">{a.text}</span>
-          <button className={`px-3 py-1.5 rounded-lg ${a.accentBtn} text-white text-[11px] font-bold cursor-pointer flex-shrink-0`}>
-            {a.action}
-          </button>
+      {!loading && (overduePayments.length > 0 || vacantFlatsCount > 0) && (
+        <>
+          <h3 className="text-[15px] font-extrabold text-ink mb-3">⚡ Alerts</h3>
+          {overduePayments.map((p) => {
+            const tenantName = (p.tenant as { user?: { full_name: string } | null } | null)?.user?.full_name ?? "Tenant";
+            const flatLabel = (p.flat as { flat_number: string; block: string | null } | null);
+            return (
+              <div key={p.id} className="bg-white rounded-[14px] p-4 border border-border-default border-l-4 border-l-red-500 mb-1.5 flex justify-between items-center gap-3">
+                <span className="text-xs text-ink">
+                  {tenantName} rent {formatCurrency(p.expected_amount)} OVERDUE
+                  {flatLabel ? ` — Flat ${flatLabel.flat_number}${flatLabel.block ? ` (${flatLabel.block})` : ""}` : ""}
+                </span>
+                <button className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-[11px] font-bold cursor-pointer flex-shrink-0">Send Reminder</button>
+              </div>
+            );
+          })}
+          {vacantFlatsCount > 0 && (
+            <div className="bg-white rounded-[14px] p-4 border border-border-default border-l-4 border-l-yellow-500 mb-1.5 flex justify-between items-center gap-3">
+              <span className="text-xs text-ink">{vacantFlatsCount} vacant {vacantFlatsCount === 1 ? "property" : "properties"} — list them to find tenants</span>
+              <button className="px-3 py-1.5 rounded-lg bg-brand-500 text-white text-[11px] font-bold cursor-pointer flex-shrink-0">List Property</button>
+            </div>
+          )}
+        </>
+      )}
+
+      {!loading && overduePayments.length === 0 && vacantFlatsCount === 0 && stats && (
+        <div className="bg-green-50 rounded-[14px] p-5 border border-green-100 text-center">
+          <div className="text-2xl mb-1">✨</div>
+          <div className="text-sm font-bold text-green-700">All rents collected. No alerts!</div>
         </div>
-      ))}
+      )}
     </div>
   );
 }

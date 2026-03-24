@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { useAuth, type MockRole } from "@/components/providers/MockAuthProvider";
 
 const ROLE_LABELS: Record<MockRole, { label: string; color: string; bg: string }> = {
-  admin:    { label: "Admin",    color: "text-brand-500",  bg: "bg-brand-100"  },
-  board:    { label: "Board",    color: "text-purple-600", bg: "bg-purple-100" },
-  landlord: { label: "Landlord", color: "text-green-700",  bg: "bg-green-100"  },
-  tenant:   { label: "Tenant",   color: "text-blue-600",   bg: "bg-blue-100"   },
+  superadmin: { label: "Super Admin", color: "text-amber-600",  bg: "bg-amber-100"  },
+  admin:      { label: "Admin",       color: "text-brand-500",  bg: "bg-brand-100"  },
+  board:      { label: "Board",       color: "text-purple-600", bg: "bg-purple-100" },
+  landlord:   { label: "Landlord",    color: "text-green-700",  bg: "bg-green-100"  },
+  tenant:     { label: "Tenant",      color: "text-blue-600",   bg: "bg-blue-100"   },
 };
 
 interface DashHeaderProps {

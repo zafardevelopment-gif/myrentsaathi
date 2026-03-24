@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS mrs_users (
   email         TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,         -- store bcrypt hash in production
   name          TEXT NOT NULL,
-  role          TEXT NOT NULL CHECK (role IN ('admin', 'board', 'landlord', 'tenant')),
+  role          TEXT NOT NULL CHECK (role IN ('admin', 'board', 'landlord', 'tenant', 'superadmin')),
   phone         TEXT,
   society_id    TEXT,
   flat_id       TEXT,
@@ -114,11 +114,12 @@ ORDER BY
 -- DEMO LOGIN CREDENTIALS SUMMARY
 -- ============================================================
 --
---  Role            | Email                      | Password
---  ----------------+----------------------------+-------------
---  Society Admin   | admin@greenvalley.com      | Admin@123
---  Board Member    | suresh@greenvalley.com     | Board@123
---  Landlord        | vikram@gmail.com           | Landlord@123
---  Tenant          | rajesh@gmail.com           | Tenant@123
+--  Role            | Email                           | Password
+--  ----------------+---------------------------------+-------------
+--  Super Admin     | superadmin@myrentsaathi.com     | Super@123
+--  Society Admin   | admin@greenvalley.com           | Admin@123
+--  Board Member    | suresh@greenvalley.com          | Board@123
+--  Landlord        | vikram@gmail.com                | Landlord@123
+--  Tenant          | rajesh@gmail.com                | Tenant@123
 --
 -- ============================================================

@@ -1,16 +1,18 @@
 "use client";
 
-import { MOCK_USERS } from "@/lib/mockData";
-
-const SETTINGS = [
-  { label: "My Profile", desc: "Vikram Malhotra · +91 98765 00001", icon: "👤" },
-  { label: "Bank Account", desc: "Linked for rent collection", icon: "🏦" },
-  { label: "Razorpay", desc: "Payment gateway connected", icon: "💳" },
-  { label: "WhatsApp Notifications", desc: "Alerts & reminders", icon: "📱" },
-  { label: "Subscription", desc: "Pro Plan · ₹999/mo", icon: "🔑" },
-];
+import { useAuth } from "@/components/providers/MockAuthProvider";
 
 export default function LandlordSettings() {
+  const { user } = useAuth();
+
+  const SETTINGS = [
+    { label: "My Profile", desc: `${user?.name ?? "—"} · ${user?.email ?? ""}`, icon: "👤" },
+    { label: "Bank Account", desc: "Linked for rent collection", icon: "🏦" },
+    { label: "Razorpay", desc: "Payment gateway connected", icon: "💳" },
+    { label: "WhatsApp Notifications", desc: "Alerts & reminders", icon: "📱" },
+    { label: "Subscription", desc: "Pro Plan · ₹999/mo", icon: "🔑" },
+  ];
+
   return (
     <div>
       <h2 className="text-[15px] font-extrabold text-ink mb-4">⚙️ Account Settings</h2>
