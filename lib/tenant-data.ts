@@ -188,6 +188,34 @@ export async function createTenantTicket(
   if (error) throw error;
 }
 
+// ─── AGREEMENT ───────────────────────────────────────────────
+
+export type TenantAgreement = {
+  id: string;
+  tier: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  monthly_rent: number;
+  security_deposit: number | null;
+};
+
+export async function getTenantAgreement(email: string): Promise<TenantAgreement | null> {
+  const { data: user } = await supabase.from("users").select("id").eq("email", email).single();
+  if (!user) return null;
+
+  const { data: tenant } = await supabase.from("tenants").select("id").eq("user_id", user.id).maybeSingle();
+  if (!tenant) return null;
+
+  const { data } = await supabase
+    .from("agreements")
+    .select("id, tier, status, start_date, end_date, monthly_rent, security_deposit")
+    .eq("tenant_id", tenant.id)
+    .eq("status", "active")
+    .maybeSingle();
+  return data as TenantAgreement | null;
+}
+
 // ─── NOTICES ─────────────────────────────────────────────────
 
 export async function getTenantNotices(societyId: string): Promise<TenantNotice[]> {

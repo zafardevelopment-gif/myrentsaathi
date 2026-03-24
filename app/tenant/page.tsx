@@ -7,9 +7,11 @@ import {
   getTenantProfile,
   getTenantRentPayments,
   getTenantNotices,
+  getTenantAgreement,
   type TenantProfile,
   type TenantRentPayment,
   type TenantNotice,
+  type TenantAgreement,
 } from "@/lib/tenant-data";
 
 export default function TenantHome() {
@@ -17,6 +19,7 @@ export default function TenantHome() {
   const [profile, setProfile] = useState<TenantProfile | null>(null);
   const [payments, setPayments] = useState<TenantRentPayment[]>([]);
   const [notices, setNotices] = useState<TenantNotice[]>([]);
+  const [agreement, setAgreement] = useState<TenantAgreement | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,12 +28,14 @@ export default function TenantHome() {
       const p = await getTenantProfile(user!.email);
       setProfile(p);
       if (p) {
-        const [pay, not] = await Promise.all([
+        const [pay, not, ag] = await Promise.all([
           getTenantRentPayments(user!.email).catch(() => []),
           p.society_id ? getTenantNotices(p.society_id).catch(() => []) : Promise.resolve([]),
+          getTenantAgreement(user!.email).catch(() => null),
         ]);
         setPayments(pay);
         setNotices(not);
+        setAgreement(ag);
       }
       setLoading(false);
     }
@@ -142,6 +147,29 @@ export default function TenantHome() {
             />
           </div>
           <div className="text-[11px] text-ink-muted mt-2">Keep it up! You have a great payment record.</div>
+        </div>
+      )}
+
+      {/* Agreement */}
+      {agreement && (
+        <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-bold text-ink">📄 Rental Agreement</span>
+            <span className="inline-block px-2 py-[3px] rounded-2xl text-[10px] font-bold bg-green-100 text-green-700 capitalize">{agreement.status}</span>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            {[
+              { label: "Type", value: agreement.tier?.replace("_", " ") ?? "Standard" },
+              { label: "Valid Till", value: new Date(agreement.end_date).toLocaleDateString("en-IN") },
+              { label: "Rent", value: formatCurrency(agreement.monthly_rent) },
+              { label: "Deposit", value: formatCurrency(agreement.security_deposit ?? 0) },
+            ].map(d => (
+              <div key={d.label} className="flex-1 min-w-[80px] bg-warm-50 rounded-xl p-2">
+                <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
+                <div className="text-xs font-extrabold text-ink mt-0.5 capitalize">{d.value}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
