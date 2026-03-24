@@ -179,8 +179,8 @@ export async function createTenantTicket(
   if (!user) throw new Error("User not found");
 
   const { error } = await supabase.from("tickets").insert({
-    society_id: societyId,
-    flat_id: flatId,
+    ...(societyId ? { society_id: societyId } : {}),
+    ...(flatId ? { flat_id: flatId } : {}),
     raised_by: user.id,
     ...ticket,
     status: "open",

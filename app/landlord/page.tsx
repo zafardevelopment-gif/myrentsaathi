@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
-import { getLandlordOverviewStats, getLandlordRentPayments, type LandlordRentPayment } from "@/lib/landlord-data";
+import { getLandlordOverviewStats, getLandlordRentPayments, getLandlordTickets, type LandlordRentPayment, type LandlordTicket } from "@/lib/landlord-data";
 
 export default function LandlordOverview() {
   const { user } = useAuth();
@@ -13,17 +13,20 @@ export default function LandlordOverview() {
     expectedRent: number; collectedRent: number; overdueRent: number;
   } | null>(null);
   const [payments, setPayments] = useState<LandlordRentPayment[]>([]);
+  const [tickets, setTickets] = useState<LandlordTicket[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.email) return;
     async function load() {
-      const [s, p] = await Promise.all([
+      const [s, p, t] = await Promise.all([
         getLandlordOverviewStats(user!.email),
         getLandlordRentPayments(user!.email),
+        getLandlordTickets(user!.email).catch(() => [] as LandlordTicket[]),
       ]);
       setStats(s);
       setPayments(p);
+      setTickets(t);
       setLoading(false);
     }
     load().catch(() => setLoading(false));
@@ -36,6 +39,7 @@ export default function LandlordOverview() {
   const currentMonthLabel = new Date().toLocaleString("en-IN", { month: "long", year: "numeric" });
 
   const overduePayments = payments.filter((p) => p.status === "overdue");
+  const openTickets = tickets.filter(t => t.status === "open" || t.status === "in_progress");
   const vacantFlatsCount = stats ? stats.totalFlats - stats.occupiedFlats : 0;
 
   return (
@@ -110,11 +114,34 @@ export default function LandlordOverview() {
         </>
       )}
 
-      {!loading && overduePayments.length === 0 && vacantFlatsCount === 0 && stats && (
+      {!loading && overduePayments.length === 0 && vacantFlatsCount === 0 && openTickets.length === 0 && stats && (
         <div className="bg-green-50 rounded-[14px] p-5 border border-green-100 text-center">
           <div className="text-2xl mb-1">✨</div>
           <div className="text-sm font-bold text-green-700">All rents collected. No alerts!</div>
         </div>
+      )}
+
+      {/* Open Complaints */}
+      {!loading && openTickets.length > 0 && (
+        <>
+          <h3 className="text-[15px] font-extrabold text-ink mb-3 mt-2">🚫 Open Complaints ({openTickets.length})</h3>
+          {openTickets.slice(0, 3).map(tk => {
+            const flat = tk.flat as { flat_number: string; block: string | null } | null;
+            const flatLabel = flat ? `Flat ${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : "—";
+            return (
+              <div key={tk.id} className="bg-white rounded-[14px] p-4 border border-border-default border-l-4 border-l-orange-400 mb-1.5 flex justify-between items-center gap-3">
+                <div>
+                  <div className="text-xs font-bold text-ink">{tk.subject}</div>
+                  <div className="text-[11px] text-ink-muted mt-0.5">{flatLabel} · {tk.priority.toUpperCase()} · {tk.status.replace("_", " ")}</div>
+                </div>
+                <a href="/landlord/complaints" className="px-3 py-1.5 rounded-lg bg-orange-50 border border-orange-200 text-orange-700 text-[11px] font-bold flex-shrink-0">View</a>
+              </div>
+            );
+          })}
+          {openTickets.length > 3 && (
+            <a href="/landlord/complaints" className="block text-center text-xs text-brand-500 font-semibold mt-2">View all {openTickets.length} complaints →</a>
+          )}
+        </>
       )}
     </div>
   );

@@ -156,19 +156,30 @@ export async function deleteLandlordFlat(flatId: string): Promise<{ success: boo
 
 // ─── RENT PAYMENTS ───────────────────────────────────────────
 
+async function getTenantIdsForLandlord(userId: string): Promise<string[]> {
+  // Get all flat IDs owned by this landlord
+  const { data: flats } = await supabase
+    .from("flats").select("id").eq("owner_id", userId);
+  if (!flats || flats.length === 0) return [];
+  const flatIds = flats.map(f => f.id);
+  // Get tenant record IDs for those flats
+  const { data: tenants } = await supabase
+    .from("tenants").select("id").in("flat_id", flatIds).eq("status", "active");
+  return (tenants ?? []).map(t => t.id);
+}
+
 export async function getLandlordRentPayments(email: string): Promise<LandlordRentPayment[]> {
   const userId = await getLandlordUserId(email);
   if (!userId) return [];
 
+  const tenantIds = await getTenantIdsForLandlord(userId);
+  if (tenantIds.length === 0) return [];
+
   const currentMonth = new Date().toISOString().slice(0, 7);
   const { data, error } = await supabase
     .from("rent_payments")
-    .select(`
-      id, amount, expected_amount, month_year, status,
-      payment_date, payment_method, created_at,
-      flat:flats(flat_number, block)
-    `)
-    .eq("landlord_id", userId)
+    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, flat:flats(flat_number, block)`)
+    .in("tenant_id", tenantIds)
     .eq("month_year", currentMonth)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -179,14 +190,13 @@ export async function getAllLandlordRentPayments(email: string): Promise<Landlor
   const userId = await getLandlordUserId(email);
   if (!userId) return [];
 
+  const tenantIds = await getTenantIdsForLandlord(userId);
+  if (tenantIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("rent_payments")
-    .select(`
-      id, amount, expected_amount, month_year, status,
-      payment_date, payment_method, created_at,
-      flat:flats(flat_number, block)
-    `)
-    .eq("landlord_id", userId)
+    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, flat:flats(flat_number, block)`)
+    .in("tenant_id", tenantIds)
     .order("month_year", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as LandlordRentPayment[];
@@ -300,17 +310,13 @@ export async function getLandlordOverviewStats(email: string) {
 
   const currentMonth = new Date().toISOString().slice(0, 7);
 
-  const [flatsRes, rentRes] = await Promise.all([
-    supabase.from("flats").select("id, status, monthly_rent").eq("owner_id", userId),
-    supabase
-      .from("rent_payments")
-      .select("amount, expected_amount, status")
-      .eq("landlord_id", userId)
-      .eq("month_year", currentMonth),
-  ]);
-
+  const flatsRes = await supabase.from("flats").select("id, status, monthly_rent").eq("owner_id", userId);
   const flats = flatsRes.data ?? [];
-  const rents = rentRes.data ?? [];
+
+  const tenantIds = await getTenantIdsForLandlord(userId);
+  const rents = tenantIds.length > 0
+    ? (await supabase.from("rent_payments").select("amount, expected_amount, status").in("tenant_id", tenantIds).eq("month_year", currentMonth)).data ?? []
+    : [];
 
   const totalFlats = flats.length;
   const occupiedFlats = flats.filter((f) => f.status === "occupied").length;

@@ -43,6 +43,7 @@ export default function LandlordTenants() {
   // KYC modal
   const [kycFlat, setKycFlat] = useState<LandlordFlat | null>(null);
   const [tenantDetail, setTenantDetail] = useState<TenantDetail | null>(null);
+  const [tenantDocs, setTenantDocs] = useState<{ id: string; title: string; doc_type: string; file_url: string | null; file_size: number | null; created_at: string }[]>([]);
   const [loadingKyc, setLoadingKyc] = useState(false);
 
   // Agreement modal
@@ -70,14 +71,24 @@ export default function LandlordTenants() {
   async function openKyc(flat: LandlordFlat) {
     setKycFlat(flat);
     setTenantDetail(null);
+    setTenantDocs([]);
     setLoadingKyc(true);
-    const { data } = await supabase
+    const { data: tenantRec } = await supabase
       .from("tenants")
       .select("id, user_id, flat_id, landlord_id, lease_start, lease_end, monthly_rent, security_deposit, status, aadhaar_encrypted, pan_number, emergency_contact, emergency_name")
       .eq("flat_id", flat.id)
       .eq("status", "active")
       .maybeSingle();
-    setTenantDetail(data as TenantDetail | null);
+    setTenantDetail(tenantRec as TenantDetail | null);
+    // Fetch tenant's uploaded documents
+    if (tenantRec?.user_id) {
+      const { data: docs } = await supabase
+        .from("documents")
+        .select("id, title, doc_type, file_url, file_size, created_at")
+        .eq("uploaded_by", tenantRec.user_id)
+        .order("created_at", { ascending: false });
+      setTenantDocs(docs ?? []);
+    }
     setLoadingKyc(false);
   }
 
@@ -230,7 +241,7 @@ export default function LandlordTenants() {
       {/* KYC Modal */}
       {kycFlat && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setKycFlat(null)}>
-          <div className="bg-white rounded-[18px] w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-[18px] w-full max-w-md p-5 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <div className="text-base font-extrabold text-ink">🪪 Tenant KYC</div>
               <button onClick={() => setKycFlat(null)} className="text-ink-muted text-lg cursor-pointer">✕</button>
@@ -261,6 +272,30 @@ export default function LandlordTenants() {
                   <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Emergency Contact</div>
                   <div className="flex justify-between text-sm"><span className="text-ink-muted">Name</span><span className="font-bold text-ink">{tenantDetail.emergency_name ?? "—"}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-ink-muted">Phone</span><span className="font-bold text-ink">{tenantDetail.emergency_contact ?? "—"}</span></div>
+                </div>
+                {/* Uploaded Documents */}
+                <div className="bg-warm-50 rounded-xl p-3">
+                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wide mb-2">Uploaded Documents</div>
+                  {tenantDocs.length === 0 ? (
+                    <div className="text-xs text-ink-muted">No documents uploaded yet.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {tenantDocs.map(d => (
+                        <div key={d.id} className="flex justify-between items-center">
+                          <div>
+                            <div className="text-xs font-semibold text-ink">{d.title}</div>
+                            <div className="text-[10px] text-ink-muted">{d.doc_type?.toUpperCase()} · {new Date(d.created_at).toLocaleDateString("en-IN")}</div>
+                          </div>
+                          {d.file_url ? (
+                            <a href={d.file_url} target="_blank" rel="noopener noreferrer"
+                              className="px-2.5 py-1 rounded-lg border border-border-default text-[10px] font-semibold text-brand-500 cursor-pointer">View</a>
+                          ) : (
+                            <span className="text-[10px] text-ink-muted">No file</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
