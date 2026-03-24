@@ -39,6 +39,12 @@ export type AdminFlat = {
   society_id: string;
   owner_id: string | null;
   current_tenant_id: string | null;
+  owner_name: string | null;
+  owner_phone: string | null;
+  owner_email: string | null;
+  tenant_name: string | null;
+  tenant_phone: string | null;
+  tenant_email: string | null;
   owner?: { full_name: string; phone: string; email: string } | null;
   tenant?: { user?: { full_name: string; phone: string; email: string } | null } | null;
 };
@@ -155,6 +161,7 @@ export async function getSocietyFlats(societyId: string): Promise<AdminFlat[]> {
     .select(`
       id, flat_number, block, flat_type, floor_number, area_sqft, status,
       monthly_rent, maintenance_amount, security_deposit, society_id, owner_id, current_tenant_id,
+      owner_name, owner_phone, owner_email, tenant_name, tenant_phone, tenant_email,
       owner:users!flats_owner_id_fkey(full_name, phone, email)
     `)
     .eq("society_id", societyId)
@@ -470,7 +477,7 @@ export type AuditLog = {
   action: string;
   entity_type: string | null;
   entity_id: string | null;
-  performed_by: string | null;
+  user_id: string | null;
   created_at: string;
   user?: { full_name: string } | null;
 };
@@ -479,7 +486,7 @@ export async function getSocietyAuditLogs(societyId: string, limit = 20): Promis
   try {
     const { data, error } = await supabase
       .from("audit_logs")
-      .select("id, action, entity_type, entity_id, performed_by, created_at, user:users(full_name)")
+      .select("id, action, entity_type, entity_id, user_id, created_at, user:users(full_name)")
       .eq("society_id", societyId)
       .order("created_at", { ascending: false })
       .limit(limit);
@@ -548,6 +555,12 @@ export async function createFlat(societyId: string, flatData: {
   floor_number?: number | null;
   flat_type?: string | null;
   area_sqft?: number | null;
+  owner_name?: string | null;
+  owner_phone?: string | null;
+  owner_email?: string | null;
+  tenant_name?: string | null;
+  tenant_phone?: string | null;
+  tenant_email?: string | null;
 }) {
   const { data, error } = await supabase.from("flats").insert({
     society_id: societyId,
@@ -556,6 +569,12 @@ export async function createFlat(societyId: string, flatData: {
     floor_number: flatData.floor_number ?? null,
     flat_type: flatData.flat_type ?? null,
     area_sqft: flatData.area_sqft ?? null,
+    owner_name: flatData.owner_name ?? null,
+    owner_phone: flatData.owner_phone ?? null,
+    owner_email: flatData.owner_email ?? null,
+    tenant_name: flatData.tenant_name ?? null,
+    tenant_phone: flatData.tenant_phone ?? null,
+    tenant_email: flatData.tenant_email ?? null,
     status: "vacant",
   }).select().single();
   if (error) throw error;
@@ -570,6 +589,12 @@ export async function updateFlat(flatId: string, flatData: Partial<{
   area_sqft: number | null;
   monthly_rent: number | null;
   security_deposit: number | null;
+  owner_name: string | null;
+  owner_phone: string | null;
+  owner_email: string | null;
+  tenant_name: string | null;
+  tenant_phone: string | null;
+  tenant_email: string | null;
 }>) {
   const { data, error } = await supabase.from("flats").update(flatData).eq("id", flatId).select().single();
   if (error) throw error;
