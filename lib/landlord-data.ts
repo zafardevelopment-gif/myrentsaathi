@@ -93,18 +93,14 @@ export async function getLandlordFlats(email: string): Promise<LandlordFlat[]> {
     .select("id, full_name, phone, email")
     .in("id", tenantUserIds);
 
-  if (tenantUsers && tenantUsers.length > 0) {
-    const userById: Record<string, unknown> = {};
-    tenantUsers.forEach(u => { userById[u.id] = u; });
-    return flats.map(f => ({
-      ...f,
-      tenant: f.current_tenant_id
-        ? { id: f.current_tenant_id, user: userById[f.current_tenant_id] ?? null }
-        : null,
-    }));
-  }
-
-  return flats;
+  const userById: Record<string, { id: string; full_name: string; phone: string; email: string }> = {};
+  (tenantUsers ?? []).forEach(u => { userById[u.id] = u; });
+  return flats.map(f => ({
+    ...f,
+    tenant: f.current_tenant_id
+      ? { id: f.current_tenant_id, user: userById[f.current_tenant_id] ?? null }
+      : null,
+  }));
 }
 
 export async function addLandlordFlat(params: {
