@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth, DEMO_CREDENTIALS } from "@/components/providers/MockAuthProvider";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/MockAuthProvider";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -10,12 +11,13 @@ interface LoginModalProps {
 
 export default function LoginModal({ onClose, onLogin }: LoginModalProps) {
   const { login } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!email.trim() || !password) {
@@ -23,19 +25,22 @@ export default function LoginModal({ onClose, onLogin }: LoginModalProps) {
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      const result = login(email, password);
-      setLoading(false);
-      if (!result.success) {
-        setError(result.error || "Invalid email or password.");
-        return;
+    const result = await login(email, password);
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error || "Invalid email or password.");
+      return;
+    }
+    // Re-read from localStorage to get role for redirect
+    try {
+      const stored = localStorage.getItem("mrs_user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        onLogin(parsed.role);
       }
-      // Find role to redirect
-      const match = DEMO_CREDENTIALS.find(
-        (c) => c.email.toLowerCase() === email.trim().toLowerCase()
-      );
-      if (match) onLogin(match.role);
-    }, 300);
+    } catch {
+      onClose();
+    }
   };
 
   return (
@@ -96,23 +101,14 @@ export default function LoginModal({ onClose, onLogin }: LoginModalProps) {
           </button>
         </form>
 
-        {/* Demo credentials */}
-        <div className="mt-5 p-3.5 rounded-xl bg-warm-50 border border-border-light">
-          <div className="text-[11px] font-bold text-ink-soft mb-2 uppercase tracking-wide">Demo Credentials</div>
-          <div className="space-y-1">
-            {DEMO_CREDENTIALS.map((c) => (
-              <button
-                key={c.email}
-                type="button"
-                onClick={() => { setEmail(c.email); setPassword(c.password); setError(""); }}
-                className="w-full flex justify-between items-center text-[11px] hover:bg-white rounded-lg px-2 py-1 transition-colors cursor-pointer group"
-              >
-                <span className="font-semibold text-ink group-hover:text-brand-500 transition-colors">{c.name}</span>
-                <span className="text-ink-muted font-mono">{c.email}</span>
-              </button>
-            ))}
-          </div>
-          <div className="text-[10px] text-ink-muted mt-2">↑ Click a row to auto-fill credentials</div>
+        <div className="mt-5 text-center">
+          <span className="text-xs text-ink-muted">Don't have an account? </span>
+          <button
+            onClick={() => { onClose(); router.push("/signup"); }}
+            className="text-xs font-bold text-brand-500 cursor-pointer hover:underline"
+          >
+            Sign up
+          </button>
         </div>
       </div>
     </div>

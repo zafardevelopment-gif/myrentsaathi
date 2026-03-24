@@ -116,7 +116,7 @@ export async function getAdminSocietyId(email: string): Promise<string | null> {
     .from("society_members")
     .select("society_id")
     .eq("user_id", user.id)
-    .in("role", ["admin", "board"])
+    .in("role", ["admin", "board", "board_member"])
     .single();
   return membership?.society_id ?? null;
 }

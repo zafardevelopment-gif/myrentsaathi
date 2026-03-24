@@ -2,13 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/MockAuthProvider";
-import {
-  getAdminSocietyId,
-  getSocietyMembers,
-  getSocietyAuditLogs,
-  type SocietyMember,
-  type AuditLog,
-} from "@/lib/admin-data";
+import { getAdminSocietyId, getSocietyMembers, getSocietyAuditLogs, type SocietyMember, type AuditLog } from "@/lib/admin-data";
+import { addBoardMember } from "@/lib/auth-db";
+import toast, { Toaster } from "react-hot-toast";
 
 const ROLE_BADGE: Record<string, string> = {
   admin:    "bg-red-100 text-red-700",
@@ -22,11 +18,18 @@ export default function AdminGovernance() {
   const [members, setMembers] = useState<SocietyMember[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [societyId, setSocietyId] = useState<string | null>(null);
+
+  // Add board member form
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ full_name: "", email: "", phone: "", designation: "" });
 
   useEffect(() => {
     if (!user?.email) return;
     async function load() {
       const sid = await getAdminSocietyId(user!.email);
+      setSocietyId(sid);
       if (sid) {
         const [m, l] = await Promise.all([
           getSocietyMembers(sid),
@@ -40,7 +43,31 @@ export default function AdminGovernance() {
     load().catch(() => setLoading(false));
   }, [user]);
 
-  const boardMembers = members.filter((m) => m.role === "board" || m.role === "admin");
+  async function handleAddMember(e: React.FormEvent) {
+    e.preventDefault();
+    if (!societyId) return;
+    setSaving(true);
+    const result = await addBoardMember({
+      full_name: form.full_name,
+      email: form.email,
+      phone: form.phone,
+      designation: form.designation,
+      society_id: societyId,
+    });
+    setSaving(false);
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to add member.");
+      return;
+    }
+    toast.success(`Board member added! Auto password: ${form.full_name.split(" ")[0]}@123`);
+    setForm({ full_name: "", email: "", phone: "", designation: "" });
+    setShowForm(false);
+    // Refresh members
+    const m = await getSocietyMembers(societyId);
+    setMembers(m);
+  }
+
+  const boardMembers = members.filter((m) => m.role === "board" || m.role === "board_member" || m.role === "admin");
 
   if (loading) {
     return (
@@ -50,17 +77,64 @@ export default function AdminGovernance() {
     );
   }
 
+  const inputClass = "w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500";
+
   return (
     <div>
+      <Toaster position="top-center" />
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-[15px] font-extrabold text-ink">⚖️ Governance & Board</h2>
-        <button className="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer">+ Add Member</button>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer"
+        >
+          {showForm ? "Cancel" : "+ Add Member"}
+        </button>
       </div>
+
+      {/* Add Board Member Form */}
+      {showForm && (
+        <form onSubmit={handleAddMember} className="bg-white rounded-[14px] p-4 border border-brand-200 mb-4 space-y-3">
+          <div className="text-sm font-bold text-ink mb-1">Add Board Member</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] font-semibold text-ink-muted block mb-1">Full Name *</label>
+              <input required className={inputClass} placeholder="Suresh Kumar"
+                value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-ink-muted block mb-1">Phone *</label>
+              <input required className={inputClass} placeholder="+91 98765 11111"
+                value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-ink-muted block mb-1">Email *</label>
+            <input required type="email" className={inputClass} placeholder="suresh@society.com"
+              value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-ink-muted block mb-1">Designation</label>
+            <input className={inputClass} placeholder="Secretary / Treasurer / Chairman"
+              value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))} />
+          </div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2 text-[11px] text-yellow-700">
+            Auto password will be: <strong>{form.full_name ? form.full_name.split(" ")[0] + "@123" : "FirstName@123"}</strong> — share with member
+          </div>
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60"
+          >
+            {saving ? "Adding..." : "Add Board Member"}
+          </button>
+        </form>
+      )}
 
       {/* Board / Admin Members */}
       <h3 className="text-[13px] font-bold text-ink mb-2.5">Board Members</h3>
       {boardMembers.length === 0 ? (
-        <div className="text-center py-8 text-ink-muted text-sm mb-4">No board members found in DB.</div>
+        <div className="text-center py-8 text-ink-muted text-sm mb-4">No board members found.</div>
       ) : (
         boardMembers.map((bm) => {
           const u = bm.user as { full_name: string; email: string; phone: string } | null;

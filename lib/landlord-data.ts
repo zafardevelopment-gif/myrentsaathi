@@ -72,13 +72,90 @@ export async function getLandlordFlats(email: string): Promise<LandlordFlat[]> {
     .select(`
       id, flat_number, block, flat_type, floor_number, area_sqft, status,
       monthly_rent, security_deposit, society_id, current_tenant_id,
-      society:societies(name, city),
-      tenant:tenants!flats_current_tenant_id_fkey(id, user:users(full_name, phone, email))
+      society:societies(name, city)
     `)
     .eq("owner_id", userId)
     .order("flat_number");
   if (error) throw error;
-  return (data ?? []) as unknown as LandlordFlat[];
+
+  const flats = (data ?? []) as unknown as LandlordFlat[];
+  // Enrich occupied flats with tenant info
+  const occupiedFlatIds = flats.filter(f => f.current_tenant_id).map(f => f.id);
+  if (occupiedFlatIds.length === 0) return flats;
+
+  // current_tenant_id is user_id — fetch user info directly
+  const tenantUserIds = flats
+    .filter(f => f.current_tenant_id)
+    .map(f => f.current_tenant_id as string);
+
+  const { data: tenantUsers } = await supabase
+    .from("users")
+    .select("id, full_name, phone, email")
+    .in("id", tenantUserIds);
+
+  if (tenantUsers && tenantUsers.length > 0) {
+    const userById: Record<string, unknown> = {};
+    tenantUsers.forEach(u => { userById[u.id] = u; });
+    return flats.map(f => ({
+      ...f,
+      tenant: f.current_tenant_id
+        ? { id: f.current_tenant_id, user: userById[f.current_tenant_id] ?? null }
+        : null,
+    }));
+  }
+
+  return flats;
+}
+
+export async function addLandlordFlat(params: {
+  owner_id: string;
+  society_id?: string;
+  flat_number: string;
+  block?: string;
+  flat_type?: string;
+  floor_number?: number;
+  area_sqft?: number;
+  monthly_rent?: number;
+  security_deposit?: number;
+}): Promise<{ success: boolean; error?: string; flatId?: string }> {
+  const { data, error } = await supabase
+    .from("flats")
+    .insert({
+      owner_id: params.owner_id,
+      society_id: params.society_id ?? null,
+      flat_number: params.flat_number.trim(),
+      block: params.block?.trim() || null,
+      flat_type: params.flat_type?.trim() || null,
+      floor_number: params.floor_number ?? null,
+      area_sqft: params.area_sqft ?? null,
+      monthly_rent: params.monthly_rent ?? null,
+      security_deposit: params.security_deposit ?? null,
+      status: "vacant",
+    })
+    .select("id")
+    .single();
+  if (error || !data) return { success: false, error: error?.message ?? "Failed to create flat." };
+  return { success: true, flatId: data.id };
+}
+
+export async function updateLandlordFlat(flatId: string, params: {
+  flat_number?: string;
+  block?: string | null;
+  flat_type?: string | null;
+  floor_number?: number | null;
+  area_sqft?: number | null;
+  monthly_rent?: number | null;
+  security_deposit?: number | null;
+}): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase.from("flats").update(params).eq("id", flatId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function deleteLandlordFlat(flatId: string): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase.from("flats").delete().eq("id", flatId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
 }
 
 // ─── RENT PAYMENTS ───────────────────────────────────────────
@@ -93,8 +170,7 @@ export async function getLandlordRentPayments(email: string): Promise<LandlordRe
     .select(`
       id, amount, expected_amount, month_year, status,
       payment_date, payment_method, created_at,
-      flat:flats(flat_number, block),
-      tenant:tenants(user:users(full_name))
+      flat:flats(flat_number, block)
     `)
     .eq("landlord_id", userId)
     .eq("month_year", currentMonth)
@@ -112,8 +188,7 @@ export async function getAllLandlordRentPayments(email: string): Promise<Landlor
     .select(`
       id, amount, expected_amount, month_year, status,
       payment_date, payment_method, created_at,
-      flat:flats(flat_number, block),
-      tenant:tenants(user:users(full_name))
+      flat:flats(flat_number, block)
     `)
     .eq("landlord_id", userId)
     .order("month_year", { ascending: false });
@@ -132,8 +207,7 @@ export async function getLandlordAgreements(email: string): Promise<LandlordAgre
     .select(`
       id, tier, status, monthly_rent, security_deposit, start_date, end_date, created_at,
       flat:flats(flat_number, block),
-      society:societies(name, city),
-      tenant:tenants(user:users(full_name))
+      society:societies(name, city)
     `)
     .eq("landlord_id", userId)
     .order("created_at", { ascending: false });
@@ -207,6 +281,19 @@ export async function getLandlordTickets(email: string): Promise<LandlordTicket[
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as LandlordTicket[];
+}
+
+// ─── SOCIETIES (for flat creation) ───────────────────────────
+
+export type SocietyOption = { id: string; name: string; city: string };
+
+export async function getAllSocieties(): Promise<SocietyOption[]> {
+  const { data } = await supabase
+    .from("societies")
+    .select("id, name, city")
+    .eq("is_active", true)
+    .order("name");
+  return (data ?? []) as SocietyOption[];
 }
 
 // ─── OVERVIEW STATS ───────────────────────────────────────────

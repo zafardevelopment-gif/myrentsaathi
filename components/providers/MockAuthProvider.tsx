@@ -2,8 +2,18 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
+import { dbLogin } from "@/lib/auth-db";
 
 export type MockRole = "admin" | "board" | "landlord" | "tenant" | "superadmin";
+
+// Map DB role values to app role keys
+const ROLE_MAP: Record<string, MockRole> = {
+  society_admin: "admin",
+  board_member:  "board",
+  landlord:      "landlord",
+  tenant:        "tenant",
+  superadmin:    "superadmin",
+};
 
 interface MockUser {
   role: MockRole;
@@ -14,28 +24,14 @@ interface MockUser {
 interface AuthContextType {
   user: MockUser | null;
   hydrated: boolean;
-  login: (email: string, password: string) => { success: boolean; error?: string };
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
-
-// Demo credentials — matches the SQL script
-export const DEMO_CREDENTIALS: {
-  email: string;
-  password: string;
-  role: MockRole;
-  name: string;
-}[] = [
-  { email: "admin@greenvalley.com",        password: "Admin@123",    role: "admin",      name: "Society Admin"    },
-  { email: "suresh@greenvalley.com",       password: "Board@123",    role: "board",      name: "Suresh Kumar"     },
-  { email: "vikram@gmail.com",             password: "Landlord@123", role: "landlord",   name: "Vikram Malhotra"  },
-  { email: "rajesh@gmail.com",             password: "Tenant@123",   role: "tenant",     name: "Rajesh Sharma"    },
-  { email: "superadmin@myrentsaathi.com",  password: "Super@123",    role: "superadmin", name: "Platform Owner"   },
-];
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   hydrated: false,
-  login: () => ({ success: false }),
+  login: async () => ({ success: false }),
   logout: () => {},
 });
 
@@ -43,13 +39,13 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<MockUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  // Read localStorage once on mount — sets hydrated=true when done
   useEffect(() => {
     try {
       const stored = localStorage.getItem("mrs_user");
       if (stored) {
         const parsed = JSON.parse(stored) as MockUser;
-        if (["admin", "board", "landlord", "tenant", "superadmin"].includes(parsed.role)) {
+        const validRoles: MockRole[] = ["admin", "board", "landlord", "tenant", "superadmin"];
+        if (validRoles.includes(parsed.role)) {
           setUser(parsed);
         }
       }
@@ -60,16 +56,22 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = (email: string, password: string) => {
-    const match = DEMO_CREDENTIALS.find(
-      (c) =>
-        c.email.toLowerCase() === email.trim().toLowerCase() &&
-        c.password === password
-    );
-    if (!match) {
-      return { success: false, error: "Invalid email or password." };
+  const login = async (email: string, password: string) => {
+    const result = await dbLogin(email, password);
+    if (!result.success || !result.user) {
+      return { success: false, error: result.error ?? "Invalid credentials." };
     }
-    const newUser: MockUser = { role: match.role as MockRole, name: match.name, email: match.email };
+
+    const mappedRole = ROLE_MAP[result.user.role];
+    if (!mappedRole) {
+      return { success: false, error: "Unsupported role." };
+    }
+
+    const newUser: MockUser = {
+      role: mappedRole,
+      name: result.user.full_name,
+      email: result.user.email,
+    };
     setUser(newUser);
     localStorage.setItem("mrs_user", JSON.stringify(newUser));
     return { success: true };

@@ -26,8 +26,8 @@ export default function TenantHome() {
       setProfile(p);
       if (p) {
         const [pay, not] = await Promise.all([
-          getTenantRentPayments(user!.email),
-          getTenantNotices(p.society_id),
+          getTenantRentPayments(user!.email).catch(() => []),
+          p.society_id ? getTenantNotices(p.society_id).catch(() => []) : Promise.resolve([]),
         ]);
         setPayments(pay);
         setNotices(not);

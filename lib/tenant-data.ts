@@ -9,9 +9,8 @@ import { supabase } from "./supabase";
 
 export type TenantProfile = {
   id: string;
-  society_id: string;
+  society_id: string | null;
   flat_id: string | null;
-  move_in_date: string | null;
   user: { id: string; full_name: string; email: string; phone: string } | null;
   flat?: {
     flat_number: string;
@@ -68,19 +67,57 @@ export async function getTenantProfile(email: string): Promise<TenantProfile | n
 
   const { data, error } = await supabase
     .from("tenants")
-    .select(`
-      id, society_id, flat_id, move_in_date,
-      user:users(id, full_name, email, phone),
-      flat:flats(
-        flat_number, block, flat_type, monthly_rent, owner_id,
-        owner:users!flats_owner_id_fkey(full_name, phone)
-      ),
-      society:societies(name, city)
-    `)
+    .select("id, society_id, flat_id, user_id")
     .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) { console.error("getTenantProfile error:", error); return null; }
+  if (!data) { console.warn("getTenantProfile: no tenant for user", user.id); return null; }
+
+  // Fetch flat separately
+  let flat = null;
+  if (data.flat_id) {
+    const { data: flatData } = await supabase
+      .from("flats")
+      .select("flat_number, block, flat_type, monthly_rent, owner_id")
+      .eq("id", data.flat_id)
+      .single();
+    flat = flatData;
+    // Fetch owner
+    if (flat?.owner_id) {
+      const { data: owner } = await supabase
+        .from("users")
+        .select("full_name, phone")
+        .eq("id", flat.owner_id)
+        .single();
+      if (owner) flat = { ...flat, owner };
+    }
+  }
+
+  // Fetch society
+  let society = null;
+  if (data.society_id) {
+    const { data: socData } = await supabase
+      .from("societies")
+      .select("name, city")
+      .eq("id", data.society_id)
+      .single();
+    society = socData;
+  }
+
+  const { data: userInfo } = await supabase
+    .from("users")
+    .select("id, full_name, email, phone")
+    .eq("id", user.id)
     .single();
-  if (error) return null;
-  return data as unknown as TenantProfile;
+
+  return {
+    id: data.id,
+    society_id: data.society_id,
+    flat_id: data.flat_id,
+    user: userInfo ?? { id: user.id, full_name: email, email, phone: "" },
+    flat,
+    society,
+  } as unknown as TenantProfile;
 }
 
 // ─── RENT PAYMENTS ───────────────────────────────────────────

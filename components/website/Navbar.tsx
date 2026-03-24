@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 
+import Link from "next/link";
+
 interface NavbarProps {
   onLoginClick: () => void;
 }
@@ -51,6 +53,12 @@ export default function Navbar({ onLoginClick }: NavbarProps) {
               {link.label}
             </a>
           ))}
+          <Link
+            href="/signup"
+            className="px-5 py-3 rounded-[14px] border border-brand-500 text-brand-500 text-sm font-bold hover:bg-brand-50 transition-colors"
+          >
+            Sign Up
+          </Link>
           <button
             onClick={onLoginClick}
             className="hover-lift px-7 py-3 rounded-[14px] bg-gradient-to-br from-brand-500 to-brand-600 text-white text-sm font-bold shadow-[0_4px_20px_rgba(194,102,10,0.3)] cursor-pointer"
