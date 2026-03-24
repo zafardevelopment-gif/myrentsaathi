@@ -99,6 +99,17 @@ export type AdminNotice = {
   created_by?: { full_name: string } | null;
 };
 
+export type AdminDocument = {
+  id: string;
+  society_id: string;
+  category: string;
+  file_name: string;
+  file_url: string;
+  file_size: number | null;
+  uploaded_by: string;
+  created_at: string;
+};
+
 // ─── RESOLVE SOCIETY ID ───────────────────────────────────────
 
 /** Get society_id for an admin by their email */
@@ -144,13 +155,26 @@ export async function getSocietyFlats(societyId: string): Promise<AdminFlat[]> {
     .select(`
       id, flat_number, block, flat_type, floor_number, area_sqft, status,
       monthly_rent, maintenance_amount, security_deposit, society_id, owner_id, current_tenant_id,
-      owner:users!flats_owner_id_fkey(full_name, phone, email),
-      tenant:tenants!flats_current_tenant_id_fkey(user:users(full_name, phone, email))
+      owner:users!flats_owner_id_fkey(full_name, phone, email)
     `)
     .eq("society_id", societyId)
     .order("flat_number");
   if (error) throw error;
-  return (data ?? []) as unknown as AdminFlat[];
+
+  // Fetch tenant details separately if needed
+  const flats = data ?? [];
+  if (flats.length > 0 && flats[0].current_tenant_id) {
+    const tenantIds = flats.filter(f => f.current_tenant_id).map(f => f.current_tenant_id);
+    const { data: tenants } = await supabase
+      .from("tenants")
+      .select("id, user_id, user:users(full_name, phone, email)")
+      .in("id", tenantIds);
+
+    const tenantMap = Object.fromEntries((tenants ?? []).map(t => [t.id, t]));
+    return flats.map(f => ({ ...f, tenant: tenantMap[f.current_tenant_id] })) as unknown as AdminFlat[];
+  }
+
+  return flats as unknown as AdminFlat[];
 }
 
 // ─── MAINTENANCE PAYMENTS ─────────────────────────────────────
@@ -199,22 +223,6 @@ export async function getSocietyExpenses(societyId: string): Promise<AdminExpens
   return (data ?? []) as AdminExpense[];
 }
 
-export async function approveExpense(id: string, approverId: string) {
-  const { error } = await supabase
-    .from("society_expenses")
-    .update({ approval_status: "approved", approved_by: approverId, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
-}
-
-export async function rejectExpense(id: string) {
-  const { error } = await supabase
-    .from("society_expenses")
-    .update({ approval_status: "rejected", updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
-}
-
 // ─── TICKETS ─────────────────────────────────────────────────
 
 export async function getSocietyTickets(societyId: string): Promise<AdminTicket[]> {
@@ -237,14 +245,6 @@ export async function assignTicket(id: string, assignedTo: string) {
   const { error } = await supabase
     .from("tickets")
     .update({ assigned_to: assignedTo, status: "assigned", updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw error;
-}
-
-export async function resolveTicket(id: string) {
-  const { error } = await supabase
-    .from("tickets")
-    .update({ status: "resolved", resolved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
 }
@@ -292,13 +292,21 @@ export type SocietyMember = {
 };
 
 export async function getSocietyMembers(societyId: string): Promise<SocietyMember[]> {
-  const { data, error } = await supabase
-    .from("society_members")
-    .select("id, user_id, society_id, role, designation, joined_at, user:users(full_name, email, phone)")
-    .eq("society_id", societyId)
-    .order("role");
-  if (error) throw error;
-  return (data ?? []) as unknown as SocietyMember[];
+  try {
+    const { data, error } = await supabase
+      .from("society_members")
+      .select("id, user_id, society_id, role, designation, joined_at, user:users(full_name, email, phone)")
+      .eq("society_id", societyId)
+      .order("role");
+    if (error) {
+      console.error("getSocietyMembers error:", error);
+      throw error;
+    }
+    return (data ?? []) as unknown as SocietyMember[];
+  } catch (err) {
+    console.error("Failed to load society members:", err);
+    return [];
+  }
 }
 
 export async function addSocietyMember(societyId: string, userId: string, role: string, designation?: string) {
@@ -468,14 +476,20 @@ export type AuditLog = {
 };
 
 export async function getSocietyAuditLogs(societyId: string, limit = 20): Promise<AuditLog[]> {
-  const { data, error } = await supabase
-    .from("audit_logs")
-    .select("id, action, entity_type, entity_id, performed_by, created_at, user:users(full_name)")
-    .eq("society_id", societyId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []) as unknown as AuditLog[];
+  try {
+    const { data, error } = await supabase
+      .from("audit_logs")
+      .select("id, action, entity_type, entity_id, performed_by, created_at, user:users(full_name)")
+      .eq("society_id", societyId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []) as unknown as AuditLog[];
+  } catch (err) {
+    // If audit_logs table doesn't exist or query fails, return empty array
+    console.error("Error loading audit logs:", err);
+    return [];
+  }
 }
 
 // ─── UPDATE SOCIETY ───────────────────────────────────────────
@@ -524,4 +538,311 @@ export async function getAdminOverviewStats(societyId: string) {
   const urgentTickets = tickets.filter((t) => t.priority === "urgent" && t.status !== "resolved").length;
 
   return { totalFlats, occupiedFlats, collected, expected, totalExpenses, balance: collected - totalExpenses, openTickets, urgentTickets };
+}
+
+// ─── FLATS MANAGEMENT ─────────────────────────────────────────
+
+export async function createFlat(societyId: string, flatData: {
+  flat_number: string;
+  block?: string | null;
+  floor_number?: number | null;
+  flat_type?: string | null;
+  area_sqft?: number | null;
+}) {
+  const { data, error } = await supabase.from("flats").insert({
+    society_id: societyId,
+    flat_number: flatData.flat_number,
+    block: flatData.block ?? null,
+    floor_number: flatData.floor_number ?? null,
+    flat_type: flatData.flat_type ?? null,
+    area_sqft: flatData.area_sqft ?? null,
+    status: "vacant",
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateFlat(flatId: string, flatData: Partial<{
+  flat_number: string;
+  block: string | null;
+  floor_number: number | null;
+  flat_type: string | null;
+  area_sqft: number | null;
+  monthly_rent: number | null;
+  security_deposit: number | null;
+}>) {
+  const { data, error } = await supabase.from("flats").update(flatData).eq("id", flatId).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteFlat(flatId: string) {
+  const { error } = await supabase.from("flats").delete().eq("id", flatId);
+  if (error) throw error;
+}
+
+export async function getVacantFlats(societyId: string) {
+  const { data, error } = await supabase
+    .from("flats")
+    .select("*")
+    .eq("society_id", societyId)
+    .eq("status", "vacant")
+    .order("flat_number");
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ─── EXPENSES MANAGEMENT ──────────────────────────────────────
+
+export async function createExpense(societyId: string, expenseData: {
+  category: string;
+  description?: string;
+  vendor_name?: string;
+  amount: number;
+  expense_date: string;
+}) {
+  const { data, error } = await supabase.from("society_expenses").insert({
+    society_id: societyId,
+    category: expenseData.category,
+    description: expenseData.description ?? null,
+    vendor_name: expenseData.vendor_name ?? null,
+    amount: expenseData.amount,
+    expense_date: expenseData.expense_date,
+    approval_status: "pending",
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateExpense(expenseId: string, expenseData: Partial<{
+  category: string;
+  description: string;
+  vendor_name: string;
+  amount: number;
+  expense_date: string;
+  approval_status: string;
+}>) {
+  const { data, error } = await supabase.from("society_expenses").update(expenseData).eq("id", expenseId).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteExpense(expenseId: string) {
+  const { error } = await supabase.from("society_expenses").delete().eq("id", expenseId);
+  if (error) throw error;
+}
+
+export async function approveExpense(expenseId: string) {
+  return updateExpense(expenseId, { approval_status: "approved" });
+}
+
+export async function rejectExpense(expenseId: string) {
+  return updateExpense(expenseId, { approval_status: "rejected" });
+}
+
+// ─── PARKING MANAGEMENT ───────────────────────────────────────
+
+export async function createParkingSlot(societyId: string, slotData: {
+  slot_number: string;
+  slot_type?: string;
+  level?: number | null;
+}) {
+  const { data, error } = await supabase.from("parking_slots").insert({
+    society_id: societyId,
+    slot_number: slotData.slot_number,
+    slot_type: slotData.slot_type ?? "regular",
+    level: slotData.level ?? null,
+    status: "available",
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateParkingSlot(slotId: string, slotData: Partial<{
+  slot_number: string;
+  slot_type: string;
+  level: number | null;
+  status: string;
+  flat_id: string | null;
+  vehicle_number: string | null;
+  vehicle_model: string | null;
+}>) {
+  const { data, error } = await supabase.from("parking_slots").update(slotData).eq("id", slotId).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteParkingSlot(slotId: string) {
+  const { error } = await supabase.from("parking_slots").delete().eq("id", slotId);
+  if (error) throw error;
+}
+
+export async function allocateParkingSlot(slotId: string, flatId: string, vehicleNumber: string, vehicleModel: string) {
+  return updateParkingSlot(slotId, {
+    status: "occupied",
+    flat_id: flatId,
+    vehicle_number: vehicleNumber,
+    vehicle_model: vehicleModel,
+  });
+}
+
+export async function deallocateParkingSlot(slotId: string) {
+  return updateParkingSlot(slotId, {
+    status: "available",
+    flat_id: null,
+    vehicle_number: null,
+    vehicle_model: null,
+  });
+}
+
+export async function getAvailableParkingSlots(societyId: string) {
+  const { data, error } = await supabase
+    .from("parking_slots")
+    .select("*")
+    .eq("society_id", societyId)
+    .eq("status", "available")
+    .order("level, slot_number");
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ─── DOCUMENTS MANAGEMENT ─────────────────────────────────────
+
+export async function uploadDocument(societyId: string, userId: string, docData: {
+  file_name: string;
+  file_url: string;
+  file_size: number;
+  category?: string;
+}) {
+  const { data, error } = await supabase.from("documents").insert({
+    society_id: societyId,
+    file_name: docData.file_name,
+    file_url: docData.file_url,
+    file_size: docData.file_size,
+    category: docData.category ?? "other",
+    uploaded_by: userId,
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getDocumentsByCategory(societyId: string, category: string) {
+  const { data, error } = await supabase
+    .from("documents")
+    .select("*")
+    .eq("society_id", societyId)
+    .eq("category", category)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function deleteDocument(docId: string) {
+  const { error } = await supabase.from("documents").delete().eq("id", docId);
+  if (error) throw error;
+}
+
+export async function grantDocumentAccess(docId: string, userId: string, accessType: "view" | "download" = "view") {
+  const { data, error } = await supabase.from("document_access").insert({
+    document_id: docId,
+    user_id: userId,
+    access_type: accessType,
+  }).select().single();
+  if (error && error.code !== "23505") throw error; // Ignore unique constraint error
+  return data;
+}
+
+export async function revokeDocumentAccess(docId: string, userId: string) {
+  const { error } = await supabase.from("document_access").delete().eq("document_id", docId).eq("user_id", userId);
+  if (error) throw error;
+}
+
+// ─── TICKETS MANAGEMENT ───────────────────────────────────────
+
+export async function createTicket(societyId: string, ticketData: {
+  flat_id?: string;
+  category: string;
+  subject: string;
+  description: string;
+  priority?: string;
+  raised_by: string;
+}) {
+  const { data, error } = await supabase.from("tickets").insert({
+    society_id: societyId,
+    flat_id: ticketData.flat_id ?? null,
+    category: ticketData.category,
+    subject: ticketData.subject,
+    description: ticketData.description,
+    priority: ticketData.priority ?? "normal",
+    raised_by: ticketData.raised_by,
+    status: "open",
+  }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateTicket(ticketId: string, ticketData: Partial<{
+  status: string;
+  priority: string;
+  assigned_to: string;
+  resolution_notes: string;
+}>) {
+  const { data, error } = await supabase.from("tickets").update(ticketData).eq("id", ticketId).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function resolveTicket(ticketId: string, notes: string) {
+  return updateTicket(ticketId, {
+    status: "resolved",
+    resolution_notes: notes,
+  });
+}
+
+// ─── GOVERNANCE MANAGEMENT ────────────────────────────────────
+
+export async function removeSocietyMember(memberId: string) {
+  const { error } = await supabase.from("society_members").delete().eq("id", memberId);
+  if (error) throw error;
+}
+
+export async function updateMemberRole(memberId: string, newRole: string) {
+  const { data, error } = await supabase.from("society_members").update({ role: newRole }).eq("id", memberId).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateMemberDesignation(memberId: string, newDesignation: string) {
+  const { data, error } = await supabase.from("society_members").update({ designation: newDesignation }).eq("id", memberId).select().single();
+  if (error) throw error;
+  return data;
+}
+
+// ─── INTEGRATIONS ─────────────────────────────────────────────
+
+export async function saveSocietyIntegration(societyId: string, provider: string, configJson: Record<string, unknown>) {
+  const { data, error } = await supabase.from("society_integrations").upsert({
+    society_id: societyId,
+    provider,
+    config_json: configJson,
+    is_active: true,
+  }, { onConflict: "society_id,provider" }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getSocietyIntegration(societyId: string, provider: string) {
+  const { data, error } = await supabase
+    .from("society_integrations")
+    .select("*")
+    .eq("society_id", societyId)
+    .eq("provider", provider)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function removeSocietyIntegration(societyId: string, provider: string) {
+  const { error } = await supabase.from("society_integrations").delete().eq("society_id", societyId).eq("provider", provider);
+  if (error) throw error;
 }

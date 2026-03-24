@@ -100,8 +100,8 @@ export default function AdminPolls() {
   const { user } = useAuth();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [societyId, setSocietyId] = useState<string | null>(null);
-  const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -120,15 +120,25 @@ export default function AdminPolls() {
   useEffect(() => {
     if (!user?.email) return;
     async function init() {
-      const { supabase } = await import("@/lib/supabase");
-      const sid = await getAdminSocietyId(user!.email);
-      setSocietyId(sid);
-      const { data: u } = await supabase.from("users").select("id").eq("email", user!.email).single();
-      setAdminUserId(u?.id ?? null);
-      if (sid) await loadPolls(sid);
-      setLoading(false);
+      try {
+        const sid = await getAdminSocietyId(user!.email);
+        setSocietyId(sid);
+        if (sid) {
+          try {
+            await loadPolls(sid);
+          } catch (pollErr) {
+            console.error("Failed to load polls:", pollErr);
+            setError((pollErr as Error).message || "Failed to load polls");
+          }
+        }
+      } catch (err) {
+        console.error("Init error:", err);
+        setError((err as Error).message || "Failed to initialize");
+      } finally {
+        setLoading(false);
+      }
     }
-    init().catch(() => setLoading(false));
+    init();
   }, [user]);
 
   function addOption() {
@@ -152,17 +162,32 @@ export default function AdminPolls() {
     if (!form.title.trim()) { toast.error("Title required"); return; }
     const validOpts = form.options.filter((o) => o.trim());
     if (validOpts.length < 2) { toast.error("At least 2 options needed"); return; }
-    if (!societyId || !adminUserId) return;
+    if (!societyId || !user?.email) return;
 
     setSaving(true);
     try {
-      await createPoll(societyId, adminUserId, { ...form, options: validOpts });
+      // Fetch user ID from DB using email
+      const { supabase } = await import("@/lib/supabase");
+      const { data: userData } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", user.email)
+        .single();
+
+      if (!userData?.id) {
+        toast.error("User not found in database");
+        setSaving(false);
+        return;
+      }
+
+      await createPoll(societyId, userData.id, { ...form, options: validOpts });
       toast.success("Poll launched!");
       setShowForm(false);
       setForm({ title: "", description: "", target_audience: "all", ends_at: "", options: ["", ""] });
       await loadPolls(societyId);
-    } catch {
-      toast.error("Failed — check RLS policies");
+    } catch (err) {
+      console.error("Poll creation error:", err);
+      toast.error((err as Error).message ?? "Failed — check RLS policies");
     } finally {
       setSaving(false);
     }
@@ -185,6 +210,14 @@ export default function AdminPolls() {
     return (
       <div className="space-y-3">
         {[...Array(2)].map((_, i) => <div key={i} className="h-40 bg-warm-100 rounded-[14px] animate-pulse" />)}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-[14px] p-6 text-center">
+        <div className="text-red-600 font-bold">⚠️ {error}</div>
       </div>
     );
   }

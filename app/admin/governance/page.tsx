@@ -18,6 +18,7 @@ export default function AdminGovernance() {
   const [members, setMembers] = useState<SocietyMember[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [societyId, setSocietyId] = useState<string | null>(null);
 
   // Add board member form
@@ -28,19 +29,31 @@ export default function AdminGovernance() {
   useEffect(() => {
     if (!user?.email) return;
     async function load() {
-      const sid = await getAdminSocietyId(user!.email);
-      setSocietyId(sid);
-      if (sid) {
-        const [m, l] = await Promise.all([
-          getSocietyMembers(sid),
-          getSocietyAuditLogs(sid, 15),
-        ]);
-        setMembers(m);
-        setLogs(l);
+      try {
+        const sid = await getAdminSocietyId(user!.email);
+        setSocietyId(sid);
+        if (sid) {
+          try {
+            const [m, l] = await Promise.all([
+              getSocietyMembers(sid),
+              getSocietyAuditLogs(sid, 15),
+            ]);
+            console.log("Members loaded:", m);
+            setMembers(m);
+            setLogs(l);
+          } catch (err) {
+            console.error("Failed to load members:", err);
+            setError((err as Error).message || "Failed to load governance data");
+          }
+        }
+      } catch (err) {
+        console.error("Init error:", err);
+        setError((err as Error).message || "Failed to initialize");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
-    load().catch(() => setLoading(false));
+    load();
   }, [user]);
 
   async function handleAddMember(e: React.FormEvent) {
@@ -73,6 +86,14 @@ export default function AdminGovernance() {
     return (
       <div className="space-y-2">
         {[...Array(4)].map((_, i) => <div key={i} className="h-16 bg-warm-100 rounded-[14px] animate-pulse" />)}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-[14px] p-6 text-center">
+        <div className="text-red-600 font-bold">⚠️ {error}</div>
       </div>
     );
   }

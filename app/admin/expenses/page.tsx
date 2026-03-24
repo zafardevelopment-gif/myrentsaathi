@@ -50,7 +50,7 @@ export default function AdminExpenses() {
   async function handleApprove(id: string) {
     setSaving(id);
     try {
-      await approveExpense(id, user?.email ?? "");
+      await approveExpense(id);
       setExpenses((prev) => prev.map((e) => e.id === id ? { ...e, approval_status: "approved" } : e));
       toast.success("Expense approved");
     } catch {

@@ -11,7 +11,7 @@ type Notice = {
   title: string;
   content: string;
   notice_type: string;
-  audience: string;
+  target_audience: string;
   created_at: string;
   source: "landlord" | "society";
 };
@@ -25,7 +25,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 const AUDIENCE_OPTIONS = [
   { value: "tenants", label: "Tenants Only" },
-  { value: "all", label: "Everyone (Tenants + Board)" },
+  { value: "all", label: "Everyone" },
   { value: "landlords", label: "Landlords Only" },
 ];
 
@@ -37,35 +37,34 @@ export default function LandlordNotices() {
   const [saving, setSaving] = useState(false);
   const [landlordId, setLandlordId] = useState<string | null>(null);
   const [societyId, setSocietyId] = useState<string | null>(null);
-  const [form, setForm] = useState({ title: "", content: "", notice_type: "general", audience: "tenants" });
+  const [debugInfo, setDebugInfo] = useState<string>("");
+  const [form, setForm] = useState({ title: "", content: "", notice_type: "general", target_audience: "tenants" });
 
   async function loadData() {
     if (!user?.email) return;
     const lid = await getLandlordUserId(user.email);
     setLandlordId(lid);
 
-    // Get society_id from first flat
     const flats = await getLandlordFlats(user.email).catch(() => []);
     const sid = flats.find(f => f.society_id)?.society_id ?? null;
     setSocietyId(sid);
 
-    // Fetch landlord-created notices (created_by = landlord user id)
-    const { data: myNotices } = await supabase
+    const { data: myNotices, error: myErr } = await supabase
       .from("notices")
-      .select("id, title, content, notice_type, audience, created_at")
+      .select("id, title, content, notice_type, target_audience, created_at")
       .eq("created_by", lid)
-      .order("created_at", { ascending: false });
+      .order("id", { ascending: false });
+    setDebugInfo(`lid=${lid} | myNotices=${myNotices?.length ?? 0} | err=${myErr?.message ?? "none"}`);
 
-    // Fetch society notices visible to landlords (audience = all or landlords)
     let societyNotices: Notice[] = [];
     if (sid) {
       const { data: sn } = await supabase
         .from("notices")
-        .select("id, title, content, notice_type, audience, created_at")
+        .select("id, title, content, notice_type, target_audience, created_at")
         .eq("society_id", sid)
-        .in("audience", ["all", "landlords"])
+        .in("target_audience", ["all", "landlords"])
         .neq("created_by", lid ?? "")
-        .order("created_at", { ascending: false });
+        .order("id", { ascending: false });
       societyNotices = (sn ?? []).map(n => ({ ...n, source: "society" as const }));
     }
 
@@ -73,9 +72,7 @@ export default function LandlordNotices() {
     setNotices([...myMapped, ...societyNotices].sort((a, b) => b.created_at.localeCompare(a.created_at)));
   }
 
-  useEffect(() => {
-    loadData().finally(() => setLoading(false));
-  }, [user]);
+  useEffect(() => { loadData().finally(() => setLoading(false)); }, [user]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -87,12 +84,12 @@ export default function LandlordNotices() {
       title: form.title,
       content: form.content,
       notice_type: form.notice_type,
-      audience: form.audience,
+      target_audience: form.target_audience,
     });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Notice sent!");
-    setForm({ title: "", content: "", notice_type: "general", audience: "tenants" });
+    setForm({ title: "", content: "", notice_type: "general", target_audience: "tenants" });
     setShowForm(false);
     await loadData();
   }
@@ -123,7 +120,7 @@ export default function LandlordNotices() {
 
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white rounded-[14px] p-4 border border-brand-200 mb-5 space-y-3">
-          <div className="text-sm font-bold text-ink">Send Notice to Tenants</div>
+          <div className="text-sm font-bold text-ink">Send Notice</div>
           <div>
             <label className={labelClass}>Title *</label>
             <input required className={inputClass} placeholder="e.g. Water supply interrupted" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
@@ -144,7 +141,7 @@ export default function LandlordNotices() {
             </div>
             <div>
               <label className={labelClass}>Send To</label>
-              <select className={inputClass} value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))}>
+              <select className={inputClass} value={form.target_audience} onChange={e => setForm(f => ({ ...f, target_audience: e.target.value }))}>
                 {AUDIENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
@@ -153,6 +150,10 @@ export default function LandlordNotices() {
             {saving ? "Sending..." : "Send Notice"}
           </button>
         </form>
+      )}
+
+      {debugInfo && (
+        <div className="text-[10px] text-ink-muted mb-3 bg-warm-50 rounded-lg px-3 py-1.5 break-all">{debugInfo}</div>
       )}
 
       {notices.length === 0 ? (
@@ -166,7 +167,7 @@ export default function LandlordNotices() {
                   {n.notice_type}
                 </span>
                 <span className="inline-block px-2.5 py-[3px] rounded-2xl text-[10px] font-bold bg-warm-100 text-ink-muted">
-                  → {n.audience}
+                  → {n.target_audience}
                 </span>
                 {n.source === "society" && (
                   <span className="inline-block px-2.5 py-[3px] rounded-2xl text-[10px] font-bold bg-blue-50 text-blue-600">Society</span>

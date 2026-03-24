@@ -51,19 +51,31 @@ export default function AdminNotices() {
       toast.error("Title and content required");
       return;
     }
-    if (!societyId || !user) return;
+    if (!societyId || !user?.email) return;
     setSaving(true);
     try {
-      // We need the DB user id; for now pass email as placeholder
-      // In production, store user.id in auth context
-      await createNotice(societyId, user.email, form);
+      // Fetch user ID from DB using email
+      const { supabase } = await import("@/lib/supabase");
+      const { data: userData } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", user.email)
+        .single();
+
+      if (!userData?.id) {
+        toast.error("User not found in database");
+        return;
+      }
+
+      await createNotice(societyId, userData.id, form);
       toast.success("Notice published!");
       setShowForm(false);
       setForm({ title: "", content: "", notice_type: "general", audience: "all" });
       const n = await getSocietyNotices(societyId);
       setNotices(n);
-    } catch {
-      toast.error("Failed — check RLS policies");
+    } catch (err) {
+      console.error("Notice creation error:", err);
+      toast.error((err as Error).message ?? "Failed — check RLS policies");
     } finally {
       setSaving(false);
     }

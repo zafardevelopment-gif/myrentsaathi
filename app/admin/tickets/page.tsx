@@ -39,7 +39,7 @@ export default function AdminTickets() {
   async function handleResolve(id: string) {
     setSaving(id);
     try {
-      await resolveTicket(id);
+      await resolveTicket(id, "");
       setTickets((prev) => prev.map((t) => t.id === id ? { ...t, status: "resolved" } : t));
       toast.success("Ticket resolved");
     } catch {

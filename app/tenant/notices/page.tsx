@@ -33,29 +33,29 @@ export default function TenantNotices() {
       const profile = await getTenantProfile(user!.email);
       const allNotices: Notice[] = [];
 
-      // Society notices visible to tenants (audience = all or tenants)
+      // Society notices visible to tenants (target_audience = all or tenants)
       if (profile?.society_id) {
         const { data: sn } = await supabase
           .from("notices")
-          .select("id, title, content, notice_type, audience, created_at")
+          .select("id, title, content, notice_type, target_audience, created_at")
           .eq("society_id", profile.society_id)
-          .in("audience", ["all", "tenants"])
-          .order("created_at", { ascending: false });
-        (sn ?? []).forEach(n => allNotices.push({ ...n, source: "society" }));
+          .in("target_audience", ["all", "tenants"])
+          .order("id", { ascending: false });
+        (sn ?? []).forEach(n => allNotices.push({ ...n, audience: n.target_audience, source: "society" }));
       }
 
-      // Landlord direct notices — from flat owner, audience = tenants or all
+      // Landlord direct notices — from flat owner, target_audience = tenants or all
       if (profile?.flat_id) {
         const { data: flat } = await supabase
           .from("flats").select("owner_id").eq("id", profile.flat_id).single();
         if (flat?.owner_id) {
           const { data: ln } = await supabase
             .from("notices")
-            .select("id, title, content, notice_type, audience, created_at")
+            .select("id, title, content, notice_type, target_audience, created_at")
             .eq("created_by", flat.owner_id)
-            .in("audience", ["all", "tenants"])
-            .order("created_at", { ascending: false });
-          (ln ?? []).forEach(n => allNotices.push({ ...n, source: "landlord" }));
+            .in("target_audience", ["all", "tenants"])
+            .order("id", { ascending: false });
+          (ln ?? []).forEach(n => allNotices.push({ ...n, audience: n.target_audience, source: "landlord" }));
         }
       }
 

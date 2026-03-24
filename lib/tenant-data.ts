@@ -221,12 +221,12 @@ export async function getTenantAgreement(email: string): Promise<TenantAgreement
 export async function getTenantNotices(societyId: string): Promise<TenantNotice[]> {
   const { data, error } = await supabase
     .from("notices")
-    .select("id, title, content, notice_type, audience, created_at")
+    .select("id, title, content, notice_type, target_audience, created_at")
     .eq("society_id", societyId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false });
+    .in("target_audience", ["all", "tenants"])
+    .order("id", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as TenantNotice[];
+  return (data ?? []).map(n => ({ ...n, audience: n.target_audience })) as TenantNotice[];
 }
 
 // ─── BOARD DATA ───────────────────────────────────────────────

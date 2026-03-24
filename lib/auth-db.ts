@@ -78,7 +78,7 @@ export async function signupSocietyAdmin(params: {
   if (userErr || !user) return { success: false, error: userErr?.message ?? "Failed to create account." };
 
   // Create society
-  const { data: society, error: socErr } = await supabase
+  const { data: societyInsert, error: socErr } = await supabase
     .from("societies")
     .insert({
       name: params.society_name.trim(),
@@ -89,20 +89,33 @@ export async function signupSocietyAdmin(params: {
       maintenance_amount: params.maintenance_amount,
       subscription_plan: "free",
       is_active: true,
+      pincode: null,
+      registration_number: null,
+      total_floors: 0,
     })
     .select("id")
     .single();
-  if (socErr || !society) return { success: false, error: "Failed to create society." };
+  if (socErr || !societyInsert) {
+    console.error("Society creation error:", socErr);
+    return { success: false, error: socErr?.message ?? "Failed to create society." };
+  }
+
+  const societyId = societyInsert.id;
 
   // Link admin to society
-  await supabase.from("society_members").insert({
+  const { error: memberErr } = await supabase.from("society_members").insert({
     user_id: user.id,
-    society_id: society.id,
+    society_id: societyId,
     role: "admin",
     designation: "Society Admin",
   });
 
-  return { success: true, userId: user.id, societyId: society.id };
+  if (memberErr) {
+    console.error("Member creation error:", memberErr);
+    // Don't fail, society was created successfully
+  }
+
+  return { success: true, userId: user.id, societyId: societyId };
 }
 
 // ─── SIGNUP: LANDLORD ─────────────────────────────────────────
