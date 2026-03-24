@@ -37,14 +37,32 @@ export default function TenantHome() {
       const p = await getTenantProfile(user!.email);
       setProfile(p);
       if (p) {
-        const [pay, not, ag, tk] = await Promise.all([
+        const [pay, societyNotices, ag, tk] = await Promise.all([
           getTenantRentPayments(user!.email).catch(() => []),
           p.society_id ? getTenantNotices(p.society_id).catch(() => []) : Promise.resolve([]),
           getTenantAgreement(user!.email).catch(() => null),
           getTenantTickets(user!.email).catch(() => []),
         ]);
+        // Also fetch landlord direct notices
+        let landlordNotices: TenantNotice[] = [];
+        if (p.flat_id) {
+          const { data: flatData } = await supabase.from("flats").select("owner_id").eq("id", p.flat_id).single();
+          if (flatData?.owner_id) {
+            const { data: ln } = await supabase
+              .from("notices")
+              .select("id, title, content, notice_type, audience, created_at")
+              .eq("created_by", flatData.owner_id)
+              .in("audience", ["all", "tenants"])
+              .order("created_at", { ascending: false });
+            landlordNotices = (ln ?? []) as TenantNotice[];
+          }
+        }
+        // Merge + deduplicate
+        const seen = new Set<string>();
+        const allNotices = [...societyNotices, ...landlordNotices].filter(n => { if (seen.has(n.id)) return false; seen.add(n.id); return true; });
+        allNotices.sort((a, b) => b.created_at.localeCompare(a.created_at));
         setPayments(pay);
-        setNotices(not);
+        setNotices(allNotices);
         setAgreement(ag);
         setTickets(tk);
       }

@@ -44,6 +44,7 @@ const NAV_ITEMS: Record<MockRole, NavItem[]> = {
     { icon: "🏢", label: "Society Dues", href: "/landlord/society-dues" },
     { icon: "📄", label: "Agreements",   href: "/landlord/agreements" },
     { icon: "🚫", label: "Complaints",   href: "/landlord/complaints" },
+    { icon: "📢", label: "Notices",     href: "/landlord/notices" },
     { icon: "🗳️", label: "Polls",       href: "/landlord/polls" },
     { icon: "📊", label: "Reports",      href: "/landlord/reports" },
     { icon: "⚙️", label: "Settings",    href: "/landlord/settings" },
