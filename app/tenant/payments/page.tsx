@@ -7,6 +7,7 @@ import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getTenantRentPayments, getTenantProfile, type TenantRentPayment } from "@/lib/tenant-data";
 import { supabase } from "@/lib/supabase";
 import PayRentModal from "@/components/tenant/PayRentModal";
+import ReceiptModal from "@/components/tenant/ReceiptModal";
 import toast, { Toaster } from "react-hot-toast";
 
 export default function TenantPayments() {
@@ -16,6 +17,8 @@ export default function TenantPayments() {
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [payModal, setPayModal] = useState<{ monthYear: string; amount: number; paymentId?: string } | null>(null);
+  const [receiptPayment, setReceiptPayment] = useState<TenantRentPayment | null>(null);
+  const [tenantProfile, setTenantProfile] = useState<{ user?: { full_name: string } | null; flat?: { flat_number: string; block?: string | null } | null } | null>(null);
 
   async function loadData() {
     if (!user?.email) return;
@@ -25,6 +28,7 @@ export default function TenantPayments() {
     ]);
     setMonthlyRent((profile?.flat as { monthly_rent?: number | null } | null)?.monthly_rent ?? 0);
     setTenantId(profile?.id ?? null);
+    setTenantProfile(profile as typeof tenantProfile);
     setPayments(pays);
   }
 
@@ -108,6 +112,10 @@ export default function TenantPayments() {
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span className="text-sm font-extrabold text-ink">{formatCurrency(isPaid ? p.amount : p.expected_amount)}</span>
                 <StatusBadge status={isPaid ? "paid" : p.status} />
+                {isPaid && (
+                  <button onClick={() => setReceiptPayment(p)}
+                    className="px-2.5 py-1 rounded-lg border border-green-200 text-green-700 text-[10px] font-bold cursor-pointer">Receipt</button>
+                )}
                 {!isPaid && tenantId && (
                   <button onClick={() => setPayModal({ monthYear: p.month_year, amount: p.expected_amount, paymentId: p.id })}
                     className="px-2.5 py-1 rounded-lg bg-brand-500 text-white text-[10px] font-bold cursor-pointer">Pay</button>
@@ -128,6 +136,16 @@ export default function TenantPayments() {
             Pay Early →
           </button>
         </div>
+      )}
+
+      {/* Receipt Modal */}
+      {receiptPayment && tenantProfile && (
+        <ReceiptModal
+          payment={receiptPayment}
+          tenant={{ full_name: (tenantProfile.user as { full_name: string } | null)?.full_name ?? "Tenant" }}
+          flat={{ flat_number: (tenantProfile.flat as { flat_number: string; block?: string | null } | null)?.flat_number ?? "—", block: (tenantProfile.flat as { flat_number: string; block?: string | null } | null)?.block }}
+          onClose={() => setReceiptPayment(null)}
+        />
       )}
 
       {/* Pay Modal */}

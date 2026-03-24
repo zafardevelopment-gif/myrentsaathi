@@ -14,6 +14,7 @@ import {
   type TenantAgreement,
 } from "@/lib/tenant-data";
 import PayRentModal from "@/components/tenant/PayRentModal";
+import ReceiptModal from "@/components/tenant/ReceiptModal";
 import { Toaster } from "react-hot-toast";
 import { getTenantTickets, type TenantTicket } from "@/lib/tenant-data";
 import { supabase } from "@/lib/supabase";
@@ -27,6 +28,7 @@ export default function TenantHome() {
   const [agreement, setAgreement] = useState<TenantAgreement | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPayModal, setShowPayModal] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
   const [tickets, setTickets] = useState<TenantTicket[]>([]);
 
   useEffect(() => {
@@ -139,7 +141,7 @@ export default function TenantHome() {
                 </div>
               </div>
             </div>
-            <button className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-[11px] font-bold cursor-pointer">Get Receipt</button>
+            <button onClick={() => setShowReceipt(true)} className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-[11px] font-bold cursor-pointer">Get Receipt</button>
           </div>
         </div>
       ) : (
@@ -240,6 +242,17 @@ export default function TenantHome() {
             <a href="/tenant/complaints" className="block text-center text-xs text-brand-500 font-semibold mt-1 mb-3">View all complaints →</a>
           )}
         </>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceipt && myPayment && profile && flat && (
+        <ReceiptModal
+          payment={myPayment}
+          tenant={{ full_name: tenantUser?.full_name ?? user?.name ?? "Tenant" }}
+          flat={{ flat_number: flat.flat_number, block: flat.block }}
+          landlord={(flat.owner as { full_name: string } | null)?.full_name}
+          onClose={() => setShowReceipt(false)}
+        />
       )}
 
       {/* Pay Rent Modal */}
