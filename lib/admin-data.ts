@@ -12,13 +12,15 @@ export type AdminSociety = {
   id: string;
   name: string;
   city: string;
+  address: string | null;
   state: string;
   pincode: string | null;
   registration_number: string | null;
   total_flats: number;
   total_floors: number;
   subscription_plan: string;
-  maintenance_amount: number;
+  plan: string | null;
+  maintenance_amount: number | null;
   is_active: boolean;
   created_at: string;
 };

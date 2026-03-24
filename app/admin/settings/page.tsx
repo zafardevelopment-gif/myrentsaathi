@@ -63,7 +63,7 @@ export default function AdminSettings() {
     { label: "Bank Account", desc: "Bank details for maintenance collection", icon: "🏦" },
     { label: "Razorpay Integration", desc: "Payment gateway for online collection", icon: "💳" },
     { label: "WhatsApp API", desc: "Meta Business API for notifications", icon: "📱" },
-    { label: "Subscription Plan", desc: `Current: ${society?.plan?.toUpperCase() ?? "—"}`, icon: "🔑" },
+    { label: "Subscription Plan", desc: `Current: ${(society?.plan ?? society?.subscription_plan)?.toUpperCase() ?? "—"}`, icon: "🔑" },
   ];
 
   return (
