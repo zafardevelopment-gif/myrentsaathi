@@ -481,7 +481,7 @@ export async function getSocietyAuditLogs(societyId: string, limit = 20): Promis
 // ─── UPDATE SOCIETY ───────────────────────────────────────────
 
 export async function updateSocietyDetails(id: string, updates: Partial<{
-  name: string; city: string; state: string; pincode: string;
+  name: string; city: string; address: string; state: string; pincode: string;
   maintenance_amount: number; registration_number: string;
 }>) {
   const { error } = await supabase
