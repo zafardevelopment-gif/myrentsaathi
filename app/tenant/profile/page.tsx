@@ -52,7 +52,7 @@ export default function TenantProfile() {
     { label: "Society", value: society?.name ?? "—" },
     { label: "City", value: society?.city ?? "—" },
     { label: "Monthly Rent", value: flat?.monthly_rent ? formatCurrency(flat.monthly_rent) : "—" },
-    { label: "Move-in Date", value: profile.move_in_date ? new Date(profile.move_in_date).toLocaleDateString("en-IN") : "—" },
+    { label: "Move-in Date", value: "—" },
   ];
 
   return (
