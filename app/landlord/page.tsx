@@ -11,6 +11,47 @@ import {
   type LandlordRentPayment, type LandlordTicket, type LandlordAgreement, type LandlordFlat,
 } from "@/lib/landlord-data";
 
+function CollapsibleSection({
+  title, defaultOpen = false, badge, rightLink, children,
+}: {
+  title: string; defaultOpen?: boolean; badge?: string | number;
+  rightLink?: { label: string; href: string };
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex justify-between items-center mb-2.5 cursor-pointer group"
+      >
+        <div className="flex items-center gap-2">
+          <h3 className="text-[14px] font-extrabold text-ink">{title}</h3>
+          {badge !== undefined && (
+            <span className="bg-brand-100 text-brand-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{badge}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {rightLink && !open && (
+            <span className="text-[11px] text-brand-500 font-semibold">{rightLink.label}</span>
+          )}
+          <span className={`text-ink-muted text-sm transition-transform duration-200 ${open ? "rotate-90" : ""}`}>›</span>
+        </div>
+      </button>
+      {open && (
+        <div>
+          {rightLink && (
+            <div className="flex justify-end mb-2">
+              <Link href={rightLink.href} className="text-[11px] text-brand-500 font-semibold no-underline">{rightLink.label}</Link>
+            </div>
+          )}
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const QUICK_ACTIONS = [
   { icon: "📱", label: "WhatsApp", desc: "Send reminders", href: "/landlord/whatsapp" },
   { icon: "🏠", label: "Add Property", desc: "Register new", href: "/landlord/properties" },
@@ -309,22 +350,26 @@ export default function LandlordOverview() {
       )}
 
       {/* Quick Actions */}
-      <h3 className="text-[14px] font-extrabold text-ink mb-2.5">⚡ Quick Actions</h3>
-      <div className="grid grid-cols-3 gap-2.5 mb-5 sm:grid-cols-6">
-        {QUICK_ACTIONS.map((a) => (
-          <Link key={a.href} href={a.href}
-            className="bg-white rounded-[14px] border border-border-default p-3 text-center cursor-pointer hover:border-brand-300 hover:bg-brand-50 transition-colors no-underline">
-            <div className="text-2xl mb-1">{a.icon}</div>
-            <div className="text-[11px] font-extrabold text-ink">{a.label}</div>
-            <div className="text-[10px] text-ink-muted mt-0.5">{a.desc}</div>
-          </Link>
-        ))}
-      </div>
+      <CollapsibleSection title="⚡ Quick Actions" defaultOpen={true}>
+        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+          {QUICK_ACTIONS.map((a) => (
+            <Link key={a.href} href={a.href}
+              className="bg-white rounded-[14px] border border-border-default p-3 text-center cursor-pointer hover:border-brand-300 hover:bg-brand-50 transition-colors no-underline">
+              <div className="text-2xl mb-1">{a.icon}</div>
+              <div className="text-[11px] font-extrabold text-ink">{a.label}</div>
+              <div className="text-[10px] text-ink-muted mt-0.5">{a.desc}</div>
+            </Link>
+          ))}
+        </div>
+      </CollapsibleSection>
 
       {/* Alerts */}
       {!loading && (overduePayments.length > 0 || pendingPayments.length > 0 || vacantFlatsCount > 0 || expiringAgreements.length > 0) && (
-        <>
-          <h3 className="text-[14px] font-extrabold text-ink mb-2.5">🔔 Action Required</h3>
+        <CollapsibleSection
+          title="🔔 Action Required"
+          defaultOpen={true}
+          badge={overduePayments.length + pendingPayments.length + expiringAgreements.length + (vacantFlatsCount > 0 ? 1 : 0)}
+        >
           {overduePayments.map((p) => {
             const tenantName = (p.tenant as { user?: { full_name: string } | null } | null)?.user?.full_name ?? "Tenant";
             const flat = p.flat as { flat_number: string; block: string | null } | null;
@@ -382,7 +427,7 @@ export default function LandlordOverview() {
               <Link href="/landlord/properties" className="px-3 py-1.5 rounded-lg bg-brand-500 text-white text-[11px] font-bold flex-shrink-0 no-underline">Manage</Link>
             </div>
           )}
-        </>
+        </CollapsibleSection>
       )}
 
       {!loading && overduePayments.length === 0 && pendingPayments.length === 0 && vacantFlatsCount === 0 && expiringAgreements.length === 0 && openTickets.length === 0 && (
@@ -394,11 +439,7 @@ export default function LandlordOverview() {
 
       {/* Open Complaints */}
       {!loading && openTickets.length > 0 && (
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-2.5">
-            <h3 className="text-[14px] font-extrabold text-ink">🚫 Open Complaints ({openTickets.length})</h3>
-            <Link href="/landlord/complaints" className="text-[11px] text-brand-500 font-semibold no-underline">View all →</Link>
-          </div>
+        <CollapsibleSection title="🚫 Open Complaints" badge={openTickets.length} rightLink={{ label: "View all →", href: "/landlord/complaints" }}>
           {openTickets.slice(0, 3).map(tk => {
             const flat = tk.flat as { flat_number: string; block: string | null } | null;
             return (
@@ -413,16 +454,12 @@ export default function LandlordOverview() {
               </div>
             );
           })}
-        </div>
+        </CollapsibleSection>
       )}
 
-      {/* Society Notices from admin/board */}
+      {/* Society Notices */}
       {!loading && societyNotices.length > 0 && (
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-2.5">
-            <h3 className="text-[14px] font-extrabold text-ink">📢 Society Notices</h3>
-            <Link href="/landlord/notices" className="text-[11px] text-brand-500 font-semibold no-underline">View all →</Link>
-          </div>
+        <CollapsibleSection title="📢 Society Notices" badge={societyNotices.length} rightLink={{ label: "View all →", href: "/landlord/notices" }}>
           {societyNotices.map(n => (
             <div key={n.id} className="bg-white rounded-[14px] p-3.5 border border-border-default border-l-4 border-l-blue-400 mb-2">
               <div className="text-xs font-bold text-ink">{n.title}</div>
@@ -432,16 +469,12 @@ export default function LandlordOverview() {
               {n.content && <div className="text-[11px] text-ink mt-1 line-clamp-2">{n.content}</div>}
             </div>
           ))}
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Active Society Polls */}
       {!loading && societyPolls.length > 0 && (
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-2.5">
-            <h3 className="text-[14px] font-extrabold text-ink">🗳️ Society Polls</h3>
-            <Link href="/landlord/polls" className="text-[11px] text-brand-500 font-semibold no-underline">View all →</Link>
-          </div>
+        <CollapsibleSection title="🗳️ Society Polls" badge={societyPolls.length} rightLink={{ label: "View all →", href: "/landlord/polls" }}>
           {societyPolls.map(poll => (
             <div key={poll.id} className="bg-white rounded-[14px] p-3.5 border border-border-default border-l-4 border-l-purple-400 mb-2 flex justify-between items-center gap-3">
               <div>
@@ -454,16 +487,13 @@ export default function LandlordOverview() {
               <Link href="/landlord/polls" className="px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 text-[11px] font-bold flex-shrink-0 no-underline">Vote</Link>
             </div>
           ))}
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* My Properties — grouped by society */}
       {!loading && flats.length > 0 && (
+        <CollapsibleSection title="🏠 My Properties" badge={flats.length} defaultOpen={true} rightLink={{ label: "View all →", href: "/landlord/properties" }}>
         <div>
-          <div className="flex justify-between items-center mb-2.5">
-            <h3 className="text-[14px] font-extrabold text-ink">🏠 My Properties</h3>
-            <Link href="/landlord/properties" className="text-[11px] text-brand-500 font-semibold no-underline">View all →</Link>
-          </div>
 
           {/* Society groups */}
           {societyGroups.map(sg => {
@@ -564,6 +594,7 @@ export default function LandlordOverview() {
             );
           })()}
         </div>
+        </CollapsibleSection>
       )}
 
       {/* Flat Detail Modal */}
