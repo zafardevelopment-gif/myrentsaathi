@@ -53,6 +53,12 @@ ALTER TABLE expense_receipts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "open_access" ON expense_receipts;
 CREATE POLICY "open_access" ON expense_receipts FOR ALL USING (true) WITH CHECK (true);
 
+-- Add missing columns to documents + make society_id nullable
+ALTER TABLE documents ALTER COLUMN society_id DROP NOT NULL;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS flat_id uuid REFERENCES flats(id) ON DELETE SET NULL;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_name text;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS title text;
+
 -- Enhance notices table with new columns
 ALTER TABLE notices ADD COLUMN IF NOT EXISTS scheduled_for timestamptz;
 ALTER TABLE notices ADD COLUMN IF NOT EXISTS delivery_status text DEFAULT 'draft' CHECK (delivery_status IN ('draft', 'scheduled', 'sent', 'archived'));

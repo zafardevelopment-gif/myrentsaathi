@@ -25,7 +25,7 @@ export default function ReceiptModal({ payment, tenant, flat, landlord, onClose 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 z-[60] flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-[18px] w-full max-w-md" onClick={e => e.stopPropagation()}>
         {/* Receipt content */}
         <div id="receipt-content" className="p-6">

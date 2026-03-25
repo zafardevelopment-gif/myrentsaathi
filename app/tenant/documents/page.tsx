@@ -8,7 +8,7 @@ import toast, { Toaster } from "react-hot-toast";
 type Doc = {
   id: string;
   title: string;
-  doc_type: string;
+  file_name: string | null;
   file_url: string | null;
   file_size: number | null;
   created_at: string;
@@ -40,6 +40,7 @@ export default function TenantDocuments() {
   const { user } = useAuth();
   const [docs, setDocs] = useState<Doc[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [societyId, setSocietyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [showUploadForm, setShowUploadForm] = useState(false);
@@ -50,7 +51,7 @@ export default function TenantDocuments() {
   async function loadDocs(uid: string) {
     const { data } = await supabase
       .from("documents")
-      .select("id, title, doc_type, file_url, file_size, created_at")
+      .select("id, title, file_name, file_url, file_size, created_at")
       .eq("uploaded_by", uid)
       .order("created_at", { ascending: false });
     setDocs((data ?? []) as Doc[]);
@@ -58,9 +59,17 @@ export default function TenantDocuments() {
 
   useEffect(() => {
     if (!user?.email) return;
-    supabase.from("users").select("id").eq("email", user.email).single().then(({ data }) => {
+    supabase.from("users").select("id").eq("email", user.email).single().then(async ({ data }) => {
       if (data?.id) {
         setUserId(data.id);
+        // Fetch tenant's society_id (needed for documents insert)
+        const { data: tenant } = await supabase
+          .from("tenants")
+          .select("society_id")
+          .eq("user_id", data.id)
+          .eq("status", "active")
+          .maybeSingle();
+        setSocietyId(tenant?.society_id ?? null);
         loadDocs(data.id).finally(() => setLoading(false));
       } else setLoading(false);
     });
@@ -87,8 +96,9 @@ export default function TenantDocuments() {
     // Save record to documents table
     const { error } = await supabase.from("documents").insert({
       uploaded_by: userId,
+      ...(societyId ? { society_id: societyId } : {}),
       title: uploadName,
-      doc_type: ext ?? "other",
+      file_name: uploadFile.name,
       file_url: fileUrl,
       file_size: uploadFile.size,
     });
@@ -175,7 +185,7 @@ export default function TenantDocuments() {
               <div>
                 <div className="text-sm font-bold text-ink">{d.title}</div>
                 <div className="text-[11px] text-ink-muted mt-0.5">
-                  {d.doc_type?.toUpperCase()} {d.file_size ? `· ${formatSize(d.file_size)}` : ""} · {new Date(d.created_at).toLocaleDateString("en-IN")}
+                  {d.file_name ? d.file_name.split(".").pop()?.toUpperCase() : ""} {d.file_size ? `· ${formatSize(d.file_size)}` : ""} · {new Date(d.created_at).toLocaleDateString("en-IN")}
                 </div>
               </div>
             </div>

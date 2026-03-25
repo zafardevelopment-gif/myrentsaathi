@@ -32,8 +32,9 @@ export type LandlordRentPayment = {
   payment_date: string | null;
   payment_method: string | null;
   created_at: string;
-  flat?: { flat_number: string; block: string | null } | null;
-  tenant?: { user?: { full_name: string } | null } | null;
+  tenant_id?: string;
+  flat?: { flat_number: string; block: string | null; society?: { name: string; city: string } | null } | null;
+  tenant?: { user?: { full_name: string; phone?: string } | null } | null;
 };
 
 export type LandlordAgreement = {
@@ -168,6 +169,34 @@ async function getTenantIdsForLandlord(userId: string): Promise<string[]> {
   return (tenants ?? []).map(t => t.id);
 }
 
+async function enrichPaymentsWithTenants(payments: LandlordRentPayment[]): Promise<LandlordRentPayment[]> {
+  const tenantIds = [...new Set(payments.map(p => (p as unknown as { tenant_id: string }).tenant_id).filter(Boolean))];
+  if (tenantIds.length === 0) return payments;
+
+  // Fetch tenant rows with their user info
+  const { data: tenantRows } = await supabase
+    .from("tenants")
+    .select("id, user_id")
+    .in("id", tenantIds);
+
+  if (!tenantRows || tenantRows.length === 0) return payments;
+
+  // Fetch user info for those user_ids
+  const userIds = tenantRows.map(t => t.user_id).filter(Boolean);
+  const { data: userRows } = await supabase
+    .from("users")
+    .select("id, full_name, phone")
+    .in("id", userIds);
+
+  const userMap = new Map((userRows ?? []).map(u => [u.id, u]));
+  const tenantMap = new Map(tenantRows.map(t => [t.id, { user: userMap.get(t.user_id) ?? null }]));
+
+  return payments.map(p => ({
+    ...p,
+    tenant: tenantMap.get((p as unknown as { tenant_id: string }).tenant_id) ?? null,
+  }));
+}
+
 export async function getLandlordRentPayments(email: string): Promise<LandlordRentPayment[]> {
   const userId = await getLandlordUserId(email);
   if (!userId) return [];
@@ -178,12 +207,13 @@ export async function getLandlordRentPayments(email: string): Promise<LandlordRe
   const currentMonth = new Date().toISOString().slice(0, 7);
   const { data, error } = await supabase
     .from("rent_payments")
-    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, flat:flats(flat_number, block)`)
+    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, tenant_id,
+      flat:flats(flat_number, block, society:societies(name, city))`)
     .in("tenant_id", tenantIds)
     .eq("month_year", currentMonth)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as unknown as LandlordRentPayment[];
+  return enrichPaymentsWithTenants((data ?? []) as unknown as LandlordRentPayment[]);
 }
 
 export async function getAllLandlordRentPayments(email: string): Promise<LandlordRentPayment[]> {
@@ -195,11 +225,12 @@ export async function getAllLandlordRentPayments(email: string): Promise<Landlor
 
   const { data, error } = await supabase
     .from("rent_payments")
-    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, flat:flats(flat_number, block)`)
+    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, tenant_id,
+      flat:flats(flat_number, block, society:societies(name, city))`)
     .in("tenant_id", tenantIds)
     .order("month_year", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as unknown as LandlordRentPayment[];
+  return enrichPaymentsWithTenants((data ?? []) as unknown as LandlordRentPayment[]);
 }
 
 // ─── AGREEMENTS ───────────────────────────────────────────────
