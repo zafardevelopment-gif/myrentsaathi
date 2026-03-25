@@ -27,7 +27,7 @@ type TenantDetail = {
 
 type TenantModalTab = "payments" | "agreement" | "documents" | "complaints";
 type RentPayment = { id: string; amount: number; month_year: string; status: string; payment_date: string | null; payment_method: string | null };
-type Document = { id: string; file_name: string; file_url: string; category: string; created_at: string };
+type Document = { id: string; title?: string; file_name: string; file_url: string; file_size?: number | null; category?: string; created_at: string };
 type Complaint = { id: string; subject: string; category: string; priority: string; status: string; created_at: string };
 
 function AgreementModal({ flat, agreement, onClose }: { flat: LandlordFlat; agreement: LandlordAgreement | null; onClose: () => void }) {
