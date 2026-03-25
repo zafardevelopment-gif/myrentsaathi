@@ -95,6 +95,7 @@ export default function RentHikePage() {
       await supabase.from("notices").insert({
         created_by: landlordId,
         ...(selectedFlat.society_id ? { society_id: selectedFlat.society_id } : {}),
+        flat_id: selectedFlatId,
         title: `Rent Hike Notice — Flat ${flatLabel}`,
         content: `Dear Tenant, please note that your monthly rent will increase from ${formatCurrency(currentRent)} to ${formatCurrency(newRent)} effective ${new Date(effectiveDate).toLocaleDateString("en-IN")}. Please plan accordingly.`,
         notice_type: "financial",

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS documents (
   created_at timestamptz DEFAULT now()
 );
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "open_access" ON documents;
 CREATE POLICY "open_access" ON documents FOR ALL USING (true) WITH CHECK (true);
 
 -- Add document_access table for permissions
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS document_access (
   UNIQUE(document_id, user_id)
 );
 ALTER TABLE document_access ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "open_access" ON document_access;
 CREATE POLICY "open_access" ON document_access FOR ALL USING (true) WITH CHECK (true);
 
 -- Add society_integrations table for API configs
@@ -36,6 +38,7 @@ CREATE TABLE IF NOT EXISTS society_integrations (
   UNIQUE(society_id, provider)
 );
 ALTER TABLE society_integrations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "open_access" ON society_integrations;
 CREATE POLICY "open_access" ON society_integrations FOR ALL USING (true) WITH CHECK (true);
 
 -- Add expense_receipts table
@@ -47,12 +50,14 @@ CREATE TABLE IF NOT EXISTS expense_receipts (
   uploaded_at timestamptz DEFAULT now()
 );
 ALTER TABLE expense_receipts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "open_access" ON expense_receipts;
 CREATE POLICY "open_access" ON expense_receipts FOR ALL USING (true) WITH CHECK (true);
 
 -- Enhance notices table with new columns
 ALTER TABLE notices ADD COLUMN IF NOT EXISTS scheduled_for timestamptz;
 ALTER TABLE notices ADD COLUMN IF NOT EXISTS delivery_status text DEFAULT 'draft' CHECK (delivery_status IN ('draft', 'scheduled', 'sent', 'archived'));
 ALTER TABLE notices ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+ALTER TABLE notices ADD COLUMN IF NOT EXISTS flat_id uuid REFERENCES flats(id) ON DELETE SET NULL;
 
 -- Enhance flats table
 ALTER TABLE flats ADD COLUMN IF NOT EXISTS occupancy_history jsonb DEFAULT '[]'::jsonb;
@@ -68,3 +73,19 @@ ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolution_notes text;
 -- Enhance audit_logs
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS changes_json jsonb;
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address text;
+
+-- Add rent_hike_history table for tracking rent increases
+CREATE TABLE IF NOT EXISTS rent_hike_history (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  flat_id uuid NOT NULL REFERENCES flats(id) ON DELETE CASCADE,
+  old_rent integer NOT NULL,
+  new_rent integer NOT NULL,
+  hike_type text NOT NULL CHECK (hike_type IN ('percentage', 'fixed')),
+  hike_value numeric NOT NULL,
+  effective_date date NOT NULL,
+  created_by uuid NOT NULL REFERENCES users(id),
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE rent_hike_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "open_access" ON rent_hike_history;
+CREATE POLICY "open_access" ON rent_hike_history FOR ALL USING (true) WITH CHECK (true);

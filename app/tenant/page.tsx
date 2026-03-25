@@ -50,9 +50,10 @@ export default function TenantHome() {
           if (flatData?.owner_id) {
             const { data: ln } = await supabase
               .from("notices")
-              .select("id, title, content, notice_type, target_audience, created_at")
+              .select("id, title, content, notice_type, target_audience, created_at, flat_id")
               .eq("created_by", flatData.owner_id)
               .in("target_audience", ["all", "tenants"])
+              .or(`flat_id.is.null,flat_id.eq.${p.flat_id}`)
               .order("id", { ascending: false });
             landlordNotices = (ln ?? []).map(n => ({ ...n, audience: n.target_audience })) as TenantNotice[];
           }
