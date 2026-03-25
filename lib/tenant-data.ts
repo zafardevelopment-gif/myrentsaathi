@@ -198,22 +198,45 @@ export type TenantAgreement = {
   end_date: string;
   monthly_rent: number;
   security_deposit: number | null;
+  flat?: { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
+  society?: { name: string; city: string; address?: string | null } | null;
+  landlord?: { full_name?: string; phone?: string; email?: string } | null;
+  tenant_user?: { full_name: string; phone?: string | null; email?: string | null } | null;
 };
 
 export async function getTenantAgreement(email: string): Promise<TenantAgreement | null> {
-  const { data: user } = await supabase.from("users").select("id").eq("email", email).single();
-  if (!user) return null;
+  const { data: userRow } = await supabase.from("users").select("id, full_name, phone, email").eq("email", email).single();
+  if (!userRow) return null;
 
-  const { data: tenant } = await supabase.from("tenants").select("id").eq("user_id", user.id).maybeSingle();
+  const { data: tenant } = await supabase.from("tenants").select("id").eq("user_id", userRow.id).maybeSingle();
   if (!tenant) return null;
 
   const { data } = await supabase
     .from("agreements")
-    .select("id, tier, status, start_date, end_date, monthly_rent, security_deposit")
+    .select(`
+      id, tier, status, start_date, end_date, monthly_rent, security_deposit, landlord_id,
+      flat:flats(flat_number, block, floor_number, flat_type, area_sqft),
+      society:societies(name, city, address)
+    `)
     .eq("tenant_id", tenant.id)
     .eq("status", "active")
     .maybeSingle();
-  return data as TenantAgreement | null;
+
+  if (!data) return null;
+
+  // Fetch landlord user info
+  const ag = data as unknown as TenantAgreement & { landlord_id?: string };
+  let landlord = null;
+  if (ag.landlord_id) {
+    const { data: ll } = await supabase.from("users").select("full_name, phone, email").eq("id", ag.landlord_id).single();
+    landlord = ll ?? null;
+  }
+
+  return {
+    ...ag,
+    landlord,
+    tenant_user: { full_name: userRow.full_name, phone: userRow.phone, email: userRow.email },
+  } as TenantAgreement;
 }
 
 // ─── NOTICES ─────────────────────────────────────────────────

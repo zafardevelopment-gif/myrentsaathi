@@ -40,6 +40,8 @@ export type LandlordRentPayment = {
 
 export type LandlordAgreement = {
   id: string;
+  flat_id?: string;
+  tenant_id?: string;
   tier: string;
   status: string;
   monthly_rent: number;
@@ -47,9 +49,10 @@ export type LandlordAgreement = {
   start_date: string;
   end_date: string;
   created_at: string;
-  flat?: { flat_number: string; block: string | null } | null;
-  society?: { name: string; city: string } | null;
-  tenant?: { user?: { full_name: string } | null } | null;
+  flat?: { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
+  society?: { name: string; city: string; address?: string | null } | null;
+  tenant?: { user?: { full_name: string; phone?: string | null; email?: string | null } | null } | null;
+  landlord?: { full_name?: string; phone?: string; email?: string } | null;
 };
 
 // ─── RESOLVE LANDLORD USER ID ────────────────────────────────
@@ -240,17 +243,59 @@ export async function getLandlordAgreements(email: string): Promise<LandlordAgre
   const userId = await getLandlordUserId(email);
   if (!userId) return [];
 
+  // Step 1: fetch agreements with flat + society (no multi-hop tenant join)
   const { data, error } = await supabase
     .from("agreements")
     .select(`
-      id, tier, status, monthly_rent, security_deposit, start_date, end_date, created_at,
-      flat:flats(flat_number, block),
-      society:societies(name, city)
+      id, flat_id, tenant_id, tier, status, monthly_rent, security_deposit, start_date, end_date, created_at,
+      flat:flats(flat_number, block, floor_number, flat_type, area_sqft),
+      society:societies(name, city, address)
     `)
     .eq("landlord_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as unknown as LandlordAgreement[];
+
+  const agreements = (data ?? []) as unknown as (LandlordAgreement & { tenant_id?: string })[];
+
+  // Step 2: fetch tenant records to get user_ids
+  const tenantIds = agreements.map(a => a.tenant_id).filter(Boolean) as string[];
+  let tenantUserMap: Record<string, { full_name: string; phone?: string | null; email?: string | null }> = {};
+
+  if (tenantIds.length > 0) {
+    const { data: tenantRows } = await supabase
+      .from("tenants")
+      .select("id, user_id")
+      .in("id", tenantIds);
+
+    if (tenantRows && tenantRows.length > 0) {
+      const userIds = tenantRows.map(t => t.user_id).filter(Boolean);
+      const { data: userRows } = await supabase
+        .from("users")
+        .select("id, full_name, phone, email")
+        .in("id", userIds);
+
+      const userById: Record<string, { full_name: string; phone?: string | null; email?: string | null }> = {};
+      (userRows ?? []).forEach(u => { userById[u.id] = u; });
+      tenantRows.forEach(t => {
+        if (t.user_id && userById[t.user_id]) tenantUserMap[t.id] = userById[t.user_id];
+      });
+    }
+  }
+
+  // Step 3: fetch landlord user info
+  const { data: landlordUser } = await supabase
+    .from("users")
+    .select("full_name, phone, email")
+    .eq("id", userId)
+    .single();
+
+  return agreements.map(ag => ({
+    ...ag,
+    tenant: ag.tenant_id && tenantUserMap[ag.tenant_id]
+      ? { user: tenantUserMap[ag.tenant_id] }
+      : null,
+    landlord: landlordUser ?? null,
+  }));
 }
 
 // ─── MAINTENANCE PAYMENTS (SOCIETY DUES) ─────────────────────

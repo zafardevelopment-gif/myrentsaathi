@@ -19,6 +19,7 @@ import { Toaster } from "react-hot-toast";
 import { getTenantTickets, type TenantTicket } from "@/lib/tenant-data";
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
+import Link from "next/link";
 
 export default function TenantHome() {
   const { user } = useAuth();
@@ -196,27 +197,39 @@ export default function TenantHome() {
       )}
 
       {/* Agreement */}
-      {agreement && (
-        <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-bold text-ink">📄 Rental Agreement</span>
-            <span className="inline-block px-2 py-[3px] rounded-2xl text-[10px] font-bold bg-green-100 text-green-700 capitalize">{agreement.status}</span>
-          </div>
-          <div className="flex gap-3 flex-wrap">
-            {[
-              { label: "Type", value: agreement.tier?.replace("_", " ") ?? "Standard" },
-              { label: "Valid Till", value: new Date(agreement.end_date).toLocaleDateString("en-IN") },
-              { label: "Rent", value: formatCurrency(agreement.monthly_rent) },
-              { label: "Deposit", value: formatCurrency(agreement.security_deposit ?? 0) },
-            ].map(d => (
-              <div key={d.label} className="flex-1 min-w-[80px] bg-warm-50 rounded-xl p-2">
-                <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
-                <div className="text-xs font-extrabold text-ink mt-0.5 capitalize">{d.value}</div>
+      {agreement && (() => {
+        const daysLeft = agreement.end_date ? Math.ceil((new Date(agreement.end_date).getTime() - Date.now()) / 86400000) : null;
+        return (
+          <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-ink">📄 Rental Agreement</span>
+                <span className="inline-block px-2 py-[3px] rounded-2xl text-[10px] font-bold bg-green-100 text-green-700 capitalize">{agreement.status}</span>
               </div>
-            ))}
+              <Link href="/tenant/agreement"
+                className="px-3 py-1.5 rounded-lg bg-brand-500 text-white text-[11px] font-bold no-underline hover:bg-brand-600 transition-colors">
+                View →
+              </Link>
+            </div>
+            {daysLeft !== null && daysLeft <= 30 && daysLeft > 0 && (
+              <div className="text-[10px] text-orange-600 font-semibold mb-2">⚠️ Expires in {daysLeft} days</div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: "Type",       value: agreement.tier?.replace("_", " ") ?? "Standard" },
+                { label: "Valid Till", value: new Date(agreement.end_date).toLocaleDateString("en-IN") },
+                { label: "Rent",       value: formatCurrency(agreement.monthly_rent) },
+                { label: "Deposit",    value: formatCurrency(agreement.security_deposit ?? 0) },
+              ].map(d => (
+                <div key={d.label} className="bg-warm-50 rounded-xl p-2.5">
+                  <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
+                  <div className="text-xs font-extrabold text-ink mt-0.5 capitalize">{d.value}</div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Recent notices */}
       {notices.length > 0 && (

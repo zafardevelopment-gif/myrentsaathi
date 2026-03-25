@@ -30,37 +30,271 @@ type RentPayment = { id: string; amount: number; month_year: string; status: str
 type Document = { id: string; title?: string; file_name: string; file_url: string; file_size?: number | null; category?: string; created_at: string };
 type Complaint = { id: string; subject: string; category: string; priority: string; status: string; created_at: string };
 
+// ─── helpers shared with agreements page ────────────────────
+
+const STATUS_BADGE_AG: Record<string, string> = {
+  active:     "bg-green-100 text-green-700 border-green-200",
+  expired:    "bg-gray-100 text-gray-500 border-gray-200",
+  pending:    "bg-yellow-100 text-yellow-700 border-yellow-200",
+  terminated: "bg-red-100 text-red-600 border-red-200",
+};
+const TIER_LABEL_AG: Record<string, string> = {
+  free: "Free Draft", lawyer_verified: "Lawyer Verified", registered: "Registered",
+};
+function fmtDateAg(d: string | null | undefined) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
+}
+function durationMonthsAg(start: string, end: string) {
+  return Math.round((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24 * 30));
+}
+
+function printAgreementDoc(ag: LandlordAgreement) {
+  const flat     = ag.flat as { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
+  const society  = ag.society as { name: string; city: string; address?: string | null } | null;
+  const tenant   = ag.tenant?.user as { full_name: string; phone?: string | null; email?: string | null } | null;
+  const landlord = ag.landlord as { full_name?: string; phone?: string; email?: string } | null;
+  const flatLabel = flat ? `Flat ${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : "—";
+  const months   = ag.start_date && ag.end_date ? durationMonthsAg(ag.start_date, ag.end_date) : "—";
+
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<title>Rental Agreement — ${flatLabel}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Georgia',serif;color:#1c1917;background:#fff;font-size:13px;line-height:1.7}
+.page{max-width:760px;margin:0 auto;padding:48px 48px 64px}
+.header{text-align:center;border-bottom:3px double #1c1917;padding-bottom:20px;margin-bottom:28px}
+.header .logo{font-size:22px;font-weight:900;letter-spacing:-.5px;color:#c2660a}
+.header .sub{font-size:11px;color:#78716c;margin-top:2px;letter-spacing:1px;text-transform:uppercase}
+.header h1{font-size:18px;font-weight:700;margin-top:14px;letter-spacing:.5px}
+.header .ref{font-size:10px;color:#78716c;margin-top:4px}
+.section{margin-bottom:24px}
+.section-title{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#c2660a;border-bottom:1px solid #e7e2dc;padding-bottom:6px;margin-bottom:14px}
+.party-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.party-box{border:1px solid #e7e2dc;border-radius:10px;padding:14px;background:#fefbf3}
+.party-box .role{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#78716c;margin-bottom:6px}
+.party-box .name{font-size:15px;font-weight:700;margin-bottom:4px}
+.party-box .detail{font-size:11px;color:#44403c;line-height:1.6}
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.detail-cell{background:#fdf4e3;border-radius:8px;padding:10px 12px}
+.detail-cell .lbl{font-size:9px;color:#78716c;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:3px}
+.detail-cell .val{font-size:13px;font-weight:700}
+.clause{font-size:12.5px;color:#1c1917;line-height:1.85;margin-bottom:12px;text-align:justify}
+ol.clauses{padding-left:18px}ol.clauses li{margin-bottom:10px}
+.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:48px}
+.sig-box{border-top:1.5px solid #1c1917;padding-top:10px}
+.sig-box .label{font-size:11px;font-weight:700}.sig-box .name{font-size:10px;color:#78716c;margin-top:4px}.sig-box .date{font-size:10px;color:#78716c}
+.footer{margin-top:40px;border-top:1px solid #e7e2dc;padding-top:12px;font-size:10px;color:#78716c;text-align:center}
+.ribbon{display:inline-block;padding:3px 14px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.ribbon.active{background:#dcfce7;color:#15803d}.ribbon.terminated{background:#fee2e2;color:#dc2626}.ribbon.expired{background:#f3f4f6;color:#6b7280}.ribbon.pending{background:#fef9c3;color:#b45309}
+@media print{@page{size:A4;margin:0}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{padding:28px 36px 48px}}
+</style></head><body><div class="page">
+<div class="header">
+  <div class="logo">MyRentSaathi</div>
+  <div class="sub">India's Smartest Rent &amp; Society Management Platform</div>
+  <div style="margin-top:12px"><span class="ribbon ${ag.status}">${ag.status.charAt(0).toUpperCase()+ag.status.slice(1)}</span></div>
+  <h1>RENTAL AGREEMENT</h1>
+  <div class="ref">ID: ${ag.id.slice(0,8).toUpperCase()} &nbsp;|&nbsp; Type: ${TIER_LABEL_AG[ag.tier]??ag.tier} &nbsp;|&nbsp; Generated: ${fmtDateAg(new Date().toISOString())}</div>
+</div>
+<div class="section">
+  <div class="section-title">Parties to the Agreement</div>
+  <div class="party-grid">
+    <div class="party-box"><div class="role">🏠 Landlord (Lessor)</div><div class="name">${landlord?.full_name??"—"}</div><div class="detail">${landlord?.phone?`📞 ${landlord.phone}<br/>`:""}${landlord?.email?`✉️ ${landlord.email}`:""}</div></div>
+    <div class="party-box"><div class="role">👤 Tenant (Lessee)</div><div class="name">${tenant?.full_name??"—"}</div><div class="detail">${tenant?.phone?`📞 ${tenant.phone}<br/>`:""}${tenant?.email?`✉️ ${tenant.email}`:""}</div></div>
+  </div>
+</div>
+<div class="section">
+  <div class="section-title">Property Details</div>
+  <div class="detail-grid">
+    <div class="detail-cell"><div class="lbl">Flat / Unit</div><div class="val">${flatLabel}</div></div>
+    <div class="detail-cell"><div class="lbl">Society / Area</div><div class="val">${society?.name??"Independent"}</div></div>
+    <div class="detail-cell"><div class="lbl">City</div><div class="val">${society?.city??"—"}</div></div>
+    ${flat?.flat_type?`<div class="detail-cell"><div class="lbl">Type</div><div class="val">${flat.flat_type}</div></div>`:""}
+    ${flat?.floor_number!=null?`<div class="detail-cell"><div class="lbl">Floor</div><div class="val">Floor ${flat.floor_number}</div></div>`:""}
+    ${flat?.area_sqft?`<div class="detail-cell"><div class="lbl">Area</div><div class="val">${flat.area_sqft} sq.ft</div></div>`:""}
+  </div>
+</div>
+<div class="section">
+  <div class="section-title">Financial Terms</div>
+  <div class="detail-grid">
+    <div class="detail-cell"><div class="lbl">Monthly Rent</div><div class="val" style="color:#c2660a">${formatCurrency(ag.monthly_rent)}</div></div>
+    <div class="detail-cell"><div class="lbl">Security Deposit</div><div class="val">${ag.security_deposit?formatCurrency(ag.security_deposit):"—"}</div></div>
+    <div class="detail-cell"><div class="lbl">Duration</div><div class="val">${months} months</div></div>
+    <div class="detail-cell"><div class="lbl">Start Date</div><div class="val">${fmtDateAg(ag.start_date)}</div></div>
+    <div class="detail-cell"><div class="lbl">End Date</div><div class="val">${fmtDateAg(ag.end_date)}</div></div>
+    <div class="detail-cell"><div class="lbl">Total Value</div><div class="val">${typeof months==="number"?formatCurrency(ag.monthly_rent*months):"—"}</div></div>
+  </div>
+</div>
+<div class="section">
+  <div class="section-title">Terms &amp; Conditions</div>
+  <ol class="clauses">
+    <li class="clause">The Landlord hereby lets and the Tenant hereby takes on rent the above property for <strong>${months} months</strong>, from <strong>${fmtDateAg(ag.start_date)}</strong> to <strong>${fmtDateAg(ag.end_date)}</strong>.</li>
+    <li class="clause">The Tenant shall pay a monthly rent of <strong>${formatCurrency(ag.monthly_rent)}</strong>, payable on or before the <strong>5th day</strong> of each month. Late payment shall attract a fee as mutually agreed.</li>
+    <li class="clause">A security deposit of <strong>${ag.security_deposit?formatCurrency(ag.security_deposit):"Nil"}</strong> has been paid. This shall be refunded within 30 days of vacating, after deducting any dues or damages.</li>
+    <li class="clause">The Tenant shall use the premises only for <strong>residential purposes</strong> and shall not sublet without prior written consent of the Landlord.</li>
+    <li class="clause">The Tenant shall maintain the premises in good condition. Minor repairs up to ₹500 shall be borne by the Tenant; major repairs by the Landlord.</li>
+    <li class="clause">The Tenant shall pay all utility bills (electricity, water, internet) and applicable maintenance charges during the tenancy.</li>
+    <li class="clause">Either party may terminate this agreement by giving <strong>30 days written notice</strong>.</li>
+    <li class="clause">Disputes shall be subject to the jurisdiction of courts in <strong>${society?.city??"the applicable city"}</strong> and governed by the laws of India.</li>
+  </ol>
+</div>
+<div class="sig-grid">
+  <div class="sig-box"><div class="label">Landlord's Signature</div><div class="name">${landlord?.full_name??"—"}</div><div class="date">Date: _______________________</div></div>
+  <div class="sig-box"><div class="label">Tenant's Signature</div><div class="name">${tenant?.full_name??"—"}</div><div class="date">Date: _______________________</div></div>
+</div>
+<div class="footer">Generated via MyRentSaathi. For legal enforceability, get it notarised or registered at the Sub-Registrar's office.<br/>© ${new Date().getFullYear()} MyRentSaathi</div>
+</div></body></html>`;
+
+  const w = window.open("", "_blank", "width=860,height=900");
+  if (!w) { alert("Pop-up blocked. Allow pop-ups and try again."); return; }
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+}
+
 function AgreementModal({ flat, agreement, onClose }: { flat: LandlordFlat; agreement: LandlordAgreement | null; onClose: () => void }) {
-  const tu = (flat.tenant as { user?: { full_name: string } | null } | null)?.user;
-  return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-[18px] w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
-          <div className="text-base font-extrabold text-ink">📄 Agreement</div>
-          <button onClick={onClose} className="text-ink-muted text-lg cursor-pointer">✕</button>
-        </div>
-        {agreement ? (
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Tenant", value: tu?.full_name ?? "—" },
-              { label: "Flat", value: `${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` },
-              { label: "Start Date", value: new Date(agreement.start_date).toLocaleDateString("en-IN") },
-              { label: "End Date", value: new Date(agreement.end_date).toLocaleDateString("en-IN") },
-              { label: "Monthly Rent", value: formatCurrency(agreement.monthly_rent) },
-              { label: "Security Deposit", value: formatCurrency(agreement.security_deposit ?? 0) },
-              { label: "Status", value: agreement.status },
-              { label: "Type", value: agreement.tier ?? "Standard" },
-            ].map(d => (
-              <div key={d.label} className="bg-warm-50 rounded-xl p-2.5">
-                <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
-                <div className="text-sm font-bold text-ink mt-0.5 capitalize">{d.value}</div>
-              </div>
-            ))}
+  if (!agreement) {
+    return (
+      <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
+        <div className="bg-white rounded-[18px] w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+          <div className="flex justify-between items-center mb-4">
+            <div className="text-base font-extrabold text-ink">📄 Agreement</div>
+            <button onClick={onClose} className="text-ink-muted text-lg cursor-pointer">✕</button>
           </div>
-        ) : (
           <div className="text-center py-8 text-ink-muted text-sm">No agreement found for this tenant.</div>
-        )}
-        <button onClick={onClose} className="w-full mt-4 py-2.5 rounded-xl bg-warm-100 text-ink text-xs font-bold cursor-pointer">Close</button>
+          <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-warm-100 text-ink text-xs font-bold cursor-pointer">Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  const agFlat     = agreement.flat as { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
+  const society    = agreement.society as { name: string; city: string; address?: string | null } | null;
+  const tenant     = agreement.tenant?.user as { full_name: string; phone?: string | null; email?: string | null } | null;
+  const landlord   = agreement.landlord as { full_name?: string; phone?: string; email?: string } | null;
+  const months     = agreement.start_date && agreement.end_date ? durationMonthsAg(agreement.start_date, agreement.end_date) : null;
+  const flatLabel  = agFlat ? `${agFlat.flat_number}${agFlat.block ? ` (${agFlat.block})` : ""}` : flat.flat_number;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-3 md:p-6" onClick={onClose}>
+      <div className="bg-white rounded-[20px] w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="sticky top-0 bg-white rounded-t-[20px] border-b border-border-default px-5 py-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center text-lg">📄</div>
+            <div>
+              <div className="text-sm font-extrabold text-ink">Rental Agreement</div>
+              <div className="text-[10px] text-ink-muted">#{agreement.id.slice(0, 8).toUpperCase()}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${STATUS_BADGE_AG[agreement.status] ?? "bg-gray-100 text-gray-500 border-gray-200"}`}>
+              {agreement.status.charAt(0).toUpperCase() + agreement.status.slice(1)}
+            </span>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-ink-muted hover:bg-warm-50 cursor-pointer text-lg">✕</button>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 space-y-5">
+          {/* Parties */}
+          <div>
+            <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Parties</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-50 border border-green-100 rounded-[14px] p-3.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 rounded-full bg-green-200 flex items-center justify-center text-xs font-extrabold text-green-800">
+                    {landlord?.full_name?.split(" ").map(n => n[0]).join("").slice(0, 2) ?? "L"}
+                  </div>
+                  <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Landlord</div>
+                </div>
+                <div className="text-sm font-extrabold text-ink">{landlord?.full_name ?? "—"}</div>
+                {landlord?.phone && <div className="text-[10px] text-ink-muted mt-0.5">📞 {landlord.phone}</div>}
+                {landlord?.email && <div className="text-[10px] text-ink-muted truncate">✉️ {landlord.email}</div>}
+              </div>
+              <div className="bg-blue-50 border border-blue-100 rounded-[14px] p-3.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 rounded-full bg-blue-200 flex items-center justify-center text-xs font-extrabold text-blue-800">
+                    {tenant?.full_name?.split(" ").map(n => n[0]).join("").slice(0, 2) ?? "T"}
+                  </div>
+                  <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wider">Tenant</div>
+                </div>
+                <div className="text-sm font-extrabold text-ink">{tenant?.full_name ?? "—"}</div>
+                {tenant?.phone && <div className="text-[10px] text-ink-muted mt-0.5">📞 {tenant.phone}</div>}
+                {tenant?.email && <div className="text-[10px] text-ink-muted truncate">✉️ {tenant.email}</div>}
+              </div>
+            </div>
+          </div>
+
+          {/* Property */}
+          <div>
+            <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Property</div>
+            <div className="bg-warm-50 rounded-[14px] border border-border-default p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-brand-100 flex items-center justify-center text-xl">🏠</div>
+                <div>
+                  <div className="text-sm font-extrabold text-ink">Flat {flatLabel}</div>
+                  <div className="text-[11px] text-ink-muted">
+                    {society ? `${society.name}, ${society.city}` : "Independent Property"}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "Type",  value: agFlat?.flat_type ?? "—" },
+                  { label: "Floor", value: agFlat?.floor_number != null ? `Floor ${agFlat.floor_number}` : "—" },
+                  { label: "Area",  value: agFlat?.area_sqft ? `${agFlat.area_sqft} sq.ft` : "—" },
+                ].map(d => (
+                  <div key={d.label} className="bg-white rounded-xl p-2 text-center border border-border-default">
+                    <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
+                    <div className="text-xs font-bold text-ink mt-0.5">{d.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Financial Terms */}
+          <div>
+            <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Financial Terms</div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: "Monthly Rent",     value: formatCurrency(agreement.monthly_rent),                           highlight: true },
+                { label: "Security Deposit", value: agreement.security_deposit ? formatCurrency(agreement.security_deposit) : "—", highlight: false },
+                { label: "Start Date",       value: fmtDateAg(agreement.start_date),                                  highlight: false },
+                { label: "End Date",         value: fmtDateAg(agreement.end_date),                                    highlight: false },
+                { label: "Duration",         value: months ? `${months} months` : "—",                                highlight: false },
+                { label: "Total Value",      value: months ? formatCurrency(agreement.monthly_rent * months) : "—",   highlight: false },
+              ].map(d => (
+                <div key={d.label} className={`rounded-[12px] p-3 border ${d.highlight ? "bg-brand-50 border-brand-200" : "bg-warm-50 border-border-default"}`}>
+                  <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
+                  <div className={`text-sm font-extrabold mt-0.5 ${d.highlight ? "text-brand-600" : "text-ink"}`}>{d.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Meta */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-3 py-1.5 rounded-xl bg-warm-100 border border-border-default text-[11px] font-semibold text-ink-muted">
+              Type: {TIER_LABEL_AG[agreement.tier] ?? agreement.tier}
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-warm-100 border border-border-default text-[11px] font-semibold text-ink-muted">
+              Created: {fmtDateAg(agreement.created_at)}
+            </span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-white rounded-b-[20px] border-t border-border-default px-5 py-3.5 flex gap-2">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl bg-warm-100 text-ink text-xs font-bold cursor-pointer hover:bg-warm-200 transition-colors">
+            Close
+          </button>
+          <button onClick={() => printAgreementDoc(agreement)}
+            className="flex-1 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer hover:bg-brand-600 transition-colors flex items-center justify-center gap-1.5">
+            ⬇ Download PDF
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -237,7 +471,7 @@ export default function LandlordTenants() {
   const filteredFlats = occupiedFlats.filter(flat => {
     const tu = (flat.tenant as { user?: { full_name: string; phone: string } | null } | null)?.user;
     const society = flat.society as { name: string } | null;
-    const agreement = agreements.find(a => (a.flat as { flat_number: string } | null)?.flat_number === flat.flat_number);
+    const agreement = agreements.find(a => a.flat_id === flat.id) ?? agreements.find(a => (a.flat as { flat_number: string } | null)?.flat_number === flat.flat_number);
     if (filterName && !tu?.full_name.toLowerCase().includes(filterName.toLowerCase())) return false;
     if (filterFlat && !flat.flat_number.toLowerCase().includes(filterFlat.toLowerCase())) return false;
     if (filterSociety && society?.name !== filterSociety) return false;
@@ -266,10 +500,14 @@ export default function LandlordTenants() {
   const inputClass = "w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500";
   const labelClass = "text-[10px] font-semibold text-ink-muted block mb-1";
 
-  const getAgreement = (flat: LandlordFlat) => agreements.find(a => {
-    const af = a.flat as { flat_number: string } | null;
-    return af?.flat_number === flat.flat_number;
-  });
+  const getAgreement = (flat: LandlordFlat) => {
+    const byId = agreements.find(a => a.flat_id === flat.id);
+    if (byId) return byId;
+    return agreements.find(a => {
+      const af = a.flat as { flat_number: string; block: string | null } | null;
+      return af?.flat_number === flat.flat_number && af?.block === flat.block;
+    });
+  };
 
   return (
     <div>

@@ -56,6 +56,7 @@ const NAV_ITEMS: Record<MockRole, NavItem[]> = {
   tenant: [
     { icon: "🏠", label: "Home",       href: "/tenant" },
     { icon: "💰", label: "Payments",   href: "/tenant/payments" },
+    { icon: "📄", label: "Agreement",  href: "/tenant/agreement" },
     { icon: "🚫", label: "Complaints", href: "/tenant/complaints" },
     { icon: "📢", label: "Notices",    href: "/tenant/notices" },
     { icon: "🗳️", label: "Polls",     href: "/tenant/polls" },
