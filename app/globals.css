@@ -4,14 +4,14 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  /* Brand colors */
-  --color-brand-50: #fefbf3;
-  --color-brand-100: #fdf4e3;
-  --color-brand-200: #f9e4bf;
-  --color-brand-300: #f2cc8a;
+  /* Brand colors — light defaults, overridden per theme in :root selectors */
+  --color-brand-50: var(--color-brand-50, #fefbf3);
+  --color-brand-100: var(--color-brand-100, #fdf4e3);
+  --color-brand-200: var(--color-brand-200, #f9e4bf);
+  --color-brand-300: var(--color-brand-300, #f2cc8a);
   --color-brand-400: #e5a94a;
-  --color-brand-500: #c2660a;
-  --color-brand-600: #8c4a06;
+  --color-brand-500: var(--color-brand-500, #c2660a);
+  --color-brand-600: var(--color-brand-600, #8c4a06);
   --color-brand-700: #6b3504;
   --color-brand-800: #4a2503;
   --color-brand-900: #1a1612;
@@ -22,34 +22,94 @@
   --color-forest-500: #1b5e3b;
   --color-forest-600: #166534;
 
-  /* Ink (text) */
-  --color-ink: #1c1917;
-  --color-ink-soft: #44403c;
-  --color-ink-muted: #78716c;
+  /* Ink (text) — theme-aware via CSS vars */
+  --color-ink: var(--color-ink, #1c1917);
+  --color-ink-soft: var(--color-ink-soft, #44403c);
+  --color-ink-muted: var(--color-ink-muted, #78716c);
 
-  /* Warm neutrals */
-  --color-warm-50: #fefbf3;
-  --color-warm-100: #fdf4e3;
-  --color-warm-200: #f9e4bf;
-  --color-warm-300: #f2cc8a;
+  /* Warm neutrals — theme-aware */
+  --color-warm-50: var(--color-warm-50, #fefbf3);
+  --color-warm-100: var(--color-warm-100, #fdf4e3);
+  --color-warm-200: var(--color-warm-200, #f9e4bf);
+  --color-warm-300: var(--color-warm-300, #f2cc8a);
 
-  /* Borders */
-  --color-border-default: #e7e2dc;
-  --color-border-light: #f5f0ea;
+  /* Borders — theme-aware */
+  --color-border-default: var(--color-border-default, #e7e2dc);
+  --color-border-light: var(--color-border-light, #f5f0ea);
+
+  /* Surface colors */
+  --color-surface: var(--color-surface, #ffffff);
+  --color-surface-raised: var(--color-surface-raised, #fefbf3);
+  --color-surface-sunken: var(--color-surface-sunken, #fdf4e3);
 
   /* Fonts */
   --font-sans: var(--font-outfit);
   --font-serif: var(--font-playfair);
 }
 
-:root {
+:root,
+[data-theme="light"] {
   --background: #fffcf7;
   --foreground: #1c1917;
+
+  /* Semantic surface colors */
+  --color-surface: #ffffff;
+  --color-surface-raised: #fefbf3;
+  --color-surface-sunken: #fdf4e3;
+
+  /* Ink overrides for light */
+  --color-ink: #1c1917;
+  --color-ink-soft: #44403c;
+  --color-ink-muted: #78716c;
+
+  /* Warm neutrals for light */
+  --color-warm-50: #fefbf3;
+  --color-warm-100: #fdf4e3;
+  --color-warm-200: #f9e4bf;
+  --color-warm-300: #f2cc8a;
+
+  /* Borders for light */
+  --color-border-default: #e7e2dc;
+  --color-border-light: #f5f0ea;
+}
+
+[data-theme="dark"] {
+  --background: #0f0f0f;
+  --foreground: #f5f0ea;
+
+  /* Semantic surface colors */
+  --color-surface: #1a1a1a;
+  --color-surface-raised: #222222;
+  --color-surface-sunken: #141414;
+
+  /* Ink overrides for dark */
+  --color-ink: #f5f0ea;
+  --color-ink-soft: #d6d0ca;
+  --color-ink-muted: #9c948e;
+
+  /* Warm neutrals → cool darks */
+  --color-warm-50: #1a1a1a;
+  --color-warm-100: #222222;
+  --color-warm-200: #2e2e2e;
+  --color-warm-300: #3a3a3a;
+
+  /* Borders for dark */
+  --color-border-default: #2e2e2e;
+  --color-border-light: #252525;
+
+  /* Brand stays but slightly muted */
+  --color-brand-50: #1e1610;
+  --color-brand-100: #2a1e10;
+  --color-brand-200: #3d2a14;
+  --color-brand-300: #6b4520;
+  --color-brand-500: #e07b2a;
+  --color-brand-600: #c2660a;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* Animations */
@@ -148,4 +208,42 @@ body {
 /* Smooth scroll */
 html {
   scroll-behavior: smooth;
+}
+
+/* ─── DARK MODE OVERRIDES ──────────────────────────────── */
+
+/* bg-white → dark surface */
+[data-theme="dark"] .bg-white {
+  background-color: var(--color-surface) !important;
+}
+
+/* Headers / sticky bars */
+[data-theme="dark"] header.bg-white {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border-default) !important;
+}
+
+/* Sidebar */
+[data-theme="dark"] .bg-warm-50 {
+  background-color: var(--color-surface-raised) !important;
+}
+
+/* Dark scrollbar thumb */
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+}
+
+/* Glass in dark */
+[data-theme="dark"] .glass {
+  background: rgba(26, 26, 26, 0.92);
+}
+
+/* Modal overlays */
+[data-theme="dark"] .bg-warm-100 {
+  background-color: var(--color-warm-100) !important;
+}
+
+/* Skeleton pulse color */
+[data-theme="dark"] .animate-pulse {
+  background-color: var(--color-warm-100);
 }

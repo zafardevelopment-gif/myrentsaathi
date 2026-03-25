@@ -20,29 +20,33 @@ function CollapsibleSection({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="mb-4">
+    <div className="mb-3 bg-white rounded-[16px] border border-border-default overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex justify-between items-center mb-2.5 cursor-pointer group"
+        className="w-full flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-warm-50 transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <h3 className="text-[14px] font-extrabold text-ink">{title}</h3>
+        <div className="flex items-center gap-2.5">
+          <h3 className="text-[13px] font-extrabold text-ink">{title}</h3>
           {badge !== undefined && (
-            <span className="bg-brand-100 text-brand-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{badge}</span>
+            <span className="bg-brand-100 text-brand-600 text-[10px] font-bold px-2 py-0.5 rounded-full leading-none">{badge}</span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {rightLink && !open && (
             <span className="text-[11px] text-brand-500 font-semibold">{rightLink.label}</span>
           )}
-          <span className={`text-ink-muted text-sm transition-transform duration-200 ${open ? "rotate-90" : ""}`}>›</span>
+          <span className={`text-ink-muted transition-transform duration-200 flex-shrink-0 ${open ? "rotate-90" : ""}`}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </span>
         </div>
       </button>
       {open && (
-        <div>
+        <div className="border-t border-border-light px-4 py-3.5">
           {rightLink && (
-            <div className="flex justify-end mb-2">
-              <Link href={rightLink.href} className="text-[11px] text-brand-500 font-semibold no-underline">{rightLink.label}</Link>
+            <div className="flex justify-end mb-3">
+              <Link href={rightLink.href} className="text-[11px] text-brand-500 font-semibold no-underline hover:underline">{rightLink.label}</Link>
             </div>
           )}
           {children}
