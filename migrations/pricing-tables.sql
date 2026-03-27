@@ -63,9 +63,33 @@ CREATE POLICY "Public read pricing_features"
   ON public.pricing_features FOR SELECT
   USING (true);
 
--- Anon write (superadmin uses service-role key, so anon INSERT/UPDATE/DELETE is locked)
--- If you want superadmin writes via anon key temporarily, uncomment below.
--- Otherwise keep locked and always use SUPABASE_SERVICE_ROLE_KEY in server actions.
+-- Anon write policies (codebase uses anon key throughout — no service role key needed)
+-- These allow the superadmin UI to create/update/delete pricing plans.
+-- Restrict further once auth is implemented (check role = 'superadmin').
+
+CREATE POLICY "Anon insert pricing_plans"
+  ON public.pricing_plans FOR INSERT
+  WITH CHECK (true);
+
+CREATE POLICY "Anon update pricing_plans"
+  ON public.pricing_plans FOR UPDATE
+  USING (true) WITH CHECK (true);
+
+CREATE POLICY "Anon delete pricing_plans"
+  ON public.pricing_plans FOR DELETE
+  USING (true);
+
+CREATE POLICY "Anon insert pricing_features"
+  ON public.pricing_features FOR INSERT
+  WITH CHECK (true);
+
+CREATE POLICY "Anon update pricing_features"
+  ON public.pricing_features FOR UPDATE
+  USING (true) WITH CHECK (true);
+
+CREATE POLICY "Anon delete pricing_features"
+  ON public.pricing_features FOR DELETE
+  USING (true);
 
 -- ── SEED DATA — Society Plans ──────────────────────────────
 INSERT INTO public.pricing_plans

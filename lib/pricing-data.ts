@@ -5,7 +5,11 @@
  */
 
 import { supabase } from "./supabase";
-import { supabaseAdmin } from "./supabase-admin";
+
+// All writes use the same anon client as the rest of the codebase.
+// RLS write policies on pricing_plans / pricing_features must allow anon inserts
+// (see migrations/pricing-tables.sql — run the RLS write policy section).
+const supabaseAdmin = supabase;
 
 // ─── TYPES ─────────────────────────────────────────────────
 

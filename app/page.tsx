@@ -1,4 +1,5 @@
 import HomePageClient from "@/components/website/HomePageClient";
+import PageTracker from "@/components/website/PageTracker";
 import Hero from "@/components/website/Hero";
 import ProblemSolution from "@/components/website/ProblemSolution";
 import Features from "@/components/website/Features";
@@ -13,6 +14,8 @@ import Footer from "@/components/website/Footer";
 export default function HomePage() {
   return (
     <div className="bg-background text-ink overflow-x-hidden">
+      {/* Fire-and-forget analytics — renders nothing */}
+      <PageTracker page="/" />
       {/* Client shell: Navbar + LoginModal (needs useState) */}
       <HomePageClient />
 

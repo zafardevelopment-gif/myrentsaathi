@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import HomePageClient from "@/components/website/HomePageClient";
+import PageTracker from "@/components/website/PageTracker";
 import Pricing from "@/components/website/Pricing";
 import FAQ from "@/components/website/FAQ";
 import CTA from "@/components/website/CTA";
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
 export default function PricingPage() {
   return (
     <div className="bg-background text-ink overflow-x-hidden">
+      <PageTracker page="/pricing" />
       <HomePageClient />
       <main className="pt-20">
         <div className="text-center py-12 bg-gradient-to-b from-brand-900 to-brand-900/90 px-6">

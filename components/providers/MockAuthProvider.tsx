@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { dbLogin } from "@/lib/auth-db";
+import { trackLogin } from "@/lib/analytics";
 
 export type MockRole = "admin" | "board" | "landlord" | "tenant" | "superadmin";
 
@@ -74,6 +75,7 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
     };
     setUser(newUser);
     localStorage.setItem("mrs_user", JSON.stringify(newUser));
+    trackLogin(result.user.id, result.user.role);
     return { success: true };
   };
 
