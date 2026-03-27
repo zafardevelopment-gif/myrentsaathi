@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Outfit, Playfair_Display } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import Providers from "@/components/providers/Providers";
+import ChatWidget from "@/components/website/ChatWidget";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -159,7 +160,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col font-sans">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <ChatWidget />
+        </Providers>
         <Toaster
           position="top-right"
           toastOptions={{
