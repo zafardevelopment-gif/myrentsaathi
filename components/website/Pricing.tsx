@@ -1,14 +1,123 @@
-"use client";
+/**
+ * Pricing — Server Component
+ * Fetches dynamic plans from Supabase.
+ * Falls back to static mock data if DB is unavailable (safe for dev/preview).
+ */
 
-import { useState } from "react";
-import {
-  WEBSITE_SOCIETY_PRICING,
-  WEBSITE_LANDLORD_PRICING,
-} from "@/lib/mockData";
+import PricingCards from "./PricingCards";
+import { getActivePricingPlans } from "@/lib/pricing-data";
+import type { PricingPlan } from "@/lib/pricing-data";
 
-export default function Pricing() {
-  const [tab, setTab] = useState<"society" | "landlord">("society");
-  const plans = tab === "society" ? WEBSITE_SOCIETY_PRICING : WEBSITE_LANDLORD_PRICING;
+// ── Static fallback data (mirrors original mock) ───────────
+const FALLBACK_SOCIETY: PricingPlan[] = [
+  {
+    id: "fallback-s1", plan_type: "society", name: "Starter", price: 2999, price_yearly: 29990,
+    duration: "monthly", property_limit: 30, is_popular: false, is_active: true, sort_order: 1,
+    cta_text: "Start Free Trial", description: "Small societies (up to 30 flats)",
+    badge_text: null, created_at: "", updated_at: "",
+    features: [
+      { id: "f1", plan_id: "fallback-s1", feature_text: "30 flats management",          is_highlight: false, sort_order: 1 },
+      { id: "f2", plan_id: "fallback-s1", feature_text: "Maintenance collection",        is_highlight: false, sort_order: 2 },
+      { id: "f3", plan_id: "fallback-s1", feature_text: "Complaint tickets",             is_highlight: false, sort_order: 3 },
+      { id: "f4", plan_id: "fallback-s1", feature_text: "WhatsApp reminders (500/mo)",   is_highlight: false, sort_order: 4 },
+      { id: "f5", plan_id: "fallback-s1", feature_text: "Basic reports",                 is_highlight: false, sort_order: 5 },
+      { id: "f6", plan_id: "fallback-s1", feature_text: "Email support",                 is_highlight: false, sort_order: 6 },
+    ],
+  },
+  {
+    id: "fallback-s2", plan_type: "society", name: "Professional", price: 5999, price_yearly: 59990,
+    duration: "monthly", property_limit: 100, is_popular: true, is_active: true, sort_order: 2,
+    cta_text: "Start Free Trial", description: "Medium societies (up to 100 flats)",
+    badge_text: "MOST POPULAR", created_at: "", updated_at: "",
+    features: [
+      { id: "f7",  plan_id: "fallback-s2", feature_text: "100 flats management",          is_highlight: true,  sort_order: 1 },
+      { id: "f8",  plan_id: "fallback-s2", feature_text: "Everything in Starter",         is_highlight: false, sort_order: 2 },
+      { id: "f9",  plan_id: "fallback-s2", feature_text: "Expense management + approval", is_highlight: false, sort_order: 3 },
+      { id: "f10", plan_id: "fallback-s2", feature_text: "Parking management",            is_highlight: false, sort_order: 4 },
+      { id: "f11", plan_id: "fallback-s2", feature_text: "Polls & voting",                is_highlight: false, sort_order: 5 },
+      { id: "f12", plan_id: "fallback-s2", feature_text: "WhatsApp reminders (2,000/mo)", is_highlight: false, sort_order: 6 },
+      { id: "f13", plan_id: "fallback-s2", feature_text: "Document vault",                is_highlight: false, sort_order: 7 },
+      { id: "f14", plan_id: "fallback-s2", feature_text: "Priority support",              is_highlight: true,  sort_order: 8 },
+    ],
+  },
+  {
+    id: "fallback-s3", plan_type: "society", name: "Enterprise", price: 9999, price_yearly: 99990,
+    duration: "monthly", property_limit: null, is_popular: false, is_active: true, sort_order: 3,
+    cta_text: "Contact Sales", description: "Large societies (unlimited flats)",
+    badge_text: null, created_at: "", updated_at: "",
+    features: [
+      { id: "f15", plan_id: "fallback-s3", feature_text: "Unlimited flats",              is_highlight: true,  sort_order: 1 },
+      { id: "f16", plan_id: "fallback-s3", feature_text: "Everything in Professional",   is_highlight: false, sort_order: 2 },
+      { id: "f17", plan_id: "fallback-s3", feature_text: "Multi-wing/tower support",     is_highlight: false, sort_order: 3 },
+      { id: "f18", plan_id: "fallback-s3", feature_text: "WhatsApp unlimited",           is_highlight: false, sort_order: 4 },
+      { id: "f19", plan_id: "fallback-s3", feature_text: "Custom reports",               is_highlight: false, sort_order: 5 },
+      { id: "f20", plan_id: "fallback-s3", feature_text: "Dedicated account manager",    is_highlight: true,  sort_order: 6 },
+      { id: "f21", plan_id: "fallback-s3", feature_text: "API access",                   is_highlight: false, sort_order: 7 },
+      { id: "f22", plan_id: "fallback-s3", feature_text: "On-call support",              is_highlight: false, sort_order: 8 },
+    ],
+  },
+];
+
+const FALLBACK_LANDLORD: PricingPlan[] = [
+  {
+    id: "fallback-l1", plan_type: "landlord", name: "Basic", price: 499, price_yearly: 4990,
+    duration: "monthly", property_limit: 3, is_popular: false, is_active: true, sort_order: 1,
+    cta_text: "Start Free Trial", description: "Up to 3 properties",
+    badge_text: null, created_at: "", updated_at: "",
+    features: [
+      { id: "lf1", plan_id: "fallback-l1", feature_text: "3 property management",       is_highlight: false, sort_order: 1 },
+      { id: "lf2", plan_id: "fallback-l1", feature_text: "Rent collection + tracking",  is_highlight: false, sort_order: 2 },
+      { id: "lf3", plan_id: "fallback-l1", feature_text: "Tenant management",           is_highlight: false, sort_order: 3 },
+      { id: "lf4", plan_id: "fallback-l1", feature_text: "WhatsApp reminders",          is_highlight: false, sort_order: 4 },
+      { id: "lf5", plan_id: "fallback-l1", feature_text: "Payment receipts",            is_highlight: false, sort_order: 5 },
+      { id: "lf6", plan_id: "fallback-l1", feature_text: "Basic reports",               is_highlight: false, sort_order: 6 },
+    ],
+  },
+  {
+    id: "fallback-l2", plan_type: "landlord", name: "Pro", price: 999, price_yearly: 9990,
+    duration: "monthly", property_limit: 10, is_popular: true, is_active: true, sort_order: 2,
+    cta_text: "Start Free Trial", description: "Up to 10 properties",
+    badge_text: "MOST POPULAR", created_at: "", updated_at: "",
+    features: [
+      { id: "lf7",  plan_id: "fallback-l2", feature_text: "10 property management",           is_highlight: true,  sort_order: 1 },
+      { id: "lf8",  plan_id: "fallback-l2", feature_text: "Everything in Basic",              is_highlight: false, sort_order: 2 },
+      { id: "lf9",  plan_id: "fallback-l2", feature_text: "Agreement generator (free drafts)", is_highlight: false, sort_order: 3 },
+      { id: "lf10", plan_id: "fallback-l2", feature_text: "Tax-ready reports",                is_highlight: false, sort_order: 4 },
+      { id: "lf11", plan_id: "fallback-l2", feature_text: "Multi-society view",               is_highlight: false, sort_order: 5 },
+      { id: "lf12", plan_id: "fallback-l2", feature_text: "Priority support",                 is_highlight: true,  sort_order: 6 },
+    ],
+  },
+  {
+    id: "fallback-l3", plan_type: "landlord", name: "NRI", price: 1999, price_yearly: 19990,
+    duration: "monthly", property_limit: null, is_popular: false, is_active: true, sort_order: 3,
+    cta_text: "Start Free Trial", description: "Unlimited + remote management",
+    badge_text: null, created_at: "", updated_at: "",
+    features: [
+      { id: "lf13", plan_id: "fallback-l3", feature_text: "Unlimited properties",         is_highlight: true,  sort_order: 1 },
+      { id: "lf14", plan_id: "fallback-l3", feature_text: "Everything in Pro",            is_highlight: false, sort_order: 2 },
+      { id: "lf15", plan_id: "fallback-l3", feature_text: "NRI tax reports",              is_highlight: true,  sort_order: 3 },
+      { id: "lf16", plan_id: "fallback-l3", feature_text: "Power of Attorney support",    is_highlight: false, sort_order: 4 },
+      { id: "lf17", plan_id: "fallback-l3", feature_text: "Multi-city dashboard",         is_highlight: false, sort_order: 5 },
+      { id: "lf18", plan_id: "fallback-l3", feature_text: "WhatsApp-only management",     is_highlight: false, sort_order: 6 },
+      { id: "lf19", plan_id: "fallback-l3", feature_text: "Dedicated NRI support",        is_highlight: true,  sort_order: 7 },
+    ],
+  },
+];
+
+export default async function Pricing() {
+  let societyPlans: PricingPlan[] = FALLBACK_SOCIETY;
+  let landlordPlans: PricingPlan[] = FALLBACK_LANDLORD;
+
+  try {
+    const [society, landlord] = await Promise.all([
+      getActivePricingPlans("society"),
+      getActivePricingPlans("landlord"),
+    ]);
+    if (society.length > 0) societyPlans = society;
+    if (landlord.length > 0) landlordPlans = landlord;
+  } catch {
+    // DB unavailable — use static fallback silently
+  }
 
   return (
     <section id="pricing" className="py-20 bg-brand-900">
@@ -26,73 +135,8 @@ export default function Pricing() {
           </p>
         </div>
 
-        {/* Tab Toggle */}
-        <div className="flex justify-center gap-1 mb-9">
-          {[
-            { id: "society" as const, label: "🏢 Society Plans" },
-            { id: "landlord" as const, label: "👨‍💼 Landlord Plans" },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-6 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-all ${
-                tab === t.id
-                  ? "bg-brand-500 text-white"
-                  : "bg-white/[0.08] text-white/60 hover:bg-white/[0.12]"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-[900px] mx-auto">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`hover-lift rounded-[20px] p-8 text-center relative ${
-                plan.popular
-                  ? "bg-gradient-to-br from-brand-500 to-brand-600 text-white"
-                  : "bg-white/[0.05] text-white/90 border border-white/10"
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white text-brand-500 px-4 py-1 rounded-[20px] text-[11px] font-extrabold">
-                  MOST POPULAR
-                </div>
-              )}
-
-              <div className="text-lg font-bold mb-1">{plan.name}</div>
-              <div className="font-serif text-[40px] font-black my-2">
-                {plan.price}
-                <span className="text-base font-normal opacity-70">
-                  {plan.period}
-                </span>
-              </div>
-              <div className="text-[13px] opacity-70 mb-5">{plan.desc}</div>
-
-              {plan.features.map((feature) => (
-                <div
-                  key={feature}
-                  className="text-[13px] py-[5px] border-b border-white/[0.08] text-left"
-                >
-                  ✓ {feature}
-                </div>
-              ))}
-
-              <button
-                className={`hover-lift w-full mt-5 py-3 px-7 rounded-xl text-sm font-bold cursor-pointer ${
-                  plan.popular
-                    ? "border-2 border-white bg-white/15 text-white"
-                    : "border-2 border-brand-500 bg-transparent text-brand-500 hover:bg-brand-500/10"
-                }`}
-              >
-                {plan.cta}
-              </button>
-            </div>
-          ))}
-        </div>
+        {/* Dynamic Cards (client component for tab interaction) */}
+        <PricingCards societyPlans={societyPlans} landlordPlans={landlordPlans} />
       </div>
     </section>
   );
