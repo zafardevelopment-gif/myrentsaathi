@@ -9,12 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
-    "@crayonai/react-core": "^0.7.7",
-    "@crayonai/react-ui": "^0.9.16",
     "@radix-ui/react-dialog": "^1.1.15",
     "@supabase/supabase-js": "^2.100.0",
-    "@thesysai/genui-sdk": "^0.8.6",
     "lucide-react": "^0.562.0",
     "next": "16.2.1",
     "openai": "^6.33.0",
