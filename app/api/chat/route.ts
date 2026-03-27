@@ -135,9 +135,10 @@ export async function POST(request: NextRequest) {
       // Execute tool calls
       const toolResults = await Promise.all(
         toolCalls.map(async (tc) => {
-          const args = JSON.parse(tc.function.arguments || "{}") as Record<string, unknown>;
-          const result = await dispatchTool(tc.function.name, args, user, sessionId);
-          return { role: "tool" as const, tool_call_id: tc.id, content: result };
+          const fn = tc as unknown as { id: string; function: { name: string; arguments: string } };
+          const args = JSON.parse(fn.function.arguments || "{}") as Record<string, unknown>;
+          const result = await dispatchTool(fn.function.name, args, user, sessionId);
+          return { role: "tool" as const, tool_call_id: fn.id, content: result };
         })
       );
       messages.push(...toolResults);
