@@ -21,121 +21,10 @@ function genId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-// ─── Thesys DSL → readable text ──────────────────────────────
-// C1 returns: <content thesys="true">{JSON DSL}</content>
-// DSL structure: { component: { component: "Card", props: { children: [...] } } }
-// We walk the tree and extract human-readable text from known fields.
-
-const SKIP_COMPONENTS = new Set([
-  "Card","Header","MiniCardBlock","MiniCard","ButtonGroup","Button",
-  "Icon","DataTile","CalloutV2","TextContent","Badge","Table","List",
-  "Section","Row","Col","Divider","Spacer","Image","Avatar",
-]);
-
-const TEXT_KEYS = new Set([
-  "textMarkdown","title","subtitle","description","children",
-  "label","text","content","amount","name","value","caption",
-]);
-
-function parseC1Response(raw: string): string {
-  if (!raw) return "";
-
-  // Decode HTML entities (widget receives &quot; etc.)
-  const decoded = raw
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#39;/g, "'");
-
-  // Strip XML wrappers
-  const inner = decoded
-    .replace(/<content[^>]*>/gi, "")
-    .replace(/<\/content>/gi, "")
-    .replace(/<thinking[^>]*>[\s\S]*?<\/thinking>/gi, "")
-    .trim();
-
-  if (!inner) return "";
-  if (!inner.startsWith("{") && !inner.startsWith("[")) return inner;
-
-  try {
-    const parsed = JSON.parse(inner) as unknown;
-    const parts: string[] = [];
-    walkDSL(parsed, parts);
-    const seen = new Set<string>();
-    return parts
-      .filter((s) => { if (seen.has(s)) return false; seen.add(s); return true; })
-      .join("\n")
-      .trim() || "I have the answer ready — please ask me again!";
-  } catch {
-    // Fallback: regex extract textMarkdown and title/description
-    const parts: string[] = [];
-    for (const key of ["textMarkdown","title","subtitle","description","label","amount"]) {
-      const re = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`, "g");
-      for (const m of inner.matchAll(re)) {
-        const val = m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').trim();
-        if (val.length > 1) parts.push(val);
-      }
-    }
-    return parts.join("\n") || "I have the answer — could you rephrase your question?";
-  }
-}
-
-function walkDSL(node: unknown, out: string[]): void {
-  if (node === null || node === undefined) return;
-
-  if (typeof node === "string") {
-    const s = node.trim();
-    // Skip component names, CSS, icons, URLs, single chars
-    if (
-      s.length > 1 &&
-      !SKIP_COMPONENTS.has(s) &&
-      !s.startsWith("http") &&
-      !/^[a-z-]+$/.test(s) && // skip icon/variant names like "calendar", "success"
-      !/^#[0-9a-f]/i.test(s)  // skip hex colors
-    ) {
-      out.push(s);
-    }
-    return;
-  }
-
-  if (typeof node === "number") {
-    out.push(String(node));
-    return;
-  }
-
-  if (Array.isArray(node)) {
-    for (const item of node) walkDSL(item, out);
-    return;
-  }
-
-  if (typeof node === "object") {
-    const obj = node as Record<string, unknown>;
-    // If this is a component node, only walk its props
-    if (obj.component && obj.props) {
-      walkDSL(obj.props, out);
-      return;
-    }
-    // Otherwise walk only semantic keys
-    for (const [key, val] of Object.entries(obj)) {
-      if (TEXT_KEYS.has(key)) {
-        if (typeof val === "string") {
-          const s = val.trim();
-          if (s.length > 1 && !SKIP_COMPONENTS.has(s)) out.push(s);
-        } else {
-          walkDSL(val, out);
-        }
-      } else if (key === "lhs" || key === "rhs" || key === "child") {
-        walkDSL(val, out);
-      }
-    }
-  }
-}
-
 // ─── Simple markdown-like renderer ───────────────────────────
 
 function AssistantText({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
-  const text = parseC1Response(content);
+  const text = content;
 
   if (!text && isStreaming) return <TypingDots />;
   if (!text) return null;
@@ -248,7 +137,6 @@ export default function ChatWidget() {
       });
 
       const data = await res.json() as { content?: string };
-      console.log("[chat] raw content received:", data.content?.slice(0, 200));
       const content = data.content ?? "Sorry, something went wrong.";
 
       setMessages((prev) => prev.map((m) =>

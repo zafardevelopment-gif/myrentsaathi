@@ -13,9 +13,16 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 function getClient() {
-  const apiKey = process.env.THESYS_API_KEY;
-  if (!apiKey) throw new Error("THESYS_API_KEY is not configured");
-  return new OpenAI({ apiKey, baseURL: "https://api.thesys.dev/v1/embed" });
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
+  return new OpenAI({
+    apiKey,
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+      "HTTP-Referer": "https://myrentsaathi.com",
+      "X-Title": "MyRentSaathi",
+    },
+  });
 }
 
 const messageStore = new Map<string, OpenAI.Chat.ChatCompletionMessageParam[]>();
@@ -47,17 +54,29 @@ async function dispatchTool(
 ): Promise<string> {
   try {
     switch (name) {
-      case "getPricingPlans": return JSON.stringify(await getPricingPlans());
-      case "createSupportTicket": return JSON.stringify(await createSupportTicket({
-        subject: String(args.subject ?? "Support Request"),
-        message: String(args.message ?? ""),
-        priority: (args.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
-        userId: user?.userId, userName: user?.name, userEmail: user?.email,
-        userRole: user?.role, sessionId,
-      }));
-      case "getSignupGuide": return JSON.stringify(getSignupGuide((args.userType as "society" | "landlord" | "tenant") ?? "society"));
-      case "getFAQAnswer": return JSON.stringify(getFAQAnswer(String(args.topic ?? "")));
-      default: return JSON.stringify({ error: `Unknown tool: ${name}` });
+      case "getPricingPlans":
+        return JSON.stringify(await getPricingPlans());
+      case "createSupportTicket":
+        return JSON.stringify(
+          await createSupportTicket({
+            subject: String(args.subject ?? "Support Request"),
+            message: String(args.message ?? ""),
+            priority: (args.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
+            userId: user?.userId,
+            userName: user?.name,
+            userEmail: user?.email,
+            userRole: user?.role,
+            sessionId,
+          })
+        );
+      case "getSignupGuide":
+        return JSON.stringify(
+          getSignupGuide((args.userType as "society" | "landlord" | "tenant") ?? "society")
+        );
+      case "getFAQAnswer":
+        return JSON.stringify(getFAQAnswer(String(args.topic ?? "")));
+      default:
+        return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
   } catch (err) {
     return JSON.stringify({ error: String(err) });
@@ -66,7 +85,7 @@ async function dispatchTool(
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       prompt: string;
       threadId: string;
       user?: ChatUserContext;
@@ -94,11 +113,10 @@ export async function POST(request: NextRequest) {
     // Agentic loop — max 5 iterations for tool calls
     for (let i = 0; i < 5; i++) {
       const response = await client.chat.completions.create({
-        model: "c1/anthropic/claude-sonnet-4/v-20251230",
+        model: "google/gemini-2.0-flash-001",
         messages,
         tools: CHAT_TOOLS,
         tool_choice: "auto",
-        stream: false,
       });
 
       const choice = response.choices[0];
@@ -117,10 +135,9 @@ export async function POST(request: NextRequest) {
       // Execute tool calls
       const toolResults = await Promise.all(
         toolCalls.map(async (tc) => {
-          const fn = tc as unknown as { id: string; function: { name: string; arguments: string } };
-          const args = JSON.parse(fn.function.arguments || "{}") as Record<string, unknown>;
-          const result = await dispatchTool(fn.function.name, args, user, sessionId);
-          return { role: "tool" as const, tool_call_id: fn.id, content: result };
+          const args = JSON.parse(tc.function.arguments || "{}") as Record<string, unknown>;
+          const result = await dispatchTool(tc.function.name, args, user, sessionId);
+          return { role: "tool" as const, tool_call_id: tc.id, content: result };
         })
       );
       messages.push(...toolResults);
@@ -131,13 +148,10 @@ export async function POST(request: NextRequest) {
       messageStore.set(threadId, [messages[0], ...messages.slice(-40)]);
     }
 
-    // Log first 300 chars of raw response so we can debug the format
-    console.log("[chat] raw response:", finalContent.slice(0, 300));
-    return NextResponse.json({ content: finalContent });
-
+    return NextResponse.json({ content: finalContent || "Sorry, I couldn't generate a response." });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[chat/route] ERROR:", msg);
-    return NextResponse.json({ content: `API Error: ${msg}` });
+    return NextResponse.json({ content: `Error: ${msg}` });
   }
 }
