@@ -333,7 +333,7 @@ export async function lookupVehicleByNumber(
 
   return {
     ...(data as unknown as Vehicle),
-    slot: (pass?.slot as ParkingSlotWithPass) ?? null,
+    slot: (pass?.slot as unknown as ParkingSlotWithPass) ?? null,
   };
 }
 
