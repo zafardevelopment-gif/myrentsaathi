@@ -176,6 +176,48 @@ export async function signupLandlord(params: {
   return { success: true, userId: user.id };
 }
 
+// ─── ADD GUARD (by society admin) ────────────────────────────
+
+export async function addGuard(params: {
+  full_name: string;
+  email: string;
+  phone: string;
+  society_id: string;
+}): Promise<{ success: boolean; error?: string; password?: string }> {
+  const { data: existing } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", params.email.trim().toLowerCase())
+    .single();
+  if (existing) return { success: false, error: "Email already registered." };
+
+  const autoPassword = params.full_name.split(" ")[0] + "@guard";
+
+  const { data: user, error: userErr } = await supabase
+    .from("users")
+    .insert({
+      email: params.email.trim().toLowerCase(),
+      full_name: params.full_name.trim(),
+      phone: params.phone.trim(),
+      role: "guard",
+      password: autoPassword,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+  if (userErr || !user) return { success: false, error: userErr?.message ?? "Failed to create guard." };
+
+  const { error: memErr } = await supabase.from("society_members").insert({
+    user_id: user.id,
+    society_id: params.society_id,
+    role: "guard",
+    designation: "Security Guard",
+  });
+  if (memErr) return { success: false, error: "Failed to link guard to society." };
+
+  return { success: true, password: autoPassword };
+}
+
 // ─── ADD BOARD MEMBER (by admin) ─────────────────────────────
 
 export async function addBoardMember(params: {

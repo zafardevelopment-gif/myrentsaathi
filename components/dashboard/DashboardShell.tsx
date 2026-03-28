@@ -29,6 +29,7 @@ export default function DashboardShell({
       }
     } else if (user.role !== role) {
       const dest = user.role === "superadmin" ? "/superadmin" : `/${user.role}`;
+      // guard → /guard, all others follow the same pattern
       router.push(dest);
     }
   }, [hydrated, user, role, router]);

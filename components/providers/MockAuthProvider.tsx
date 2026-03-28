@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { dbLogin } from "@/lib/auth-db";
 import { trackLogin } from "@/lib/analytics";
 
-export type MockRole = "admin" | "board" | "landlord" | "tenant" | "superadmin";
+export type MockRole = "admin" | "board" | "landlord" | "tenant" | "superadmin" | "guard";
 
 // Map DB role values to app role keys
 const ROLE_MAP: Record<string, MockRole> = {
@@ -14,6 +14,7 @@ const ROLE_MAP: Record<string, MockRole> = {
   landlord:      "landlord",
   tenant:        "tenant",
   superadmin:    "superadmin",
+  guard:         "guard",
 };
 
 interface MockUser {
@@ -45,7 +46,7 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem("mrs_user");
       if (stored) {
         const parsed = JSON.parse(stored) as MockUser;
-        const validRoles: MockRole[] = ["admin", "board", "landlord", "tenant", "superadmin"];
+        const validRoles: MockRole[] = ["admin", "board", "landlord", "tenant", "superadmin", "guard"];
         if (validRoles.includes(parsed.role)) {
           setUser(parsed);
         }
