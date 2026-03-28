@@ -10,6 +10,7 @@ const ROLE_LABELS: Record<MockRole, { label: string; color: string; bg: string }
   board:      { label: "Board",       color: "text-purple-600", bg: "bg-purple-100" },
   landlord:   { label: "Landlord",    color: "text-green-700",  bg: "bg-green-100"  },
   tenant:     { label: "Tenant",      color: "text-blue-600",   bg: "bg-blue-100"   },
+  guard:      { label: "Guard",       color: "text-gray-700",   bg: "bg-gray-100"   },
 };
 
 interface DashHeaderProps {
