@@ -139,7 +139,7 @@ export async function getAllVehicles(societyId: string): Promise<Vehicle[]> {
 
   const passMap: Record<string, ParkingSlotWithPass> = {};
   for (const p of passes ?? []) {
-    passMap[p.vehicle_id] = p.slot as ParkingSlotWithPass;
+    passMap[p.vehicle_id] = p.slot as unknown as ParkingSlotWithPass;
   }
 
   return (data as unknown as Vehicle[]).map((v) => ({
@@ -250,7 +250,7 @@ export async function getResidentVehicles(
 
   const passMap: Record<string, ParkingSlotWithPass> = {};
   for (const p of passes ?? []) {
-    passMap[p.vehicle_id] = p.slot as ParkingSlotWithPass;
+    passMap[p.vehicle_id] = p.slot as unknown as ParkingSlotWithPass;
   }
 
   return (data as unknown as Vehicle[]).map((v) => ({
