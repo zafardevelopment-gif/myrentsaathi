@@ -74,7 +74,7 @@ export default function TenantHome() {
   }, [user]);
 
   const tenantUser = profile?.user;
-  const flat = profile?.flat as { flat_number: string; block: string | null; flat_type: string | null; monthly_rent: number | null; owner?: { full_name: string } | null } | null;
+  const flat = profile?.flat as { flat_number: string; block: string | null; flat_type: string | null; floor_number?: number | null; monthly_rent: number | null; owner?: { full_name: string; phone?: string } | null } | null;
   const society = profile?.society as { name: string; city: string } | null;
   const currentMonth = new Date().toISOString().slice(0, 7);
   const myPayment = payments.find((p) => p.month_year === currentMonth);
@@ -227,6 +227,56 @@ export default function TenantHome() {
                 </div>
               ))}
             </div>
+          </div>
+        );
+      })()}
+
+      {/* My Landlord + Flat info */}
+      {(() => {
+        const landlord = flat?.owner ?? null;
+        if (!landlord && !flat) return null;
+        return (
+          <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
+            <div className="text-sm font-bold text-ink mb-3">🏠 My Flat Details</div>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {[
+                { label: "Flat",    value: flat ? `${flat.flat_number}${flat.block ? ` · Block ${flat.block}` : ""}` : "—" },
+                { label: "Society", value: society?.name ?? "Independent" },
+                { label: "Floor",   value: flat?.floor_number != null ? `Floor ${flat.floor_number}` : "—" },
+                { label: "Type",    value: flat?.flat_type ?? "—" },
+              ].map(d => (
+                <div key={d.label} className="bg-warm-50 rounded-xl p-2.5">
+                  <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
+                  <div className="text-xs font-extrabold text-ink mt-0.5 capitalize">{d.value}</div>
+                </div>
+              ))}
+            </div>
+            {landlord && (
+              <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
+                <div className="text-[10px] font-bold text-brand-600 uppercase tracking-widest mb-2">My Landlord</div>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-brand-200 flex items-center justify-center text-xs font-extrabold text-brand-700 flex-shrink-0">
+                      {landlord.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="text-sm font-extrabold text-ink">{landlord.full_name}</div>
+                      {landlord.phone && <div className="text-xs text-ink-muted">📞 {landlord.phone}</div>}
+                    </div>
+                  </div>
+                  {landlord.phone && (
+                    <a
+                      href={`https://wa.me/${landlord.phone.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-green-500 text-white text-[11px] font-bold no-underline flex-shrink-0"
+                    >
+                      📱 WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}

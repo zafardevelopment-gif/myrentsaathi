@@ -28,6 +28,7 @@ const NAV_ITEMS: Record<MockRole, NavItem[]> = {
   admin: [
     { icon: "📊", label: "Overview",   href: "/admin" },
     { icon: "🏢", label: "Flats",      href: "/admin/flats" },
+    { icon: "🏠", label: "Landlords",  href: "/admin/landlords" },
     { icon: "💰", label: "Finance",    href: "/admin/finance" },
     { icon: "📋", label: "Expenses",   href: "/admin/expenses" },
     { icon: "🚫", label: "Tickets",    href: "/admin/tickets" },

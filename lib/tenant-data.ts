@@ -16,6 +16,7 @@ export type TenantProfile = {
     flat_number: string;
     block: string | null;
     flat_type: string | null;
+    floor_number?: number | null;
     monthly_rent: number | null;
     owner_id: string | null;
     owner?: { full_name: string; phone: string } | null;
@@ -78,7 +79,7 @@ export async function getTenantProfile(email: string): Promise<TenantProfile | n
   if (data.flat_id) {
     const { data: flatData } = await supabase
       .from("flats")
-      .select("flat_number, block, flat_type, monthly_rent, owner_id")
+      .select("flat_number, block, flat_type, floor_number, monthly_rent, owner_id")
       .eq("id", data.flat_id)
       .single();
     flat = flatData;

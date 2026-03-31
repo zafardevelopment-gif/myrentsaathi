@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getLandlordFlats, getLandlordAgreements, getLandlordUserId, type LandlordFlat, type LandlordAgreement } from "@/lib/landlord-data";
+import { getLandlordTenantStats } from "@/lib/admin-data";
 import { addTenant } from "@/lib/auth-db";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
@@ -316,6 +317,10 @@ export default function LandlordTenants() {
     lease_start: "", lease_end: "",
   });
 
+  // Tenant credentials modal after creation
+  type TenantCreds = { name: string; userId: string; password: string; loginEmail: string; flatLabel: string };
+  const [tenantCreds, setTenantCreds] = useState<TenantCreds | null>(null);
+
   // KYC modal
   const [kycFlat, setKycFlat] = useState<LandlordFlat | null>(null);
   const [tenantDetail, setTenantDetail] = useState<TenantDetail | null>(null);
@@ -435,6 +440,17 @@ export default function LandlordTenants() {
     if (!landlordId || !form.flat_id) return;
     const selectedFlat = flats.find(f => f.id === form.flat_id);
     if (!selectedFlat) return;
+
+    // Check tenant limit
+    const tenantStats = await getLandlordTenantStats(landlordId);
+    if (tenantStats.count >= tenantStats.limit) {
+      toast.error(
+        `Your plan allows ${tenantStats.limit} tenants. Contact admin to purchase more slots.`,
+        { duration: 5000 }
+      );
+      return;
+    }
+
     setSaving(true);
     const result = await addTenant({
       full_name: form.full_name, email: form.email, phone: form.phone,
@@ -447,7 +463,22 @@ export default function LandlordTenants() {
     });
     setSaving(false);
     if (!result.success) { toast.error(result.error ?? "Failed to add tenant."); return; }
-    toast.success(`Tenant added! Auto password: ${form.full_name.split(" ")[0]}@123`);
+
+    // Show credentials if auto-generated
+    if (result.generatedUserId && result.generatedPassword) {
+      const flat = flats.find(f => f.id === form.flat_id);
+      const flatLabel = flat ? `${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : form.flat_id;
+      setTenantCreds({
+        name: form.full_name,
+        userId: result.generatedUserId,
+        password: result.generatedPassword,
+        loginEmail: result.loginEmail ?? form.email,
+        flatLabel,
+      });
+    } else {
+      toast.success("Tenant added successfully.");
+    }
+
     setForm({ full_name: "", email: "", phone: "", flat_id: "", monthly_rent: "", security_deposit: "", lease_start: "", lease_end: "" });
     setShowForm(false);
     setLoading(true);
@@ -512,6 +543,55 @@ export default function LandlordTenants() {
   return (
     <div>
       <Toaster position="top-center" />
+
+      {/* Tenant Credentials Modal */}
+      {tenantCreds && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setTenantCreds(null)}>
+          <div className="bg-white rounded-[20px] w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-green-50 rounded-t-[20px] px-5 pt-5 pb-4 border-b border-green-100 text-center">
+              <div className="text-3xl mb-2">✅</div>
+              <div className="text-base font-extrabold text-green-700">Tenant Added!</div>
+              <div className="text-xs text-ink-muted mt-1">Share these login credentials with the tenant</div>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="bg-warm-50 rounded-xl p-3 border border-border-default">
+                <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-1">Name</div>
+                <div className="text-sm font-extrabold text-ink">{tenantCreds.name}</div>
+                <div className="text-xs text-ink-muted mt-0.5">Flat {tenantCreds.flatLabel}</div>
+              </div>
+              <div className="bg-brand-50 rounded-xl p-4 border border-brand-200 space-y-3">
+                <div className="text-[11px] font-bold text-brand-600 uppercase tracking-widest text-center mb-1">Login Credentials</div>
+                <div>
+                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-1">User ID</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <code className="text-base font-extrabold text-brand-600 bg-brand-100 px-3 py-1.5 rounded-lg flex-1 text-center tracking-wider">
+                      {tenantCreds.userId}
+                    </code>
+                    <button onClick={() => { navigator.clipboard.writeText(tenantCreds.userId); toast.success("Copied!"); }} className="text-[10px] text-brand-500 font-bold border border-brand-200 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-brand-50">Copy</button>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-1">Password</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <code className="text-base font-extrabold text-ink bg-warm-100 px-3 py-1.5 rounded-lg flex-1 text-center tracking-wider">
+                      {tenantCreds.password}
+                    </code>
+                    <button onClick={() => { navigator.clipboard.writeText(tenantCreds.password); toast.success("Copied!"); }} className="text-[10px] text-brand-500 font-bold border border-brand-200 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-brand-50">Copy</button>
+                  </div>
+                </div>
+                <div className="text-[10px] text-ink-muted text-center">Login email: {tenantCreds.loginEmail}</div>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-[11px] text-yellow-700 text-center">
+                Screenshot these credentials — they won&apos;t be shown again.
+              </div>
+            </div>
+            <div className="px-5 pb-5">
+              <button onClick={() => setTenantCreds(null)} className="w-full py-3 rounded-xl bg-brand-500 text-white text-sm font-bold cursor-pointer">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-[15px] font-extrabold text-ink">👥 Tenants</h2>
         {vacantFlats.length > 0 && (

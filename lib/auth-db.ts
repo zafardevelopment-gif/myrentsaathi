@@ -15,22 +15,34 @@ export type DBUser = {
   password: string | null;
 };
 
-// ─── LOGIN (by email) ────────────────────────────────────────
+// ─── LOGIN (by email or display user ID) ─────────────────────
 
 export async function dbLogin(email: string, password: string): Promise<{
   success: boolean;
   user?: DBUser;
   error?: string;
 }> {
-  const { data, error } = await supabase
+  // Try email first
+  let { data } = await supabase
     .from("users")
     .select("id, email, full_name, phone, role, password")
     .eq("email", email.trim().toLowerCase())
     .eq("is_active", true)
-    .single();
+    .maybeSingle();
 
-  if (error || !data) {
-    return { success: false, error: "No account found with this email." };
+  // If not found by email, try admin_user_id (for landlord/tenant login with display ID)
+  if (!data) {
+    const { data: data2 } = await supabase
+      .from("users")
+      .select("id, email, full_name, phone, role, password")
+      .eq("admin_user_id", email.trim())
+      .eq("is_active", true)
+      .maybeSingle();
+    data = data2;
+  }
+
+  if (!data) {
+    return { success: false, error: "No account found with this email or User ID." };
   }
 
   if (data.password !== password) {
@@ -168,6 +180,7 @@ export async function signupLandlord(params: {
       role: "landlord",
       password: params.password,
       is_active: true,
+      is_independent: true,
     })
     .select("id")
     .single();
@@ -283,9 +296,13 @@ export async function addTenant(params: {
   security_deposit: number;
   lease_start: string;
   lease_end: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; generatedPassword?: string; generatedUserId?: string; loginEmail?: string }> {
   // Upsert user
   let userId: string;
+  let generatedPassword: string | undefined;
+  let generatedUserId: string | undefined;
+  let loginEmail: string | undefined;
+
   const { data: existing } = await supabase
     .from("users")
     .select("id")
@@ -295,16 +312,21 @@ export async function addTenant(params: {
   if (existing) {
     userId = existing.id;
   } else {
-    const autoPassword = params.full_name.split(" ")[0] + "@123";
+    const suffix = Math.floor(1000 + Math.random() * 9000).toString();
+    generatedUserId = `TNT-${suffix}`;
+    generatedPassword = params.full_name.split(" ")[0] + "@" + suffix;
+    loginEmail = params.email.trim().toLowerCase() || `tnt${suffix}@mrs.local`;
+
     const { data: newUser, error } = await supabase
       .from("users")
       .insert({
-        email: params.email.trim().toLowerCase(),
+        email: loginEmail,
         full_name: params.full_name.trim(),
         phone: params.phone.trim(),
         role: "tenant",
-        password: autoPassword,
+        password: generatedPassword,
         is_active: true,
+        admin_user_id: generatedUserId,
       })
       .select("id")
       .single();
@@ -362,5 +384,82 @@ export async function addTenant(params: {
   if (params.society_id) rentInsert.society_id = params.society_id;
   await supabase.from("rent_payments").insert(rentInsert);
 
-  return { success: true };
+  return { success: true, generatedPassword, generatedUserId, loginEmail };
+}
+
+// ─── ADD LANDLORD (by society admin) ────────────────────────
+
+export async function addLandlordBySocietyAdmin(params: {
+  full_name: string;
+  phone: string;
+  email?: string;
+  society_id: string;
+  flat_id?: string;
+}): Promise<{
+  success: boolean;
+  error?: string;
+  userId?: string;
+  generatedUserId?: string;
+  generatedPassword?: string;
+  loginEmail?: string;
+}> {
+  const suffix = Math.floor(1000 + Math.random() * 9000).toString();
+  const displayId = `LND-${suffix}`;
+  const autoPassword = params.full_name.trim().split(" ")[0] + "@" + suffix;
+  const loginEmail = params.email?.trim().toLowerCase() || `lnd${suffix}@mrs.local`;
+
+  // Check email not already taken
+  const { data: existing } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", loginEmail)
+    .maybeSingle();
+  if (existing) return { success: false, error: "Email already registered. Use a different email." };
+
+  // Create landlord user
+  const { data: user, error: userErr } = await supabase
+    .from("users")
+    .insert({
+      email: loginEmail,
+      full_name: params.full_name.trim(),
+      phone: params.phone.trim(),
+      role: "landlord",
+      password: autoPassword,
+      is_active: true,
+      is_independent: false,
+      admin_user_id: displayId,
+    })
+    .select("id")
+    .single();
+  if (userErr || !user) return { success: false, error: userErr?.message ?? "Failed to create landlord." };
+
+  // Link to society
+  const { error: memErr } = await supabase.from("society_members").insert({
+    user_id: user.id,
+    society_id: params.society_id,
+    role: "landlord",
+    designation: "Landlord",
+  });
+  if (memErr) {
+    console.error("Society member link error:", memErr);
+    // Don't fail — user is created
+  }
+
+  // Link to flat if provided
+  if (params.flat_id) {
+    await supabase.from("flats").update({
+      owner_id: user.id,
+      owner_name: params.full_name.trim(),
+      owner_phone: params.phone.trim(),
+      owner_email: loginEmail,
+    }).eq("id", params.flat_id);
+  }
+
+  return {
+    success: true,
+    userId: user.id,
+    generatedUserId: displayId,
+    generatedPassword: autoPassword,
+    loginEmail,
+  };
 }

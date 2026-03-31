@@ -606,6 +606,34 @@ export async function deleteFlat(flatId: string) {
   if (error) throw error;
 }
 
+// ─── SUBSCRIPTION LIMITS ─────────────────────────────────────
+
+/** Count of current landlords in society + the plan's limit */
+export async function getSocietyLandlordStats(societyId: string): Promise<{ count: number; limit: number }> {
+  const [countRes, societyRes] = await Promise.all([
+    supabase
+      .from("society_members")
+      .select("id", { count: "exact", head: true })
+      .eq("society_id", societyId)
+      .eq("role", "landlord"),
+    supabase.from("societies").select("landlord_limit").eq("id", societyId).maybeSingle(),
+  ]);
+  return { count: countRes.count ?? 0, limit: societyRes.data?.landlord_limit ?? 10 };
+}
+
+/** Count of current active tenants for a landlord + the plan's limit */
+export async function getLandlordTenantStats(landlordId: string): Promise<{ count: number; limit: number }> {
+  const [countRes, userRes] = await Promise.all([
+    supabase
+      .from("tenants")
+      .select("id", { count: "exact", head: true })
+      .eq("landlord_id", landlordId)
+      .eq("status", "active"),
+    supabase.from("users").select("tenant_limit").eq("id", landlordId).maybeSingle(),
+  ]);
+  return { count: countRes.count ?? 0, limit: userRes.data?.tenant_limit ?? 5 };
+}
+
 export async function getVacantFlats(societyId: string) {
   const { data, error } = await supabase
     .from("flats")

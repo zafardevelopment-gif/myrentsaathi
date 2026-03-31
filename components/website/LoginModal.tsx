@@ -21,7 +21,7 @@ export default function LoginModal({ onClose, onLogin }: LoginModalProps) {
     e.preventDefault();
     setError("");
     if (!email.trim() || !password) {
-      setError("Please enter your email and password.");
+      setError("Please enter your email (or User ID) and password.");
       return;
     }
     setLoading(true);
@@ -63,13 +63,13 @@ export default function LoginModal({ onClose, onLogin }: LoginModalProps) {
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3.5">
-            <label className="text-xs font-bold text-ink-soft mb-1.5 block">Email</label>
+            <label className="text-xs font-bold text-ink-soft mb-1.5 block">Email or User ID</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              autoComplete="email"
+              placeholder="your@email.com or LND-1234"
+              autoComplete="username"
               className="w-full px-4 py-3 rounded-xl border border-border-default text-sm outline-none focus:border-brand-500 transition-colors"
             />
           </div>
