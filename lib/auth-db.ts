@@ -303,19 +303,22 @@ export async function addTenant(params: {
   let generatedUserId: string | undefined;
   let loginEmail: string | undefined;
 
-  const { data: existing } = await supabase
-    .from("users")
-    .select("id")
-    .eq("email", params.email.trim().toLowerCase())
-    .single();
+  const trimmedEmail = params.email.trim().toLowerCase();
+  const { data: existing } = trimmedEmail
+    ? await supabase.from("users").select("id, admin_user_id, password, email").eq("email", trimmedEmail).single()
+    : { data: null };
 
   if (existing) {
     userId = existing.id;
+    // Return stored credentials so bulk CSV always has tenant password
+    generatedUserId = existing.admin_user_id ?? undefined;
+    generatedPassword = existing.password ?? undefined;
+    loginEmail = existing.email ?? undefined;
   } else {
     const suffix = Math.floor(1000 + Math.random() * 9000).toString();
     generatedUserId = `TNT-${suffix}`;
     generatedPassword = params.full_name.split(" ")[0] + "@" + suffix;
-    loginEmail = params.email.trim().toLowerCase() || `tnt${suffix}@mrs.local`;
+    loginEmail = trimmedEmail || `tnt${suffix}@mrs.local`;
 
     const { data: newUser, error } = await supabase
       .from("users")
@@ -452,6 +455,7 @@ export async function addLandlordBySocietyAdmin(params: {
       owner_name: params.full_name.trim(),
       owner_phone: params.phone.trim(),
       owner_email: loginEmail,
+      status: "occupied",
     }).eq("id", params.flat_id);
   }
 

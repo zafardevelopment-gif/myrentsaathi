@@ -98,7 +98,11 @@ export default function TenantComplaints() {
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this complaint?")) return;
-    await supabase.from("tickets").delete().eq("id", id);
+    const { error } = await supabase.from("tickets").delete().eq("id", id);
+    if (error) {
+      toast.error("Failed to delete complaint");
+      return;
+    }
     toast.success("Complaint deleted.");
     setTickets(prev => prev.filter(t => t.id !== id));
   }

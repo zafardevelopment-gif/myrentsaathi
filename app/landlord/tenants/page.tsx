@@ -435,11 +435,21 @@ export default function LandlordTenants() {
     await loadData();
   }
 
+  function isValidPhone(phone: string): boolean {
+    return /^\d{10}$/.test(phone.replace(/\D/g, "").slice(0, 10));
+  }
+
   async function handleAddTenant(e: React.FormEvent) {
     e.preventDefault();
     if (!landlordId || !form.flat_id) return;
     const selectedFlat = flats.find(f => f.id === form.flat_id);
     if (!selectedFlat) return;
+
+    // Phone validation
+    if (!isValidPhone(form.phone)) {
+      toast.error("Enter valid 10-digit mobile number");
+      return;
+    }
 
     // Check tenant limit
     const tenantStats = await getLandlordTenantStats(landlordId);
@@ -607,7 +617,7 @@ export default function LandlordTenants() {
           <div className="text-sm font-bold text-ink mb-1">Add New Tenant</div>
           <div className="grid grid-cols-2 gap-2">
             <div><label className={labelClass}>Full Name *</label><input required className={inputClass} placeholder="Rajesh Sharma" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} /></div>
-            <div><label className={labelClass}>Phone *</label><input required className={inputClass} placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+            <div><label className={labelClass}>Phone *</label><input required className={inputClass} placeholder="10-digit mobile" maxLength={10} inputMode="numeric" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))} /></div>
           </div>
           <div><label className={labelClass}>Email *</label><input required type="email" className={inputClass} placeholder="rajesh@gmail.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
           <div>

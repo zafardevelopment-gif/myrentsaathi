@@ -125,8 +125,8 @@ export default function AdminGovernance() {
             </div>
             <div>
               <label className="text-[10px] font-semibold text-ink-muted block mb-1">Phone *</label>
-              <input required className={inputClass} placeholder="+91 98765 11111"
-                value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+              <input required className={inputClass} placeholder="10-digit mobile" maxLength={10} inputMode="numeric"
+                value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))} />
             </div>
           </div>
           <div>

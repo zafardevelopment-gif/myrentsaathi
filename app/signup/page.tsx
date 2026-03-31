@@ -163,8 +163,8 @@ export default function SignupPage() {
                   </div>
                   <div>
                     <label className={labelClass}>Phone *</label>
-                    <input required className={inputClass} placeholder="+91 98765 00000" type="tel"
-                      value={society.phone} onChange={e => setSociety(s => ({ ...s, phone: e.target.value }))} />
+                    <input required className={inputClass} placeholder="10-digit mobile" type="tel" maxLength={10} inputMode="numeric"
+                      value={society.phone} onChange={e => setSociety(s => ({ ...s, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))} />
                   </div>
                 </div>
 
@@ -254,8 +254,8 @@ export default function SignupPage() {
                   </div>
                   <div>
                     <label className={labelClass}>Phone *</label>
-                    <input required className={inputClass} placeholder="+91 98765 00001" type="tel"
-                      value={landlord.phone} onChange={e => setLandlord(l => ({ ...l, phone: e.target.value }))} />
+                    <input required className={inputClass} placeholder="10-digit mobile" type="tel" maxLength={10} inputMode="numeric"
+                      value={landlord.phone} onChange={e => setLandlord(l => ({ ...l, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))} />
                   </div>
                 </div>
 

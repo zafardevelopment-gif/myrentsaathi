@@ -10,6 +10,10 @@ import toast, { Toaster } from "react-hot-toast";
 const inputClass = "w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500";
 const labelClass = "text-[10px] font-semibold text-ink-muted block mb-1";
 
+function isValidPhone(phone: string): boolean {
+  return /^\d{10}$/.test(phone.replace(/\D/g, "").slice(0, 10));
+}
+
 type LandlordRow = {
   id: string;
   full_name: string;
@@ -105,6 +109,12 @@ export default function AdminLandlords() {
   async function handleAddLandlord(e: React.FormEvent) {
     e.preventDefault();
     if (!societyId) return;
+
+    // Phone validation
+    if (!isValidPhone(form.phone)) {
+      toast.error("Enter valid 10-digit mobile number");
+      return;
+    }
 
     // Enforce landlord limit
     if (landlordStats && landlordStats.count >= landlordStats.limit) {
@@ -317,9 +327,11 @@ export default function AdminLandlords() {
               <input
                 required
                 className={inputClass}
-                placeholder="+91 98765 43210"
+                placeholder="10-digit mobile"
+                maxLength={10}
+                inputMode="numeric"
                 value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
               />
             </div>
             <div>

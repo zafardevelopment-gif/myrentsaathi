@@ -346,13 +346,10 @@ export type LandlordTicket = {
   flat?: { flat_number: string; block: string | null } | null;
 };
 
+/** Only complaints raised BY the landlord (landlord → society). */
 export async function getLandlordTickets(email: string): Promise<LandlordTicket[]> {
   const userId = await getLandlordUserId(email);
   if (!userId) return [];
-
-  const { data: flats } = await supabase.from("flats").select("id").eq("owner_id", userId);
-  if (!flats || flats.length === 0) return [];
-  const flatIds = flats.map((f) => f.id);
 
   const { data, error } = await supabase
     .from("tickets")
@@ -360,10 +357,40 @@ export async function getLandlordTickets(email: string): Promise<LandlordTicket[
       id, subject, category, priority, status, created_at,
       flat:flats(flat_number, block)
     `)
-    .in("flat_id", flatIds)
+    .eq("raised_by", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as LandlordTicket[];
+}
+
+/** Get the society the landlord belongs to. */
+export async function getLandlordSocietyId(email: string): Promise<string | null> {
+  const userId = await getLandlordUserId(email);
+  if (!userId) return null;
+  const { data } = await supabase
+    .from("society_members")
+    .select("society_id")
+    .eq("user_id", userId)
+    .eq("role", "landlord")
+    .maybeSingle();
+  return data?.society_id ?? null;
+}
+
+/** Create a complaint from a landlord directed at the society. */
+export async function createLandlordTicket(
+  email: string,
+  societyId: string,
+  ticket: { category: string; subject: string; description: string; priority: string }
+): Promise<void> {
+  const userId = await getLandlordUserId(email);
+  if (!userId) throw new Error("User not found");
+  const { error } = await supabase.from("tickets").insert({
+    society_id: societyId,
+    raised_by: userId,
+    ...ticket,
+    status: "open",
+  });
+  if (error) throw error;
 }
 
 // ─── SOCIETIES (for flat creation) ───────────────────────────

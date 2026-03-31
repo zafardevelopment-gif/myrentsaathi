@@ -233,19 +233,41 @@ export async function getSocietyExpenses(societyId: string): Promise<AdminExpens
 // ─── TICKETS ─────────────────────────────────────────────────
 
 export async function getSocietyTickets(societyId: string): Promise<AdminTicket[]> {
+  // Only show society-directed complaints (tenant→society and landlord→society)
   const { data, error } = await supabase
     .from("tickets")
     .select(`
       id, ticket_number, flat_id, raised_by, assigned_to, category, subject,
       description, priority, status, created_at, resolved_at,
-      flat:flats(flat_number, block),
-      raiser:users!tickets_raised_by_fkey(full_name),
-      assignee:users!tickets_assigned_to_fkey(full_name)
+      flat:flats(flat_number, block)
     `)
     .eq("society_id", societyId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as unknown as AdminTicket[];
+
+  const tickets = (data ?? []) as unknown as AdminTicket[];
+  if (tickets.length === 0) return tickets;
+
+  // Fetch user names separately to avoid FK constraint name dependency
+  const userIds = [
+    ...new Set([
+      ...tickets.map((t) => t.raised_by).filter(Boolean),
+      ...tickets.map((t) => t.assigned_to).filter(Boolean),
+    ]),
+  ] as string[];
+
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, full_name")
+    .in("id", userIds);
+
+  const userMap = Object.fromEntries((users ?? []).map((u) => [u.id, { full_name: u.full_name }]));
+
+  return tickets.map((t) => ({
+    ...t,
+    raiser: userMap[t.raised_by] ?? null,
+    assignee: t.assigned_to ? (userMap[t.assigned_to] ?? null) : null,
+  })) as unknown as AdminTicket[];
 }
 
 export async function assignTicket(id: string, assignedTo: string) {
@@ -575,7 +597,9 @@ export async function createFlat(societyId: string, flatData: {
     tenant_name: flatData.tenant_name ?? null,
     tenant_phone: flatData.tenant_phone ?? null,
     tenant_email: flatData.tenant_email ?? null,
-    status: "vacant",
+    status: (flatData.owner_name || flatData.owner_phone || flatData.tenant_name || flatData.tenant_phone)
+      ? "occupied"
+      : "vacant",
   }).select().single();
   if (error) throw error;
   return data;
@@ -602,6 +626,15 @@ export async function updateFlat(flatId: string, flatData: Partial<{
 }
 
 export async function deleteFlat(flatId: string) {
+  // Nullify FK references so dependent records can be deleted safely
+  await supabase.from("flats").update({ owner_id: null, current_tenant_id: null }).eq("id", flatId);
+  // Delete dependent records (ignore errors if tables/rows don't exist)
+  await supabase.from("rent_payments").delete().eq("flat_id", flatId);
+  await supabase.from("maintenance_payments").delete().eq("flat_id", flatId);
+  await supabase.from("tenants").delete().eq("flat_id", flatId);
+  await supabase.from("tickets").delete().eq("flat_id", flatId);
+  await supabase.from("parking_slots").update({ flat_id: null, status: "available", vehicle_number: null, vehicle_model: null }).eq("flat_id", flatId);
+  // Now safe to delete the flat
   const { error } = await supabase.from("flats").delete().eq("id", flatId);
   if (error) throw error;
 }
