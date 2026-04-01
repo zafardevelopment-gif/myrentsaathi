@@ -67,6 +67,16 @@ export default function AdminVisitorsPage() {
   const [gSuccess, setGSuccess] = useState("");
   const [gError, setGError] = useState("");
 
+  // Search + pagination
+  const [logSearch, setLogSearch] = useState("");
+  const [logPage, setLogPage] = useState(1);
+  const [logStatusFilter, setLogStatusFilter] = useState("all");
+  const [overrideSearch, setOverrideSearch] = useState("");
+  const [overridePage, setOverridePage] = useState(1);
+  const [guardSearch, setGuardSearch] = useState("");
+  const [guardPage, setGuardPage] = useState(1);
+  const PAGE_SIZE = 10;
+
   const loadData = useCallback(async (sid: string) => {
     const [ov, lg, gd] = await Promise.all([
       getAdminPendingOverrides(sid),
@@ -140,6 +150,44 @@ export default function AdminVisitorsPage() {
     setGuards(updated);
   };
 
+  // ── DERIVED: filtered + paged data ───────────────────────
+  const filteredOverrides = overrides.filter((v) => {
+    if (!overrideSearch.trim()) return true;
+    const q = overrideSearch.toLowerCase();
+    return (
+      (v.visitor?.name ?? "").toLowerCase().includes(q) ||
+      (v.visitor?.mobile ?? "").includes(q) ||
+      (v.flat_number ?? "").toLowerCase().includes(q) ||
+      (v.purpose ?? "").toLowerCase().includes(q)
+    );
+  });
+  const totalOverridePages = Math.max(1, Math.ceil(filteredOverrides.length / PAGE_SIZE));
+  const pagedOverrides = filteredOverrides.slice((overridePage - 1) * PAGE_SIZE, overridePage * PAGE_SIZE);
+
+  const filteredLog = log.filter((v) => {
+    const matchStatus = logStatusFilter === "all" || v.status === logStatusFilter;
+    if (!matchStatus) return false;
+    if (!logSearch.trim()) return true;
+    const q = logSearch.toLowerCase();
+    return (
+      (v.visitor?.name ?? "").toLowerCase().includes(q) ||
+      (v.visitor?.mobile ?? "").includes(q) ||
+      (v.flat_number ?? "").toLowerCase().includes(q) ||
+      (v.purpose ?? "").toLowerCase().includes(q) ||
+      (v.guard?.full_name ?? "").toLowerCase().includes(q)
+    );
+  });
+  const totalLogPages = Math.max(1, Math.ceil(filteredLog.length / PAGE_SIZE));
+  const pagedLog = filteredLog.slice((logPage - 1) * PAGE_SIZE, logPage * PAGE_SIZE);
+
+  const filteredGuards = guards.filter((g) => {
+    if (!guardSearch.trim()) return true;
+    const q = guardSearch.toLowerCase();
+    return g.full_name.toLowerCase().includes(q) || g.email.toLowerCase().includes(q) || (g.phone ?? "").includes(q);
+  });
+  const totalGuardPages = Math.max(1, Math.ceil(filteredGuards.length / PAGE_SIZE));
+  const pagedGuards = filteredGuards.slice((guardPage - 1) * PAGE_SIZE, guardPage * PAGE_SIZE);
+
   if (loading) {
     return <div className="text-amber-600 font-bold animate-pulse text-sm py-12 text-center">Loading…</div>;
   }
@@ -180,6 +228,15 @@ export default function AdminVisitorsPage() {
       {/* ── TAB: OVERRIDES ── */}
       {tab === "overrides" && (
         <div className="space-y-4">
+          {overrides.length > 0 && (
+            <input
+              type="text"
+              value={overrideSearch}
+              onChange={(e) => { setOverrideSearch(e.target.value); setOverridePage(1); }}
+              placeholder="Search by name, mobile, flat, purpose…"
+              className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          )}
           {overrides.length === 0 && (
             <div className="bg-white rounded-2xl border border-border-default p-8 text-center">
               <div className="text-4xl mb-3">✅</div>
@@ -187,7 +244,12 @@ export default function AdminVisitorsPage() {
               <p className="text-xs text-ink-muted mt-1">All timed-out visits have been resolved.</p>
             </div>
           )}
-          {overrides.map((v) => (
+          {overrides.length > 0 && filteredOverrides.length === 0 && (
+            <div className="bg-white rounded-2xl border border-border-default p-6 text-center">
+              <p className="text-ink-muted text-sm">No results for "{overrideSearch}".</p>
+            </div>
+          )}
+          {pagedOverrides.map((v) => (
             <div key={v.id} className="bg-white border border-amber-200 rounded-2xl p-5 space-y-4 shadow-sm">
               <div className="flex items-start justify-between">
                 <div>
@@ -248,18 +310,53 @@ export default function AdminVisitorsPage() {
               )}
             </div>
           ))}
+          {totalOverridePages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button onClick={() => setOverridePage((p) => Math.max(1, p - 1))} disabled={overridePage === 1} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">← Prev</button>
+              <span className="text-xs text-ink-muted">Page {overridePage} of {totalOverridePages}</span>
+              <button onClick={() => setOverridePage((p) => Math.min(totalOverridePages, p + 1))} disabled={overridePage === totalOverridePages} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">Next →</button>
+            </div>
+          )}
         </div>
       )}
 
       {/* ── TAB: FULL LOG ── */}
       {tab === "log" && (
         <div className="space-y-2">
+          {/* Search + status filter */}
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              value={logSearch}
+              onChange={(e) => { setLogSearch(e.target.value); setLogPage(1); }}
+              placeholder="Search by name, mobile, flat, guard…"
+              className="flex-1 min-w-[160px] border border-border-default rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+            <select
+              value={logStatusFilter}
+              onChange={(e) => { setLogStatusFilter(e.target.value); setLogPage(1); }}
+              className="border border-border-default rounded-xl px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="exited">Exited</option>
+              <option value="admin_override_approved">Admin ✓</option>
+              <option value="admin_override_rejected">Admin ✗</option>
+            </select>
+          </div>
           {log.length === 0 && (
             <div className="bg-white rounded-2xl border border-border-default p-8 text-center">
               <p className="text-ink-muted text-sm">No visits recorded yet.</p>
             </div>
           )}
-          {log.map((v) => (
+          {log.length > 0 && filteredLog.length === 0 && (
+            <div className="bg-white rounded-2xl border border-border-default p-6 text-center">
+              <p className="text-ink-muted text-sm">No visits match your search.</p>
+            </div>
+          )}
+          {pagedLog.map((v) => (
             <div key={v.id} className="bg-white border border-border-default rounded-xl p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -288,6 +385,13 @@ export default function AdminVisitorsPage() {
               </div>
             </div>
           ))}
+          {totalLogPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button onClick={() => setLogPage((p) => Math.max(1, p - 1))} disabled={logPage === 1} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">← Prev</button>
+              <span className="text-xs text-ink-muted">Page {logPage} of {totalLogPages} · {filteredLog.length} visits</span>
+              <button onClick={() => setLogPage((p) => Math.min(totalLogPages, p + 1))} disabled={logPage === totalLogPages} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">Next →</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -348,13 +452,28 @@ export default function AdminVisitorsPage() {
             </div>
           )}
 
+          {guards.length > 0 && (
+            <input
+              type="text"
+              value={guardSearch}
+              onChange={(e) => { setGuardSearch(e.target.value); setGuardPage(1); }}
+              placeholder="Search by name, email, phone…"
+              className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          )}
+
           {guards.length === 0 && !showAddGuard && (
             <div className="bg-white rounded-2xl border border-border-default p-8 text-center">
               <p className="text-ink-muted text-sm">No guards added yet.</p>
             </div>
           )}
+          {guards.length > 0 && filteredGuards.length === 0 && (
+            <div className="bg-white rounded-2xl border border-border-default p-6 text-center">
+              <p className="text-ink-muted text-sm">No guards match "{guardSearch}".</p>
+            </div>
+          )}
 
-          {guards.map((g) => (
+          {pagedGuards.map((g) => (
             <div key={g.id} className="bg-white border border-border-default rounded-xl p-4 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -376,6 +495,13 @@ export default function AdminVisitorsPage() {
               )}
             </div>
           ))}
+          {totalGuardPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button onClick={() => setGuardPage((p) => Math.max(1, p - 1))} disabled={guardPage === 1} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">← Prev</button>
+              <span className="text-xs text-ink-muted">Page {guardPage} of {totalGuardPages} · {filteredGuards.length} guards</span>
+              <button onClick={() => setGuardPage((p) => Math.min(totalGuardPages, p + 1))} disabled={guardPage === totalGuardPages} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">Next →</button>
+            </div>
+          )}
         </div>
       )}
     </div>

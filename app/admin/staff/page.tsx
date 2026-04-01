@@ -82,6 +82,7 @@ export default function AdminStaffPage() {
   const [attDate, setAttDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [roleFilter, setRoleFilter] = useState("All");
   const [showInactive, setShowInactive] = useState(false);
+  const [staffSearch, setStaffSearch] = useState("");
 
   // Add staff form
   const [showAddForm, setShowAddForm] = useState(false);
@@ -102,7 +103,22 @@ export default function AdminStaffPage() {
   const [docType, setDocType] = useState(DOC_TYPES[0]);
   const [docName, setDocName] = useState("");
   const [docUrl, setDocUrl] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docUploading, setDocUploading] = useState(false);
   const [docSubmitting, setDocSubmitting] = useState(false);
+
+  // Pagination / search
+  const [attSearch, setAttSearch] = useState("");
+  const [attPage, setAttPage] = useState(1);
+  const ATT_PAGE_SIZE = 10;
+  const [staffPage, setStaffPage] = useState(1);
+  const STAFF_PAGE_SIZE = 10;
+  const [docSearch, setDocSearch] = useState("");
+  const [docPage, setDocPage] = useState(1);
+  const [salarySearch, setSalarySearch] = useState("");
+  const [salaryPage, setSalaryPage] = useState(1);
+  const DOC_PAGE_SIZE = 10;
+  const SALARY_PAGE_SIZE = 10;
 
   // Pay salary
   const [payingId, setPayingId] = useState<string | null>(null);
@@ -162,6 +178,10 @@ export default function AdminStaffPage() {
   const visibleStaff = staff.filter((s) => {
     if (!showInactive && !s.is_active) return false;
     if (roleFilter !== "All" && s.role !== roleFilter) return false;
+    if (staffSearch.trim()) {
+      const q = staffSearch.toLowerCase();
+      if (!s.full_name.toLowerCase().includes(q) && !s.mobile.includes(q) && !(s.address ?? "").toLowerCase().includes(q)) return false;
+    }
     return true;
   });
 
@@ -218,20 +238,49 @@ export default function AdminStaffPage() {
     if (societyId) await loadStaff(societyId);
   };
 
+  const handleFileSelect = async (file: File) => {
+    setDocFile(file);
+    if (!docName.trim()) setDocName(file.name);
+    setDocUploading(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "bin";
+      const path = `staff-docs/${docStaffId || "unknown"}/${Date.now()}.${ext}`;
+      const { data, error } = await supabase.storage.from("staff-documents").upload(path, file, { upsert: true });
+      if (error) {
+        // If bucket doesn't exist, fall back to base64 data URL for preview
+        const reader = new FileReader();
+        reader.onload = (e) => { if (e.target?.result) setDocUrl(e.target.result as string); };
+        reader.readAsDataURL(file);
+        toast("Storage bucket not set up. URL saved as preview only.", { icon: "⚠️" });
+      } else {
+        const { data: pub } = supabase.storage.from("staff-documents").getPublicUrl(data.path);
+        setDocUrl(pub.publicUrl);
+        toast.success("File uploaded!");
+      }
+    } catch {
+      toast.error("Upload failed.");
+    } finally {
+      setDocUploading(false);
+    }
+  };
+
   const handleAddDoc = async () => {
-    if (!docStaffId || !docName.trim() || !docUrl.trim() || !societyId) {
-      toast.error("All document fields are required."); return;
+    if (!docStaffId || !docName.trim() || !societyId) {
+      toast.error("Staff member and file name are required."); return;
+    }
+    if (!docUrl.trim() && !docFile) {
+      toast.error("Please upload a file or enter a URL."); return;
     }
     setDocSubmitting(true);
     const res = await addDocument({
       staffId: docStaffId, societyId,
-      doc_type: docType, file_name: docName, file_url: docUrl,
+      doc_type: docType, file_name: docName, file_url: docUrl || "pending",
       uploaded_by: adminUserId ?? undefined,
     });
     if (!res.success) { toast.error(res.error ?? "Failed to add document."); setDocSubmitting(false); return; }
     toast.success("Document added!");
     setShowDocForm(false);
-    setDocStaffId(""); setDocName(""); setDocUrl(""); setDocType(DOC_TYPES[0]);
+    setDocStaffId(""); setDocName(""); setDocUrl(""); setDocType(DOC_TYPES[0]); setDocFile(null);
     const updated = await getAllDocuments(societyId);
     setDocs(updated as DocWithStaff[]);
     setDocSubmitting(false);
@@ -284,6 +333,46 @@ export default function AdminStaffPage() {
   const attMap = Object.fromEntries(attendance.map((r) => [r.staff_id, r.status]));
   const activeStaff = staff.filter((s) => s.is_active);
 
+  // Staff pagination
+  const totalStaffPages = Math.max(1, Math.ceil(visibleStaff.length / STAFF_PAGE_SIZE));
+  const pagedStaff = visibleStaff.slice((staffPage - 1) * STAFF_PAGE_SIZE, staffPage * STAFF_PAGE_SIZE);
+
+  // Documents search + pagination
+  const filteredDocs = docs.filter((d) => {
+    if (!docSearch.trim()) return true;
+    const q = docSearch.toLowerCase();
+    return (
+      d.file_name.toLowerCase().includes(q) ||
+      d.doc_type.toLowerCase().includes(q) ||
+      (d.staff?.full_name ?? "").toLowerCase().includes(q) ||
+      (d.staff?.role ?? "").toLowerCase().includes(q)
+    );
+  });
+  const totalDocPages = Math.max(1, Math.ceil(filteredDocs.length / DOC_PAGE_SIZE));
+  const pagedDocs = filteredDocs.slice((docPage - 1) * DOC_PAGE_SIZE, docPage * DOC_PAGE_SIZE);
+
+  // Salary search + pagination
+  const filteredSalaries = salaries.filter((r) => {
+    if (!salarySearch.trim()) return true;
+    const q = salarySearch.toLowerCase();
+    const staffInfo = r.staff as { full_name: string; role: string } | null;
+    return (
+      (staffInfo?.full_name ?? "").toLowerCase().includes(q) ||
+      (staffInfo?.role ?? "").toLowerCase().includes(q) ||
+      r.month_year.toLowerCase().includes(q) ||
+      r.status.toLowerCase().includes(q)
+    );
+  });
+  const totalSalaryPages = Math.max(1, Math.ceil(filteredSalaries.length / SALARY_PAGE_SIZE));
+  const pagedSalaries = filteredSalaries.slice((salaryPage - 1) * SALARY_PAGE_SIZE, salaryPage * SALARY_PAGE_SIZE);
+
+  // Attendance search + pagination
+  const filteredAttStaff = activeStaff.filter((s) =>
+    !attSearch.trim() || s.full_name.toLowerCase().includes(attSearch.toLowerCase()) || s.role.toLowerCase().includes(attSearch.toLowerCase())
+  );
+  const totalAttPages = Math.max(1, Math.ceil(filteredAttStaff.length / ATT_PAGE_SIZE));
+  const pagedAttStaff = filteredAttStaff.slice((attPage - 1) * ATT_PAGE_SIZE, attPage * ATT_PAGE_SIZE);
+
   // ── RENDER ────────────────────────────────────────────────
 
   return (
@@ -330,10 +419,17 @@ export default function AdminStaffPage() {
         <div className="space-y-4">
           {/* Toolbar */}
           <div className="flex flex-wrap gap-2 items-center justify-between">
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap flex-1">
+              <input
+                type="text"
+                value={staffSearch}
+                onChange={(e) => { setStaffSearch(e.target.value); setStaffPage(1); }}
+                placeholder="Search by name, mobile…"
+                className="flex-1 min-w-[140px] border border-border-default rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
               <select
                 value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
+                onChange={(e) => { setRoleFilter(e.target.value); setStaffPage(1); }}
                 className="border border-border-default rounded-xl px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
               >
                 <option value="All">All Roles</option>
@@ -448,7 +544,7 @@ export default function AdminStaffPage() {
             <EmptyState icon="👷" text="No staff found. Add your first staff member above." />
           )}
 
-          {visibleStaff.map((s) => (
+          {pagedStaff.map((s) => (
             <div
               key={s.id}
               className={`bg-white border border-border-default rounded-2xl p-4 shadow-sm ${!s.is_active ? "opacity-60" : ""}`}
@@ -536,6 +632,27 @@ export default function AdminStaffPage() {
               )}
             </div>
           ))}
+
+          {/* Staff pagination */}
+          {totalStaffPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                onClick={() => setStaffPage((p) => Math.max(1, p - 1))}
+                disabled={staffPage === 1}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer"
+              >
+                ← Prev
+              </button>
+              <span className="text-xs text-ink-muted">Page {staffPage} of {totalStaffPages}</span>
+              <button
+                onClick={() => setStaffPage((p) => Math.min(totalStaffPages, p + 1))}
+                disabled={staffPage === totalStaffPages}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -588,13 +705,30 @@ export default function AdminStaffPage() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-semibold text-ink-muted block mb-1">File URL *</label>
+                <label className="text-xs font-semibold text-ink-muted block mb-1">Upload File *</label>
+                <label className={`flex items-center gap-2 w-full border border-border-default rounded-xl px-3 py-2 text-sm cursor-pointer hover:border-amber-400 transition-colors ${docUploading ? "opacity-50" : ""}`}>
+                  <span className="text-amber-600">📎</span>
+                  <span className="text-ink-muted truncate flex-1">
+                    {docUploading ? "Uploading…" : docFile ? docFile.name : "Choose file to upload"}
+                  </span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    disabled={docUploading}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+                  />
+                </label>
+                {docUrl && !docUploading && (
+                  <p className="text-[11px] text-green-600 mt-1 truncate">✓ File ready</p>
+                )}
+                <p className="text-[11px] text-ink-muted mt-1">Or paste a URL directly:</p>
                 <input
                   type="url"
                   value={docUrl}
                   onChange={(e) => setDocUrl(e.target.value)}
                   placeholder="https://… (Supabase Storage URL)"
-                  className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 mt-1"
                 />
               </div>
               <div className="flex gap-2">
@@ -610,9 +744,20 @@ export default function AdminStaffPage() {
             </div>
           )}
 
-          {docs.length === 0 && <EmptyState icon="📄" text="No documents uploaded yet." />}
+          {docs.length > 0 && (
+            <input
+              type="text"
+              value={docSearch}
+              onChange={(e) => { setDocSearch(e.target.value); setDocPage(1); }}
+              placeholder="Search by file name, document type, staff name…"
+              className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          )}
 
-          {docs.map((d) => (
+          {docs.length === 0 && <EmptyState icon="📄" text="No documents uploaded yet." />}
+          {docs.length > 0 && filteredDocs.length === 0 && <EmptyState icon="🔍" text="No documents match your search." />}
+
+          {pagedDocs.map((d) => (
             <div key={d.id} className="bg-white border border-border-default rounded-xl p-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl flex-shrink-0">📄</div>
               <div className="flex-1 min-w-0">
@@ -641,6 +786,13 @@ export default function AdminStaffPage() {
               </div>
             </div>
           ))}
+          {totalDocPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button onClick={() => setDocPage((p) => Math.max(1, p - 1))} disabled={docPage === 1} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">← Prev</button>
+              <span className="text-xs text-ink-muted">Page {docPage} of {totalDocPages} · {filteredDocs.length} documents</span>
+              <button onClick={() => setDocPage((p) => Math.min(totalDocPages, p + 1))} disabled={docPage === totalDocPages} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">Next →</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -683,8 +835,21 @@ export default function AdminStaffPage() {
             </div>
           )}
 
+          {salaries.length > 0 && (
+            <input
+              type="text"
+              value={salarySearch}
+              onChange={(e) => { setSalarySearch(e.target.value); setSalaryPage(1); }}
+              placeholder="Search by staff name, role, status…"
+              className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          )}
+
           {salaries.length === 0 && (
             <EmptyState icon="💰" text={`No salary records for ${salaryMonth}. Click "Generate for Month" to create them.`} />
+          )}
+          {salaries.length > 0 && filteredSalaries.length === 0 && (
+            <EmptyState icon="🔍" text="No salary records match your search." />
           )}
 
           {/* Pay modal */}
@@ -728,7 +893,7 @@ export default function AdminStaffPage() {
             </div>
           )}
 
-          {salaries.map((r) => {
+          {pagedSalaries.map((r) => {
             const staffInfo = r.staff as { full_name: string; role: string } | null;
             return (
               <div
@@ -771,21 +936,37 @@ export default function AdminStaffPage() {
               </div>
             );
           })}
+          {totalSalaryPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button onClick={() => setSalaryPage((p) => Math.max(1, p - 1))} disabled={salaryPage === 1} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">← Prev</button>
+              <span className="text-xs text-ink-muted">Page {salaryPage} of {totalSalaryPages} · {filteredSalaries.length} records</span>
+              <button onClick={() => setSalaryPage((p) => Math.min(totalSalaryPages, p + 1))} disabled={salaryPage === totalSalaryPages} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">Next →</button>
+            </div>
+          )}
         </div>
       )}
 
       {/* ══ TAB: ATTENDANCE ═════════════════════════════════════ */}
       {tab === "attendance" && (
         <div className="space-y-4">
-          {/* Date picker */}
-          <div className="flex items-center gap-3">
-            <label className="text-xs font-semibold text-ink-muted">Date:</label>
+          {/* Date picker + search */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-ink-muted">Date:</label>
+              <input
+                type="date"
+                value={attDate}
+                onChange={(e) => { setAttDate(e.target.value); setAttPage(1); }}
+                max={new Date().toISOString().slice(0, 10)}
+                className="border border-border-default rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
             <input
-              type="date"
-              value={attDate}
-              onChange={(e) => setAttDate(e.target.value)}
-              max={new Date().toISOString().slice(0, 10)}
-              className="border border-border-default rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              type="text"
+              value={attSearch}
+              onChange={(e) => { setAttSearch(e.target.value); setAttPage(1); }}
+              placeholder="Search by name or role…"
+              className="flex-1 min-w-[160px] border border-border-default rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
           </div>
 
@@ -815,7 +996,11 @@ export default function AdminStaffPage() {
             <EmptyState icon="📅" text="No active staff to mark attendance for." />
           )}
 
-          {activeStaff.map((s) => {
+          {activeStaff.length > 0 && filteredAttStaff.length === 0 && (
+            <EmptyState icon="🔍" text="No staff matching your search." />
+          )}
+
+          {pagedAttStaff.map((s) => {
             const current = attMap[s.id] ?? null;
             const monthSummary = attSummary[s.id];
             return (
@@ -855,6 +1040,27 @@ export default function AdminStaffPage() {
               </div>
             );
           })}
+
+          {/* Attendance pagination */}
+          {totalAttPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                onClick={() => setAttPage((p) => Math.max(1, p - 1))}
+                disabled={attPage === 1}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer"
+              >
+                ← Prev
+              </button>
+              <span className="text-xs text-ink-muted">Page {attPage} of {totalAttPages} · {filteredAttStaff.length} staff</span>
+              <button
+                onClick={() => setAttPage((p) => Math.min(totalAttPages, p + 1))}
+                disabled={attPage === totalAttPages}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

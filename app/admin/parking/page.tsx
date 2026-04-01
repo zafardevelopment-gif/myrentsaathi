@@ -58,6 +58,16 @@ export default function AdminParkingPage() {
   const [assignError, setAssignError] = useState("");
   const [assignSuccess, setAssignSuccess] = useState("");
 
+  // Search + pagination
+  const [slotSearch, setSlotSearch] = useState("");
+  const [slotPage, setSlotPage] = useState(1);
+  const [slotStatusFilter, setSlotStatusFilter] = useState("all");
+  const [vehicleSearch, setVehicleSearch] = useState("");
+  const [vehiclePage, setVehiclePage] = useState(1);
+  const [assignSearch, setAssignSearch] = useState("");
+  const [assignPage, setAssignPage] = useState(1);
+  const PAGE_SIZE = 12;
+
   const loadAll = useCallback(async (sid: string) => {
     const [s, v] = await Promise.all([getParkingSlotsAdmin(sid), getAllVehicles(sid)]);
     setSlots(s);
@@ -149,6 +159,54 @@ export default function AdminParkingPage() {
     vehicles: vehicles.length,
     unauthorized: vehicles.filter((v) => !v.is_authorized).length,
   };
+
+  // ── DERIVED: filtered + paged ─────────────────────────────
+  const filteredSlots = slots.filter((s) => {
+    const matchStatus = slotStatusFilter === "all" || s.status === slotStatusFilter;
+    if (!matchStatus) return false;
+    if (!slotSearch.trim()) return true;
+    const q = slotSearch.toLowerCase();
+    const pv = s.pass?.vehicle as unknown as { vehicle_number: string; owner: { full_name: string } | null } | null;
+    return (
+      s.slot_number.toLowerCase().includes(q) ||
+      (s.slot_type).toLowerCase().includes(q) ||
+      (s.level ?? "").toLowerCase().includes(q) ||
+      (pv?.vehicle_number ?? "").toLowerCase().includes(q) ||
+      (pv?.owner?.full_name ?? "").toLowerCase().includes(q)
+    );
+  });
+  const totalSlotPages = Math.max(1, Math.ceil(filteredSlots.length / PAGE_SIZE));
+  const pagedSlots = filteredSlots.slice((slotPage - 1) * PAGE_SIZE, slotPage * PAGE_SIZE);
+
+  const filteredVehicles = vehicles.filter((v) => {
+    if (!vehicleSearch.trim()) return true;
+    const q = vehicleSearch.toLowerCase();
+    const owner = v.owner as { full_name: string } | null;
+    return (
+      v.vehicle_number.toLowerCase().includes(q) ||
+      (v.vehicle_model ?? "").toLowerCase().includes(q) ||
+      (v.vehicle_type).toLowerCase().includes(q) ||
+      (owner?.full_name ?? "").toLowerCase().includes(q) ||
+      (v.flat_number ?? "").toLowerCase().includes(q) ||
+      (v.color ?? "").toLowerCase().includes(q)
+    );
+  });
+  const totalVehiclePages = Math.max(1, Math.ceil(filteredVehicles.length / PAGE_SIZE));
+  const pagedVehicles = filteredVehicles.slice((vehiclePage - 1) * PAGE_SIZE, vehiclePage * PAGE_SIZE);
+
+  const occupiedSlots = slots.filter((s) => s.status === "occupied");
+  const filteredAssign = occupiedSlots.filter((s) => {
+    if (!assignSearch.trim()) return true;
+    const q = assignSearch.toLowerCase();
+    const pv = s.pass?.vehicle as unknown as { vehicle_number: string; owner: { full_name: string } | null } | null;
+    return (
+      s.slot_number.toLowerCase().includes(q) ||
+      (pv?.vehicle_number ?? "").toLowerCase().includes(q) ||
+      (pv?.owner?.full_name ?? "").toLowerCase().includes(q)
+    );
+  });
+  const totalAssignPages = Math.max(1, Math.ceil(filteredAssign.length / PAGE_SIZE));
+  const pagedAssign = filteredAssign.slice((assignPage - 1) * PAGE_SIZE, assignPage * PAGE_SIZE);
 
   if (loading) {
     return (
@@ -264,14 +322,40 @@ export default function AdminParkingPage() {
             </div>
           )}
 
+          {slots.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="text"
+                value={slotSearch}
+                onChange={(e) => { setSlotSearch(e.target.value); setSlotPage(1); }}
+                placeholder="Search slot number, type, vehicle…"
+                className="flex-1 min-w-[160px] border border-border-default rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <select
+                value={slotStatusFilter}
+                onChange={(e) => { setSlotStatusFilter(e.target.value); setSlotPage(1); }}
+                className="border border-border-default rounded-xl px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+              >
+                <option value="all">All Status</option>
+                <option value="available">Available</option>
+                <option value="occupied">Occupied</option>
+              </select>
+            </div>
+          )}
+
           {slots.length === 0 && !showSlotForm && (
             <div className="bg-white rounded-2xl border border-border-default p-8 text-center">
               <p className="text-ink-muted text-sm">No parking slots yet. Add your first slot above.</p>
             </div>
           )}
+          {slots.length > 0 && filteredSlots.length === 0 && (
+            <div className="bg-white rounded-2xl border border-border-default p-6 text-center">
+              <p className="text-ink-muted text-sm">No slots match your search.</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {slots.map((slot) => {
+            {pagedSlots.map((slot) => {
               const flat = slot.flat as { flat_number: string; block: string | null } | null;
               const passVehicle = slot.pass?.vehicle as unknown as { vehicle_number: string; vehicle_type: string; vehicle_model: string | null; owner: { full_name: string } | null } | null;
               return (
@@ -319,18 +403,37 @@ export default function AdminParkingPage() {
               );
             })}
           </div>
+          {totalSlotPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button onClick={() => setSlotPage((p) => Math.max(1, p - 1))} disabled={slotPage === 1} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">← Prev</button>
+              <span className="text-xs text-ink-muted">Page {slotPage} of {totalSlotPages} · {filteredSlots.length} slots</span>
+              <button onClick={() => setSlotPage((p) => Math.min(totalSlotPages, p + 1))} disabled={slotPage === totalSlotPages} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">Next →</button>
+            </div>
+          )}
         </div>
       )}
 
       {/* ── TAB: VEHICLES ── */}
       {tab === "vehicles" && (
         <div className="space-y-2">
+          <input
+            type="text"
+            value={vehicleSearch}
+            onChange={(e) => { setVehicleSearch(e.target.value); setVehiclePage(1); }}
+            placeholder="Search by number, model, owner, flat…"
+            className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
           {vehicles.length === 0 && (
             <div className="bg-white rounded-2xl border border-border-default p-8 text-center">
               <p className="text-ink-muted text-sm">No vehicles registered yet.</p>
             </div>
           )}
-          {vehicles.map((v) => {
+          {vehicles.length > 0 && filteredVehicles.length === 0 && (
+            <div className="bg-white rounded-2xl border border-border-default p-6 text-center">
+              <p className="text-ink-muted text-sm">No vehicles match "{vehicleSearch}".</p>
+            </div>
+          )}
+          {pagedVehicles.map((v) => {
             const owner = v.owner as { full_name: string; email: string; phone: string | null } | null;
             return (
               <div key={v.id} className="bg-white border border-border-default rounded-xl p-4 flex items-center gap-3">
@@ -364,6 +467,13 @@ export default function AdminParkingPage() {
               </div>
             );
           })}
+          {totalVehiclePages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button onClick={() => setVehiclePage((p) => Math.max(1, p - 1))} disabled={vehiclePage === 1} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">← Prev</button>
+              <span className="text-xs text-ink-muted">Page {vehiclePage} of {totalVehiclePages} · {filteredVehicles.length} vehicles</span>
+              <button onClick={() => setVehiclePage((p) => Math.min(totalVehiclePages, p + 1))} disabled={vehiclePage === totalVehiclePages} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">Next →</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -440,11 +550,26 @@ export default function AdminParkingPage() {
 
           {/* Current assignments */}
           <div className="space-y-2">
-            <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">Current Assignments</p>
-            {slots.filter((s) => s.status === "occupied").length === 0 && (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-bold text-ink-muted uppercase tracking-widest">Current Assignments</p>
+              <span className="text-xs text-ink-muted">{occupiedSlots.length} assigned</span>
+            </div>
+            {occupiedSlots.length > 0 && (
+              <input
+                type="text"
+                value={assignSearch}
+                onChange={(e) => { setAssignSearch(e.target.value); setAssignPage(1); }}
+                placeholder="Search slot, vehicle, owner…"
+                className="w-full border border-border-default rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            )}
+            {occupiedSlots.length === 0 && (
               <p className="text-xs text-ink-muted">No assignments yet.</p>
             )}
-            {slots.filter((s) => s.status === "occupied").map((s) => {
+            {occupiedSlots.length > 0 && filteredAssign.length === 0 && (
+              <p className="text-xs text-ink-muted">No assignments match "{assignSearch}".</p>
+            )}
+            {pagedAssign.map((s) => {
               const pv = s.pass?.vehicle as unknown as { vehicle_number: string; vehicle_type: string; owner: { full_name: string } | null } | null;
               return (
                 <div key={s.id} className="bg-white border border-border-default rounded-xl p-3 flex items-center gap-3">
@@ -466,6 +591,13 @@ export default function AdminParkingPage() {
                 </div>
               );
             })}
+            {totalAssignPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <button onClick={() => setAssignPage((p) => Math.max(1, p - 1))} disabled={assignPage === 1} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">← Prev</button>
+                <span className="text-xs text-ink-muted">Page {assignPage} of {totalAssignPages}</span>
+                <button onClick={() => setAssignPage((p) => Math.min(totalAssignPages, p + 1))} disabled={assignPage === totalAssignPages} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer">Next →</button>
+              </div>
+            )}
           </div>
         </div>
       )}

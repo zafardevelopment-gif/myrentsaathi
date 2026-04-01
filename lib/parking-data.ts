@@ -94,14 +94,27 @@ export async function createSlot(societyId: string, params: {
   slot_type: string;
   level?: string;
 }): Promise<{ success: boolean; error?: string }> {
-  const { error } = await supabase.from("parking_slots").insert({
+  const row: Record<string, unknown> = {
     society_id: societyId,
     slot_number: params.slot_number.trim().toUpperCase(),
     slot_type: params.slot_type,
-    level: params.level?.trim() || null,
     status: "available",
-  });
-  if (error) return { success: false, error: error.message };
+  };
+  // Only include level if provided (column may not exist in older DB)
+  const levelVal = params.level?.trim() || null;
+  if (levelVal !== null) row.level = levelVal;
+
+  const { error } = await supabase.from("parking_slots").insert(row);
+  if (error) {
+    // If level column missing, retry without it
+    if (error.message.includes("level")) {
+      delete row.level;
+      const { error: err2 } = await supabase.from("parking_slots").insert(row);
+      if (err2) return { success: false, error: err2.message };
+      return { success: true };
+    }
+    return { success: false, error: error.message };
+  }
   return { success: true };
 }
 

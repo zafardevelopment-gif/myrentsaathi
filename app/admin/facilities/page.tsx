@@ -52,6 +52,12 @@ export default function AdminFacilitiesPage() {
   const [calBookings, setCalBookings] = useState<Booking[]>([]);
   const [calMonth, setCalMonth] = useState(() => new Date().toISOString().slice(0, 7));
 
+  // Search + pagination for all bookings
+  const [bookingSearch, setBookingSearch] = useState("");
+  const [bookingPage, setBookingPage] = useState(1);
+  const [bookingStatusFilter, setBookingStatusFilter] = useState("all");
+  const BOOKING_PAGE_SIZE = 10;
+
   // Add facility form
   const [showFacilityForm, setShowFacilityForm] = useState(false);
   const [fForm, setFForm] = useState({
@@ -160,6 +166,21 @@ export default function AdminFacilitiesPage() {
     thisMonth: allBookings.filter((b) => b.booking_date.startsWith(new Date().toISOString().slice(0, 7))).length,
     approved: allBookings.filter((b) => b.status === "approved").length,
   };
+
+  // Filtered and paged bookings
+  const filteredBookings = allBookings.filter((b) => {
+    const fac = b.facility as { name: string } | null;
+    const res = b.resident as { full_name: string } | null;
+    const matchSearch = !bookingSearch.trim() ||
+      (fac?.name ?? "").toLowerCase().includes(bookingSearch.toLowerCase()) ||
+      (res?.full_name ?? "").toLowerCase().includes(bookingSearch.toLowerCase()) ||
+      (b.flat_number ?? "").toLowerCase().includes(bookingSearch.toLowerCase()) ||
+      b.booking_date.includes(bookingSearch);
+    const matchStatus = bookingStatusFilter === "all" || b.status === bookingStatusFilter;
+    return matchSearch && matchStatus;
+  });
+  const totalBookingPages = Math.max(1, Math.ceil(filteredBookings.length / BOOKING_PAGE_SIZE));
+  const pagedBookings = filteredBookings.slice((bookingPage - 1) * BOOKING_PAGE_SIZE, bookingPage * BOOKING_PAGE_SIZE);
 
   if (loading) {
     return <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-20 bg-warm-100 rounded-2xl animate-pulse" />)}</div>;
@@ -557,13 +578,35 @@ export default function AdminFacilitiesPage() {
 
       {/* ══ TAB: ALL BOOKINGS ═══════════════════════════════════ */}
       {tab === "all_bookings" && (
-        <div className="space-y-2">
-          {allBookings.length === 0 && (
+        <div className="space-y-3">
+          {/* Search + filter */}
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              value={bookingSearch}
+              onChange={(e) => { setBookingSearch(e.target.value); setBookingPage(1); }}
+              placeholder="Search by facility, resident, flat, date…"
+              className="flex-1 min-w-[180px] border border-border-default rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+            <select
+              value={bookingStatusFilter}
+              onChange={(e) => { setBookingStatusFilter(e.target.value); setBookingPage(1); }}
+              className="border border-border-default rounded-xl px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          {filteredBookings.length === 0 && (
             <div className="bg-white rounded-2xl border border-border-default p-10 text-center">
-              <p className="text-ink-muted text-sm">No bookings yet.</p>
+              <p className="text-ink-muted text-sm">{allBookings.length === 0 ? "No bookings yet." : "No bookings match your search."}</p>
             </div>
           )}
-          {allBookings.map((b) => {
+          {pagedBookings.map((b) => {
             const fac = b.facility as { name: string; category: string } | null;
             const res = b.resident as { full_name: string } | null;
             return (
@@ -589,6 +632,27 @@ export default function AdminFacilitiesPage() {
               </div>
             );
           })}
+
+          {/* Pagination */}
+          {totalBookingPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <button
+                onClick={() => setBookingPage((p) => Math.max(1, p - 1))}
+                disabled={bookingPage === 1}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer"
+              >
+                ← Prev
+              </button>
+              <span className="text-xs text-ink-muted">Page {bookingPage} of {totalBookingPages} · {filteredBookings.length} bookings</span>
+              <button
+                onClick={() => setBookingPage((p) => Math.min(totalBookingPages, p + 1))}
+                disabled={bookingPage === totalBookingPages}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-40 cursor-pointer"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

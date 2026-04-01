@@ -218,7 +218,14 @@ export async function addGuard(params: {
     })
     .select("id")
     .single();
-  if (userErr || !user) return { success: false, error: userErr?.message ?? "Failed to create guard." };
+  if (userErr || !user) {
+    const msg = userErr?.message ?? "Failed to create guard.";
+    // Provide clear instructions for the role constraint issue
+    if (msg.includes("users_role_check")) {
+      return { success: false, error: "DB constraint error: run fix-users-role-constraint.sql in Supabase SQL Editor to allow 'guard' role." };
+    }
+    return { success: false, error: msg };
+  }
 
   const { error: memErr } = await supabase.from("society_members").insert({
     user_id: user.id,
