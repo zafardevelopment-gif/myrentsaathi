@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getAdminSociety, updateSocietyDetails, type AdminSociety } from "@/lib/admin-data";
 import toast from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 
 export default function AdminSettings() {
   const { user } = useAuth();
@@ -11,7 +12,9 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", city: "", address: "", maintenance_amount: "" });
+  const [savingSplit, setSavingSplit] = useState(false);
+  const [form, setForm] = useState({ name: "", city: "", address: "", maintenance_amount: "", payment_due_day: "" });
+  const [splitMode, setSplitMode] = useState<"total_flats" | "active_flats">("total_flats");
 
   useEffect(() => {
     if (!user?.email) return;
@@ -24,7 +27,9 @@ export default function AdminSettings() {
           city: s.city ?? "",
           address: s.address ?? "",
           maintenance_amount: s.maintenance_amount ? String(s.maintenance_amount) : "",
+          payment_due_day: s.payment_due_day ? String(s.payment_due_day) : "",
         });
+        setSplitMode((s.expense_split_mode === "active_flats" ? "active_flats" : "total_flats"));
       }
       setLoading(false);
     }
@@ -40,14 +45,34 @@ export default function AdminSettings() {
         city: form.city,
         address: form.address,
         maintenance_amount: form.maintenance_amount ? Number(form.maintenance_amount) : undefined,
+        payment_due_day: form.payment_due_day ? Number(form.payment_due_day) : undefined,
       });
-      setSociety((prev) => prev ? { ...prev, ...form, maintenance_amount: Number(form.maintenance_amount) } : prev);
+      setSociety((prev) => prev ? {
+        ...prev, ...form,
+        maintenance_amount: Number(form.maintenance_amount),
+        payment_due_day: form.payment_due_day ? Number(form.payment_due_day) : null,
+      } : prev);
       setEditing(false);
       toast.success("Society details updated");
     } catch {
       toast.error("Failed to update");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveSplit(mode: "total_flats" | "active_flats") {
+    if (!society?.id) return;
+    setSplitMode(mode);
+    setSavingSplit(true);
+    try {
+      await updateSocietyDetails(society.id, { expense_split_mode: mode });
+      setSociety((prev) => prev ? { ...prev, expense_split_mode: mode } : prev);
+      toast.success("Expense split mode updated");
+    } catch {
+      toast.error("Failed to update");
+    } finally {
+      setSavingSplit(false);
     }
   }
 
@@ -68,6 +93,7 @@ export default function AdminSettings() {
 
   return (
     <div>
+      <Toaster position="top-center" />
       <h2 className="text-[15px] font-extrabold text-ink mb-4">⚙️ Society Settings</h2>
 
       {/* Society Profile */}
@@ -141,6 +167,18 @@ export default function AdminSettings() {
                 className="w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500"
               />
             </div>
+            <div>
+              <label className="text-[11px] font-semibold text-ink-muted block mb-1">Payment Due Day (1–28)</label>
+              <input
+                type="number"
+                min="1"
+                max="28"
+                placeholder="e.g. 10 = due on 10th of every month"
+                value={form.payment_due_day}
+                onChange={(e) => setForm((f) => ({ ...f, payment_due_day: e.target.value }))}
+                className="w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500"
+              />
+            </div>
           </div>
         ) : (
           <div className="space-y-1.5 mt-2 text-sm">
@@ -162,6 +200,12 @@ export default function AdminSettings() {
                 {society?.maintenance_amount ? `₹${society.maintenance_amount}/mo` : "—"}
               </span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-ink-muted text-xs">Payment Due Day</span>
+              <span className="text-ink font-semibold text-xs">
+                {society?.payment_due_day ? `${society.payment_due_day}th of every month` : "—"}
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -176,6 +220,52 @@ export default function AdminSettings() {
           </div>
         </div>
         <span className="text-ink-muted">→</span>
+      </div>
+
+      {/* Expense Split Mode */}
+      <div className="bg-white rounded-[14px] p-4 border border-border-default mb-2">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-[22px]">🔢</span>
+          <div>
+            <div className="text-sm font-bold text-ink">Expense Split Mode</div>
+            <div className="text-[11px] text-ink-muted">How society expenses are divided per flat</div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleSaveSplit("total_flats")}
+            disabled={savingSplit}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-60 ${
+              splitMode === "total_flats"
+                ? "bg-brand-500 text-white border-brand-500"
+                : "bg-warm-50 text-ink-muted border-border-default hover:border-brand-400"
+            }`}
+          >
+            🏢 Total Flats
+            <div className={`text-[10px] font-normal mt-0.5 ${splitMode === "total_flats" ? "text-white/80" : "text-ink-muted"}`}>
+              From society profile ({society?.total_flats ?? "—"} flats)
+            </div>
+          </button>
+          <button
+            onClick={() => handleSaveSplit("active_flats")}
+            disabled={savingSplit}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-60 ${
+              splitMode === "active_flats"
+                ? "bg-brand-500 text-white border-brand-500"
+                : "bg-warm-50 text-ink-muted border-border-default hover:border-brand-400"
+            }`}
+          >
+            ✅ Active Flats
+            <div className={`text-[10px] font-normal mt-0.5 ${splitMode === "active_flats" ? "text-white/80" : "text-ink-muted"}`}>
+              Only flats in system
+            </div>
+          </button>
+        </div>
+        <div className="text-[10px] text-ink-muted mt-2">
+          {splitMode === "total_flats"
+            ? "Each landlord pays: Total Expense ÷ Total Flats in society profile"
+            : "Each landlord pays: Total Expense ÷ Flats currently added in system"}
+        </div>
       </div>
 
       {STATIC_SETTINGS.map((s) => (

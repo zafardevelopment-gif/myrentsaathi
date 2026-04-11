@@ -30,6 +30,8 @@ type SocietyExpense = {
   recurrence_type: string | null;
 };
 
+type SocietyMeta = { name: string; total_flats: number | null; expense_split_mode: string | null; payment_due_day: number | null };
+
 const CATEGORIES = ["AC Repair", "Painting", "Plumbing", "Electrical", "Other"];
 const CATEGORY_ICON: Record<string, string> = {
   "AC Repair": "❄️",
@@ -51,6 +53,8 @@ export default function MaintenanceExpensesPage() {
   const [flats, setFlats] = useState<LandlordFlat[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [societyExpenses, setSocietyExpenses] = useState<SocietyExpense[]>([]);
+  const [societyMeta, setSocietyMeta] = useState<SocietyMeta | null>(null);
+  const [activeFlatsCount, setActiveFlatsCount] = useState<number>(0);
   const [landlordId, setLandlordId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -88,13 +92,26 @@ export default function MaintenanceExpensesPage() {
       // Load society expenses from the first flat's society
       const societyId = f[0].society_id;
       if (societyId) {
-        const { data: se } = await supabase
-          .from("society_expenses")
-          .select("id, category, description, vendor_name, amount, expense_date, approval_status, is_recurring, recurrence_type")
-          .eq("society_id", societyId)
-          .eq("approval_status", "approved")
-          .order("expense_date", { ascending: false });
+        const [{ data: se }, { data: socData }, { count: actCount }] = await Promise.all([
+          supabase
+            .from("society_expenses")
+            .select("id, category, description, vendor_name, amount, expense_date, approval_status, is_recurring, recurrence_type")
+            .eq("society_id", societyId)
+            .eq("approval_status", "approved")
+            .order("expense_date", { ascending: false }),
+          supabase
+            .from("societies")
+            .select("name, total_flats, expense_split_mode, payment_due_day")
+            .eq("id", societyId)
+            .single(),
+          supabase
+            .from("flats")
+            .select("id", { count: "exact", head: true })
+            .eq("society_id", societyId),
+        ]);
         setSocietyExpenses(se ?? []);
+        if (socData) setSocietyMeta(socData as SocietyMeta);
+        setActiveFlatsCount(actCount ?? 0);
       }
     }
   }
@@ -155,6 +172,28 @@ export default function MaintenanceExpensesPage() {
     return <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-20 bg-warm-100 rounded-[14px] animate-pulse" />)}</div>;
   }
 
+  // Society dues calculation
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const currentMonthLabel = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const splitMode = societyMeta?.expense_split_mode ?? "total_flats";
+  const totalFlatsInSociety = splitMode === "active_flats" || !societyMeta?.total_flats
+    ? (activeFlatsCount || 1)
+    : societyMeta.total_flats;
+  const currentMonthExpenses = societyExpenses.filter(e => e.is_recurring || e.expense_date.startsWith(currentMonthStr));
+  const totalCurrentMonth = currentMonthExpenses.reduce((s, e) => s + e.amount, 0);
+  const perFlatShare = totalFlatsInSociety > 0 ? Math.round(totalCurrentMonth / totalFlatsInSociety) : 0;
+  const landlordDue = perFlatShare * flats.length;
+
+  const dueDay = societyMeta?.payment_due_day ?? null;
+  const now2 = new Date();
+  let daysLeft: number | null = null;
+  let isOverdue = false;
+  if (dueDay) {
+    const dueDateObj = new Date(now2.getFullYear(), now2.getMonth(), dueDay);
+    const diff = Math.ceil((dueDateObj.getTime() - now2.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff < 0) { isOverdue = true; } else { daysLeft = diff; }
+  }
+
   const SEXP_ICON: Record<string, string> = {
     electricity: "⚡", water: "💧", cleaning: "🧹", security: "🛡️",
     lift_maintenance: "🔧", garden: "🌿", painting: "🎨", plumbing: "🔧",
@@ -199,6 +238,26 @@ export default function MaintenanceExpensesPage() {
             <div className="text-center py-12 text-ink-muted text-sm">No approved society expenses yet.</div>
           ) : (
             <>
+              {/* My Due This Month */}
+              {landlordDue > 0 && (
+                <div className={`rounded-[14px] p-4 border mb-2 ${isOverdue ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-0.5">Your Due — {currentMonthLabel}</div>
+                      <div className="text-xl font-extrabold text-red-600">{formatCurrency(landlordDue)}</div>
+                      <div className="text-[11px] text-ink-muted mt-0.5">{flats.length} flat{flats.length !== 1 ? "s" : ""} × {formatCurrency(perFlatShare)}/flat</div>
+                    </div>
+                    {dueDay && (
+                      <div className={`text-[11px] font-bold rounded-lg px-2.5 py-1.5 text-center ${
+                        isOverdue ? "bg-red-100 text-red-700" : daysLeft !== null && daysLeft <= 3 ? "bg-orange-100 text-orange-700" : "bg-blue-50 text-blue-700"
+                      }`}>
+                        {isOverdue ? "🔴 Overdue!" : daysLeft === 0 ? "📅 Due today!" : `📅 ${daysLeft}d left`}
+                        <div className="text-[10px] font-normal">{dueDay}th {currentMonthLabel}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="bg-white rounded-[14px] p-4 border border-border-default mb-2">
                 <div className="text-[10px] text-ink-muted uppercase tracking-wide mb-1">Total Society Expenses</div>
                 <div className="text-xl font-extrabold text-brand-600">{formatCurrency(societyExpenses.reduce((s, e) => s + e.amount, 0))}</div>

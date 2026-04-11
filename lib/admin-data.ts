@@ -21,6 +21,8 @@ export type AdminSociety = {
   subscription_plan: string;
   plan: string | null;
   maintenance_amount: number | null;
+  expense_split_mode: string | null;
+  payment_due_day: number | null;
   is_active: boolean;
   created_at: string;
 };
@@ -527,7 +529,7 @@ export async function getSocietyAuditLogs(societyId: string, limit = 20): Promis
 
 export async function updateSocietyDetails(id: string, updates: Partial<{
   name: string; city: string; address: string; state: string; pincode: string;
-  maintenance_amount: number; registration_number: string;
+  maintenance_amount: number; registration_number: string; expense_split_mode: string; payment_due_day: number;
 }>) {
   const { error } = await supabase
     .from("societies")
@@ -688,22 +690,25 @@ export async function createExpense(societyId: string, expenseData: {
   vendor_name?: string;
   amount: number;
   expense_date: string;
-  created_by: string;
+  created_by?: string | null;
   is_recurring?: boolean;
   recurrence_type?: string;
 }) {
-  const { data, error } = await supabase.from("society_expenses").insert({
+  const insertPayload: Record<string, unknown> = {
     society_id: societyId,
     category: expenseData.category,
     description: expenseData.description ?? null,
     vendor_name: expenseData.vendor_name ?? null,
     amount: expenseData.amount,
     expense_date: expenseData.expense_date,
-    approval_status: "pending",
-    created_by: expenseData.created_by,
+    approval_status: "approved",
     is_recurring: expenseData.is_recurring ?? false,
     recurrence_type: expenseData.is_recurring ? (expenseData.recurrence_type ?? "monthly") : null,
-  }).select();
+  };
+  if (expenseData.created_by) {
+    insertPayload.created_by = expenseData.created_by;
+  }
+  const { data, error } = await supabase.from("society_expenses").insert(insertPayload).select();
   if (error) {
     console.error("createExpense Supabase error:", JSON.stringify(error, null, 2));
     throw new Error(error.message || error.code || JSON.stringify(error));
@@ -714,10 +719,12 @@ export async function createExpense(societyId: string, expenseData: {
 export async function updateExpense(expenseId: string, expenseData: Partial<{
   category: string;
   description: string;
-  vendor_name: string;
+  vendor_name: string | null;
   amount: number;
   expense_date: string;
   approval_status: string;
+  is_recurring: boolean;
+  recurrence_type: string | null;
 }>) {
   const { data, error } = await supabase.from("society_expenses").update(expenseData).eq("id", expenseId).select().single();
   if (error) throw error;

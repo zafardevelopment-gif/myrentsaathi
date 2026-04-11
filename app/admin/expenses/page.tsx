@@ -3,13 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import { formatCurrency } from "@/lib/utils";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { useAuth } from "@/components/providers/MockAuthProvider";
+import { supabase } from "@/lib/supabase";
 import {
   getAdminSocietyId,
   getSocietyExpenses,
   getSocietyFlats,
   createExpense,
+  updateExpense,
   approveExpense,
   rejectExpense,
   deleteExpense,
@@ -52,6 +54,11 @@ export default function AdminExpenses() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  // expenseId -> { paid, pending, paidAmount, pendingAmount }
+  const [expensePaymentStats, setExpensePaymentStats] = useState<Record<string, { paid: number; pending: number; paidAmt: number; pendingAmt: number }>>({});
+  // Edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ category: "", description: "", vendor_name: "", amount: "", expense_date: "", is_recurring: false, recurrence_type: "monthly" as "monthly" | "weekly" });
 
   // Create form
   const [showForm, setShowForm] = useState(false);
@@ -122,8 +129,36 @@ export default function AdminExpenses() {
       const [e, f] = await Promise.all([getSocietyExpenses(sid), getSocietyFlats(sid)]);
       setExpenses(e);
       setFlats(f);
+      await loadPaymentStats(e, f);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadPaymentStats(expenseList: AdminExpense[], flatList: AdminFlat[]) {
+    const currentMonthStr = new Date().toISOString().slice(0, 7);
+    const approvedIds = expenseList.filter(e => e.approval_status === "approved").map(e => e.id);
+    const activeFlatIds = flatList.filter(f => f.status !== "inactive").map(f => f.id);
+    if (approvedIds.length === 0 || activeFlatIds.length === 0) return;
+    const { data } = await supabase
+      .from("society_due_payments")
+      .select("expense_id, flat_id, amount")
+      .eq("month_year", currentMonthStr)
+      .in("expense_id", approvedIds)
+      .in("flat_id", activeFlatIds);
+    const stats: Record<string, { paid: number; pending: number; paidAmt: number; pendingAmt: number }> = {};
+    for (const exp of expenseList.filter(e => e.approval_status === "approved")) {
+      const perFlat = Math.round(exp.amount / (activeFlatIds.length || 1));
+      const paidForExp = (data ?? []).filter(p => p.expense_id === exp.id);
+      const paidCount = paidForExp.length;
+      const pendingCount = activeFlatIds.length - paidCount;
+      stats[exp.id] = {
+        paid: paidCount,
+        pending: pendingCount,
+        paidAmt: paidCount * perFlat,
+        pendingAmt: pendingCount * perFlat,
+      };
+    }
+    setExpensePaymentStats(stats);
+  }
 
   useEffect(() => {
     if (!user?.email) return;
@@ -133,7 +168,8 @@ export default function AdminExpenses() {
       .finally(() => setLoading(false));
   }, [user, load]);
 
-  function downloadExpenseExcel(expense: {
+  async function downloadExpenseExcel(expense: {
+    id?: string;
     description: string;
     category: string;
     vendor_name?: string | null;
@@ -145,8 +181,24 @@ export default function AdminExpenses() {
   }) {
     const perFlatAmt = expense.calcMode === "per_flat" ? expense.perFlat ?? 0 : 0;
     const perSqftRate = expense.calcMode === "per_sqft" ? expense.perSqft ?? 0 : 0;
+    const monthYear = expense.expense_date.slice(0, 7);
 
-    // Build per-flat rows
+    // Fetch per-expense payment status for each flat
+    let paidFlatIds = new Set<string>();
+    let paidAtMap: Record<string, string> = {};
+    if (expense.id && societyId) {
+      const { data: dp } = await supabase
+        .from("society_due_payments")
+        .select("flat_id, paid_at")
+        .eq("expense_id", expense.id)
+        .eq("month_year", monthYear)
+        .in("flat_id", activeFlats.map(f => f.id));
+      for (const p of dp ?? []) {
+        paidFlatIds.add(p.flat_id);
+        paidAtMap[p.flat_id] = p.paid_at;
+      }
+    }
+
     const flatRows = activeFlats.map((f) => {
       let flatShare = 0;
       if (expense.calcMode === "per_flat") {
@@ -156,39 +208,248 @@ export default function AdminExpenses() {
       } else {
         flatShare = +(expense.amount / (activeFlats.length || 1)).toFixed(2);
       }
+      const paid = paidFlatIds.has(f.id);
       return [
         f.flat_number,
         f.block ?? "",
         f.owner_name ?? "",
         f.area_sqft ?? "",
         flatShare,
+        paid ? "Paid" : "Pending",
+        paid && paidAtMap[f.id] ? new Date(paidAtMap[f.id]).toLocaleDateString("en-IN") : "",
+        paid ? "Online" : "",
       ];
     });
 
-    const headers = ["flat_number", "block", "owner_name", "area_sqft", "amount_share"];
+    const headers = ["Flat No", "Block", "Owner Name", "Area (sqft)", "Amount Due (₹)", "Payment Status", "Paid On", "Payment Method"];
+    const paidCount = paidFlatIds.size;
+    const pendingCount = activeFlats.length - paidCount;
+
     const summaryRows = [
+      ["SOCIETY EXPENSE REPORT"],
+      [],
       ["Expense", expense.description],
       ["Category", expense.category.replace(/_/g, " ")],
       ["Vendor", expense.vendor_name ?? ""],
       ["Date", expense.expense_date],
-      ["Total Amount", expense.amount],
-      ["Calculation", expense.calcMode === "per_flat" ? `₹${perFlatAmt} per flat` : expense.calcMode === "per_sqft" ? `₹${perSqftRate}/sqft` : "Manual total"],
+      ["Total Amount", `₹${expense.amount.toLocaleString("en-IN")}`],
+      ["Per Flat Share", `₹${(expense.amount / (activeFlats.length || 1)).toFixed(0)}`],
+      ["Calculation Mode", expense.calcMode === "per_flat" ? `₹${perFlatAmt}/flat` : expense.calcMode === "per_sqft" ? `₹${perSqftRate}/sqft` : "Total split equally"],
+      ["Month", new Date(monthYear + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })],
+      [],
+      ["PAYMENT SUMMARY"],
+      ["Total Flats", activeFlats.length],
+      ["Paid", paidCount],
+      ["Pending", pendingCount],
+      ["Amount Collected", `₹${(paidCount * (expense.amount / (activeFlats.length || 1))).toFixed(0)}`],
+      ["Amount Pending", `₹${(pendingCount * (expense.amount / (activeFlats.length || 1))).toFixed(0)}`],
       [],
       headers,
       ...flatRows,
     ];
 
     const csv = summaryRows.map(row =>
-      row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")
+      Array.isArray(row) && row.length > 0
+        ? row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")
+        : ""
     ).join("\n");
 
-    const blob = new Blob([csv], { type: "text/csv" });
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `expense_${expense.description.replace(/\s+/g, "_")}_${expense.expense_date}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  async function downloadMasterPaymentReport() {
+    if (!societyId) return;
+    const currentMonthStr = new Date().toISOString().slice(0, 7);
+
+    const approvedExpenses = expenses.filter(e => e.approval_status === "approved");
+    const monthExpenses = approvedExpenses.filter(e =>
+      e.is_recurring || e.expense_date.startsWith(currentMonthStr)
+    );
+    const totalExpenseAmount = monthExpenses.reduce((s, e) => s + e.amount, 0);
+    const perFlatDue = activeFlats.length > 0 ? Math.round(totalExpenseAmount / activeFlats.length) : 0;
+
+    // Fetch per-expense payments for this month
+    const expenseIds = monthExpenses.map(e => e.id);
+    const flatIds = activeFlats.map(f => f.id);
+    const { data: dp } = expenseIds.length > 0
+      ? await supabase
+          .from("society_due_payments")
+          .select("expense_id, flat_id, paid_at")
+          .eq("month_year", currentMonthStr)
+          .in("expense_id", expenseIds)
+          .in("flat_id", flatIds)
+      : { data: [] };
+
+    // Build set: "expenseId:flatId" -> paid_at
+    const paidSet: Record<string, string> = {};
+    for (const p of dp ?? []) paidSet[`${p.expense_id}:${p.flat_id}`] = p.paid_at;
+
+    // Per flat: how many expenses paid
+    const flatPaidExpenseCount = (flatId: string) =>
+      monthExpenses.filter(e => paidSet[`${e.id}:${flatId}`]).length;
+    const flatFullyPaid = (flatId: string) => flatPaidExpenseCount(flatId) === monthExpenses.length;
+    const flatPaidAmount = (flatId: string) =>
+      monthExpenses.filter(e => paidSet[`${e.id}:${flatId}`]).reduce((s, e) => s + Math.round(e.amount / (activeFlats.length || 1)), 0);
+
+    const fullyPaidCount = activeFlats.filter(f => flatFullyPaid(f.id)).length;
+    const partialCount = activeFlats.filter(f => !flatFullyPaid(f.id) && flatPaidExpenseCount(f.id) > 0).length;
+    const pendingCount = activeFlats.filter(f => flatPaidExpenseCount(f.id) === 0).length;
+
+    const rows: (string | number)[][] = [
+      ["SOCIETY DUES PAYMENT REPORT"],
+      [`Month: ${new Date(currentMonthStr + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}`],
+      [`Total Expenses This Month: ₹${totalExpenseAmount.toLocaleString("en-IN")}`],
+      [`Per Flat Due: ₹${perFlatDue.toLocaleString("en-IN")}`],
+      [`Total Flats: ${activeFlats.length}`],
+      [`Fully Paid: ${fullyPaidCount}`, `Partial: ${partialCount}`, `Pending: ${pendingCount}`],
+      [],
+      ["EXPENSE BREAKDOWN"],
+      ["Description", "Category", "Date", "Total Amount (₹)", "Per Flat (₹)", "Recurring", "Flats Paid", "Flats Pending"],
+      ...monthExpenses.map(e => {
+        const expPaid = activeFlats.filter(f => paidSet[`${e.id}:${f.id}`]).length;
+        return [
+          e.description,
+          e.category.replace(/_/g, " "),
+          e.expense_date,
+          e.amount,
+          Math.round(e.amount / (activeFlats.length || 1)),
+          e.is_recurring ? "Yes" : "No",
+          expPaid,
+          activeFlats.length - expPaid,
+        ];
+      }),
+      [],
+      ["FLAT-WISE PAYMENT STATUS"],
+      ["Flat No", "Block", "Owner Name", "Area (sqft)", "Amount Due (₹)", "Amount Paid (₹)", "Status", "Expenses Paid"],
+      ...activeFlats.map(f => [
+        f.flat_number,
+        f.block ?? "",
+        f.owner_name ?? "",
+        f.area_sqft ?? "",
+        perFlatDue,
+        flatPaidAmount(f.id),
+        flatFullyPaid(f.id) ? "Fully Paid" : flatPaidExpenseCount(f.id) > 0 ? "Partial" : "Pending",
+        `${flatPaidExpenseCount(f.id)}/${monthExpenses.length}`,
+      ]),
+      [],
+      ["EXPENSE-WISE DETAIL PER FLAT"],
+      ["Flat No", "Block", "Owner", ...monthExpenses.map(e => `${e.description} (₹${Math.round(e.amount / (activeFlats.length || 1))})`)],
+      ...activeFlats.map(f => [
+        f.flat_number,
+        f.block ?? "",
+        f.owner_name ?? "",
+        ...monthExpenses.map(e => paidSet[`${e.id}:${f.id}`]
+          ? `Paid ${new Date(paidSet[`${e.id}:${f.id}`]).toLocaleDateString("en-IN")}`
+          : "Pending"
+        ),
+      ]),
+    ];
+
+    const csv = rows.map(row =>
+      Array.isArray(row) && row.length > 0
+        ? row.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")
+        : ""
+    ).join("\n");
+
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `payment_status_${currentMonthStr}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function startEdit(e: AdminExpense) {
+    setEditingId(e.id);
+    setEditForm({
+      category: e.category,
+      description: e.description,
+      vendor_name: e.vendor_name ?? "",
+      amount: String(e.amount),
+      expense_date: e.expense_date,
+      is_recurring: e.is_recurring,
+      recurrence_type: (e.recurrence_type as "monthly" | "weekly") ?? "monthly",
+    });
+  }
+
+  async function handleSaveEdit(id: string) {
+    setSaving(id);
+    try {
+      await updateExpense(id, {
+        category: editForm.category,
+        description: editForm.description,
+        vendor_name: editForm.vendor_name || null,
+        amount: parseFloat(editForm.amount) || 0,
+        expense_date: editForm.expense_date,
+        is_recurring: editForm.is_recurring,
+        recurrence_type: editForm.is_recurring ? editForm.recurrence_type : null,
+      });
+      setExpenses(prev => prev.map(e => e.id === id ? {
+        ...e,
+        category: editForm.category,
+        description: editForm.description,
+        vendor_name: editForm.vendor_name || null,
+        amount: parseFloat(editForm.amount) || 0,
+        expense_date: editForm.expense_date,
+        is_recurring: editForm.is_recurring,
+        recurrence_type: editForm.is_recurring ? editForm.recurrence_type : null,
+      } : e));
+      setEditingId(null);
+      toast.success("Expense updated");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function handleRemind(expense: AdminExpense) {
+    if (!societyId) return;
+    setSaving(`remind-${expense.id}`);
+    try {
+      const currentMonthStr = new Date().toISOString().slice(0, 7);
+      const perFlat = Math.round(expense.amount / (activeFlats.length || 1));
+      const stats = expensePaymentStats[expense.id];
+      // Get flat_ids that have NOT paid for this expense
+      const { data: paidFlats } = await supabase
+        .from("society_due_payments")
+        .select("flat_id")
+        .eq("expense_id", expense.id)
+        .eq("month_year", currentMonthStr);
+      const paidFlatIds = new Set((paidFlats ?? []).map(p => p.flat_id));
+      const unpaidFlats = activeFlats.filter(f => !paidFlatIds.has(f.id));
+      if (unpaidFlats.length === 0) { toast.success("All flats have already paid!"); return; }
+      // Get owner_id for unpaid flats, then get user IDs
+      const { data: flatOwners } = await supabase
+        .from("flats")
+        .select("id, owner_id")
+        .in("id", unpaidFlats.map(f => f.id));
+      const ownerIds = [...new Set((flatOwners ?? []).map(f => f.owner_id).filter(Boolean))];
+      if (ownerIds.length === 0) { toast("No owners found for unpaid flats."); return; }
+      // Create notifications for each owner
+      const notifications = ownerIds.map(ownerId => ({
+        user_id: ownerId,
+        title: "Society Dues Reminder",
+        message: `Please pay ₹${perFlat.toLocaleString("en-IN")} for "${expense.description}" (${new Date(currentMonthStr + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}).`,
+        type: "dues_reminder",
+        is_read: false,
+        metadata: JSON.stringify({ expense_id: expense.id, month_year: currentMonthStr, amount: perFlat }),
+      }));
+      const { error } = await supabase.from("notifications").insert(notifications);
+      if (error) throw error;
+      toast.success(`Reminder sent to ${ownerIds.length} landlord${ownerIds.length !== 1 ? "s" : ""}!`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to send reminder");
+    } finally {
+      setSaving(null);
+    }
   }
 
   async function handleCreate() {
@@ -222,7 +483,7 @@ export default function AdminExpenses() {
         calcMode,
         perFlat: parseFloat(amountPerFlat) || 0,
         perSqft: parseFloat(amountPerSqft) || 0,
-      });
+      }).catch(() => {});
 
       setShowForm(false);
       setForm({ category: "general", description: "", vendor_name: "", expense_date: new Date().toISOString().slice(0, 10), is_recurring: false, recurrence_type: "monthly" });
@@ -342,6 +603,7 @@ export default function AdminExpenses() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
+      <Toaster position="top-center" />
 
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -369,6 +631,16 @@ export default function AdminExpenses() {
             <p className="text-[11px] text-ink-muted">Pending Approval</p>
           </div>
         </div>
+      )}
+
+      {/* Master payment status download */}
+      {expenses.filter(e => e.approval_status === "approved").length > 0 && (
+        <button
+          onClick={() => downloadMasterPaymentReport().catch(() => {})}
+          className="w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold cursor-pointer transition-colors"
+        >
+          ⬇ Download Full Payment Status Report (All Landlords)
+        </button>
       )}
 
       {/* ── CREATE EXPENSE FORM ── */}
@@ -652,14 +924,18 @@ export default function AdminExpenses() {
           <span>Page {page} of {totalPages}</span>
         </div>
         <div className="space-y-2">
-          {paginated.map((e) => (
+          {paginated.map((e) => {
+            const stats = expensePaymentStats[e.id];
+            const isEditing = editingId === e.id;
+            return (
             <div
               key={e.id}
-              className={`bg-white rounded-[14px] p-4 border border-border-default border-l-4 ${
+              className={`bg-white rounded-[14px] border border-border-default border-l-4 ${
                 e.approval_status === "approved" ? "border-l-green-500" : e.approval_status === "rejected" ? "border-l-red-500" : "border-l-yellow-500"
               }`}
             >
-              <div className="flex justify-between items-start gap-2">
+              {/* Main row */}
+              <div className="flex justify-between items-start gap-2 p-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span>{CATEGORY_ICON[e.category] ?? "📋"}</span>
@@ -673,53 +949,120 @@ export default function AdminExpenses() {
                       </span>
                     )}
                   </div>
+                  {/* Payment progress */}
+                  {stats && e.approval_status === "approved" && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-warm-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full transition-all"
+                          style={{ width: `${activeFlats.length > 0 ? (stats.paid / activeFlats.length) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-green-700 font-bold whitespace-nowrap">{formatCurrency(stats.paidAmt)} collected</span>
+                      <span className="text-[10px] text-red-500 font-bold whitespace-nowrap">{formatCurrency(stats.pendingAmt)} pending</span>
+                      <span className="text-[10px] text-ink-muted whitespace-nowrap">{stats.paid}/{activeFlats.length} flats</span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                   <span className="text-[15px] font-extrabold text-ink">{formatCurrency(e.amount)}</span>
                   <StatusBadge status={e.approval_status} />
                   {e.approval_status === "pending" && (
                     <>
-                      <button
-                        onClick={() => handleApprove(e.id)}
-                        disabled={saving === e.id}
-                        className="px-2 py-1 rounded-lg bg-green-600 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
-                      >
-                        ✓
-                      </button>
-                      <button
-                        onClick={() => handleReject(e.id)}
-                        disabled={saving === e.id}
-                        className="px-2 py-1 rounded-lg bg-red-600 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
-                      >
-                        ✗
-                      </button>
+                      <button onClick={() => handleApprove(e.id)} disabled={saving === e.id}
+                        className="px-2 py-1 rounded-lg bg-green-600 text-white text-xs font-bold cursor-pointer disabled:opacity-50">✓</button>
+                      <button onClick={() => handleReject(e.id)} disabled={saving === e.id}
+                        className="px-2 py-1 rounded-lg bg-red-600 text-white text-xs font-bold cursor-pointer disabled:opacity-50">✗</button>
                     </>
+                  )}
+                  <button onClick={() => isEditing ? setEditingId(null) : startEdit(e)}
+                    className={`px-2 py-1 rounded-lg text-xs font-bold cursor-pointer ${isEditing ? "bg-gray-200 text-gray-700" : "bg-blue-50 hover:bg-blue-100 text-blue-700"}`}
+                    title="Edit expense">✏️</button>
+                  {e.approval_status === "approved" && stats && stats.pending > 0 && (
+                    <button
+                      onClick={() => handleRemind(e)}
+                      disabled={saving === `remind-${e.id}`}
+                      className="px-2 py-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold cursor-pointer disabled:opacity-50"
+                      title="Send payment reminder to unpaid landlords"
+                    >
+                      {saving === `remind-${e.id}` ? "…" : "🔔 Remind"}
+                    </button>
                   )}
                   <button
                     onClick={() => downloadExpenseExcel({
-                      description: e.description,
-                      category: e.category,
-                      vendor_name: e.vendor_name,
-                      expense_date: e.expense_date,
-                      amount: e.amount,
-                      calcMode: "total",
-                    })}
+                      id: e.id, description: e.description, category: e.category,
+                      vendor_name: e.vendor_name, expense_date: e.expense_date, amount: e.amount, calcMode: "total",
+                    }).catch(() => {})}
                     className="px-2 py-1 rounded-lg bg-green-50 hover:bg-green-100 text-green-700 text-xs font-bold cursor-pointer"
-                    title="Download flat-wise Excel"
-                  >
-                    ⬇ Excel
-                  </button>
-                  <button
-                    onClick={() => handleDelete(e.id)}
-                    disabled={saving === e.id}
-                    className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold cursor-pointer disabled:opacity-50"
-                  >
-                    🗑
-                  </button>
+                    title="Download flat-wise Excel with payment status">⬇ Excel</button>
+                  <button onClick={() => handleDelete(e.id)} disabled={saving === e.id}
+                    className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold cursor-pointer disabled:opacity-50">🗑</button>
                 </div>
               </div>
+
+              {/* Inline edit form */}
+              {isEditing && (
+                <div className="border-t border-border-default bg-blue-50 p-4 space-y-3 rounded-b-[14px]">
+                  <div className="text-xs font-bold text-blue-700 mb-2">Edit Expense</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-semibold text-ink-muted block mb-1">Category</label>
+                      <select value={editForm.category} onChange={ev => setEditForm(f => ({ ...f, category: ev.target.value }))}
+                        className="w-full border border-border-default rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+                        {CATEGORIES.map(c => <option key={c} value={c}>{c.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-ink-muted block mb-1">Date</label>
+                      <input type="date" value={editForm.expense_date} onChange={ev => setEditForm(f => ({ ...f, expense_date: ev.target.value }))}
+                        className="w-full border border-border-default rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-semibold text-ink-muted block mb-1">Description</label>
+                      <input value={editForm.description} onChange={ev => setEditForm(f => ({ ...f, description: ev.target.value }))}
+                        className="w-full border border-border-default rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-ink-muted block mb-1">Vendor</label>
+                      <input value={editForm.vendor_name} onChange={ev => setEditForm(f => ({ ...f, vendor_name: ev.target.value }))}
+                        className="w-full border border-border-default rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-ink-muted block mb-1">Amount (₹)</label>
+                      <input type="number" value={editForm.amount} onChange={ev => setEditForm(f => ({ ...f, amount: ev.target.value }))}
+                        className="w-full border border-border-default rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    </div>
+                    <div className="col-span-2 flex items-center gap-3">
+                      <label className="text-[10px] font-semibold text-ink-muted">Recurring</label>
+                      <button type="button" onClick={() => setEditForm(f => ({ ...f, is_recurring: !f.is_recurring }))}
+                        className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${editForm.is_recurring ? "bg-blue-500" : "bg-gray-300"}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editForm.is_recurring ? "translate-x-4" : "translate-x-0"}`} />
+                      </button>
+                      {editForm.is_recurring && (
+                        <div className="flex gap-1">
+                          {(["monthly", "weekly"] as const).map(t => (
+                            <button key={t} type="button" onClick={() => setEditForm(f => ({ ...f, recurrence_type: t }))}
+                              className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer border ${editForm.recurrence_type === t ? "bg-blue-500 text-white border-blue-500" : "bg-white text-ink-muted border-border-default"}`}>
+                              {t === "monthly" ? "Monthly" : "Weekly"}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleSaveEdit(e.id)} disabled={saving === e.id}
+                      className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold cursor-pointer disabled:opacity-50">
+                      {saving === e.id ? "Saving…" : "Save"}
+                    </button>
+                    <button onClick={() => setEditingId(null)}
+                      className="px-4 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-bold cursor-pointer">Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Pagination */}

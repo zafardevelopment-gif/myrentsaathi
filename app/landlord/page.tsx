@@ -67,6 +67,8 @@ const QUICK_ACTIONS = [
 
 type SocietyNotice = { id: string; title: string; content: string; notice_type: string; created_at: string; society?: { name: string } | null };
 type SocietyPoll = { id: string; title: string; description: string; status: string; ends_at: string | null; society?: { name: string } | null };
+type SocietyDueInfo = { societyName: string; perFlatShare: number; landlordTotalDue: number; landlordPaid: number; landlordRemaining: number; flatCount: number; dueDay: number | null; splitMode: string; expenseCount: number };
+type SocietyExpenseItem = { id: string; amount: number; is_recurring: boolean; expense_date: string };
 
 // Flat detail modal
 function FlatDetailModal({ flat, payment, onClose }: {
@@ -184,6 +186,8 @@ export default function LandlordOverview() {
   const [flats, setFlats] = useState<LandlordFlat[]>([]);
   const [societyNotices, setSocietyNotices] = useState<SocietyNotice[]>([]);
   const [societyPolls, setSocietyPolls] = useState<SocietyPoll[]>([]);
+  const [societyDues, setSocietyDues] = useState<SocietyDueInfo[]>([]);
+  const [duesReminders, setDuesReminders] = useState<{ id: string; title: string; message: string; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Flat detail modal
@@ -225,6 +229,69 @@ export default function LandlordOverview() {
         ]);
         setSocietyNotices((noticesRes.data ?? []) as unknown as SocietyNotice[]);
         setSocietyPolls((pollsRes.data ?? []) as unknown as SocietyPoll[]);
+
+        // Load society dues for each unique society
+        const currentMonthStr = new Date().toISOString().slice(0, 7);
+        const dueInfos: SocietyDueInfo[] = [];
+        for (const sid of societyIds) {
+          const [{ data: socData }, { data: expData }, { count: activeCount }] = await Promise.all([
+            supabase.from("societies").select("name, total_flats, expense_split_mode, payment_due_day").eq("id", sid).single(),
+            supabase.from("society_expenses")
+              .select("id, amount, is_recurring, expense_date")
+              .eq("society_id", sid)
+              .eq("approval_status", "approved"),
+            supabase.from("flats").select("id", { count: "exact", head: true }).eq("society_id", sid),
+          ]);
+          if (!socData || !expData) continue;
+          const splitMode = socData.expense_split_mode ?? "total_flats";
+          const totalFlats = splitMode === "active_flats" || !socData.total_flats
+            ? (activeCount ?? 1)
+            : socData.total_flats;
+          const landlordFlats = f.filter(fl => fl.society_id === sid);
+          const monthExpenses = (expData as SocietyExpenseItem[])
+            .filter(e => e.is_recurring || e.expense_date.startsWith(currentMonthStr));
+          const totalExpenses = monthExpenses.reduce((s, e) => s + e.amount, 0);
+          const perFlatShare = totalFlats > 0 ? Math.round(totalExpenses / totalFlats) : 0;
+          const landlordTotalDue = perFlatShare * landlordFlats.length;
+
+          // Fetch what landlord has already paid this month
+          let landlordPaid = 0;
+          if (landlordFlats.length > 0 && monthExpenses.length > 0) {
+            const { data: dp } = await supabase
+              .from("society_due_payments")
+              .select("amount")
+              .eq("month_year", currentMonthStr)
+              .in("flat_id", landlordFlats.map(fl => fl.id))
+              .in("expense_id", monthExpenses.map(e => e.id));
+            landlordPaid = (dp ?? []).reduce((s, p) => s + (p.amount ?? 0), 0);
+          }
+
+          dueInfos.push({
+            societyName: socData.name,
+            perFlatShare,
+            landlordTotalDue,
+            landlordPaid,
+            landlordRemaining: Math.max(0, landlordTotalDue - landlordPaid),
+            flatCount: landlordFlats.length,
+            dueDay: socData.payment_due_day ?? null,
+            splitMode,
+            expenseCount: monthExpenses.length,
+          });
+        }
+        setSocietyDues(dueInfos);
+      }
+
+      // Fetch dues reminder notifications for this landlord
+      if (lid) {
+        const { data: reminders } = await supabase
+          .from("notifications")
+          .select("id, title, message, created_at")
+          .eq("user_id", lid)
+          .eq("type", "dues_reminder")
+          .eq("is_read", false)
+          .order("created_at", { ascending: false })
+          .limit(5);
+        setDuesReminders(reminders ?? []);
       }
 
       setLoading(false);
@@ -351,6 +418,72 @@ export default function LandlordOverview() {
             <span>{formatCurrency(stats.expectedRent)} total</span>
           </div>
         </div>
+      )}
+
+      {/* Dues Reminders from admin */}
+      {!loading && duesReminders.length > 0 && (
+        <CollapsibleSection title="🔔 Payment Reminders" defaultOpen={true} badge={duesReminders.length} rightLink={{ label: "View dues →", href: "/landlord/society-dues" }}>
+          {duesReminders.map(r => (
+            <div key={r.id} className="bg-orange-50 border border-orange-200 rounded-[14px] p-3.5 mb-2 border-l-4 border-l-orange-500">
+              <div className="text-xs font-bold text-orange-800">{r.title}</div>
+              <div className="text-[11px] text-orange-700 mt-0.5">{r.message}</div>
+              <div className="text-[10px] text-orange-500 mt-1">{new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div>
+            </div>
+          ))}
+        </CollapsibleSection>
+      )}
+
+      {/* Society Dues */}
+      {!loading && societyDues.length > 0 && (
+        <CollapsibleSection title="🏢 Society Dues" defaultOpen={true} rightLink={{ label: "Details →", href: "/landlord/society-dues" }}>
+          {societyDues.map((d, i) => {
+            const now = new Date();
+            let daysLeft: number | null = null;
+            let isOverdue = false;
+            if (d.dueDay) {
+              const dueDateObj = new Date(now.getFullYear(), now.getMonth(), d.dueDay);
+              const diff = Math.ceil((dueDateObj.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              if (diff < 0) { isOverdue = true; }
+              else { daysLeft = diff; }
+            }
+            return (
+              <div key={i} className={`rounded-[14px] p-4 border mb-2 ${isOverdue && d.landlordRemaining > 0 ? "bg-red-50 border-red-200" : d.landlordRemaining === 0 ? "bg-green-50 border-green-200" : "bg-white border-border-default"}`}>
+                <div className="flex justify-between items-start gap-3 mb-2">
+                  <div>
+                    <div className="text-xs font-bold text-ink">{d.societyName}</div>
+                    <div className="text-[11px] text-ink-muted">{d.flatCount} flat{d.flatCount !== 1 ? "s" : ""} · {d.expenseCount} expense{d.expenseCount !== 1 ? "s" : ""} · {currentMonthLabel}</div>
+                  </div>
+                  <div className="text-right">
+                    {d.landlordRemaining > 0 ? (
+                      <>
+                        <div className="text-base font-extrabold text-red-600">{formatCurrency(d.landlordRemaining)} remaining</div>
+                        {d.landlordPaid > 0 && <div className="text-[10px] text-green-600 font-semibold">{formatCurrency(d.landlordPaid)} paid</div>}
+                      </>
+                    ) : (
+                      <div className="text-base font-extrabold text-green-600">✓ Fully Paid</div>
+                    )}
+                    <div className="text-[10px] text-ink-muted">{formatCurrency(d.perFlatShare)}/flat · total {formatCurrency(d.landlordTotalDue)}</div>
+                  </div>
+                </div>
+                {/* Progress bar */}
+                {d.landlordTotalDue > 0 && (
+                  <div className="h-1.5 bg-warm-100 rounded-full overflow-hidden mb-2">
+                    <div className="h-full bg-green-500 rounded-full transition-all"
+                      style={{ width: `${Math.min(100, (d.landlordPaid / d.landlordTotalDue) * 100)}%` }} />
+                  </div>
+                )}
+                {d.dueDay && d.landlordRemaining > 0 && (
+                  <div className={`text-[11px] font-semibold rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1 ${
+                    isOverdue ? "bg-red-100 text-red-700" : daysLeft !== null && daysLeft <= 3 ? "bg-orange-100 text-orange-700" : "bg-blue-50 text-blue-700"
+                  }`}>
+                    {isOverdue ? "🔴 Overdue!" : daysLeft === 0 ? "📅 Due today!" : `📅 Due in ${daysLeft} day${daysLeft !== 1 ? "s" : ""} · ${d.dueDay}th`}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <Link href="/landlord/society-dues" className="block text-center text-xs text-brand-500 font-bold mt-1 no-underline">View full breakdown →</Link>
+        </CollapsibleSection>
       )}
 
       {/* Quick Actions */}
