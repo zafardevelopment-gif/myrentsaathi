@@ -585,6 +585,19 @@ export default function AdminExpenses() {
   const totalApproved = expenses.filter((e) => e.approval_status === "approved").reduce((s, e) => s + e.amount, 0);
   const totalPending = expenses.filter((e) => e.approval_status === "pending").reduce((s, e) => s + e.amount, 0);
 
+  // Current month collection summary across all approved expenses
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const currentMonthApproved = expenses.filter(e =>
+    e.approval_status === "approved" && (e.is_recurring || e.expense_date.startsWith(currentMonthStr))
+  );
+  const totalCollected = Object.values(expensePaymentStats).reduce((s, st) => s + st.paidAmt, 0);
+  const totalExpected = currentMonthApproved.reduce((s, e) => s + e.amount, 0);
+  const totalRemaining = Math.max(0, totalExpected - totalCollected);
+  const collectionPct = totalExpected > 0 ? Math.round((totalCollected / totalExpected) * 100) : 0;
+  const totalPaidFlats = currentMonthApproved.length > 0
+    ? Math.round(Object.values(expensePaymentStats).reduce((s, st) => s + st.paid, 0) / currentMonthApproved.length)
+    : 0;
+
   if (loading) {
     return (
       <div className="space-y-2">
@@ -621,15 +634,62 @@ export default function AdminExpenses() {
 
       {/* Summary stats */}
       {expenses.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white border border-border-default rounded-xl p-3 text-center">
-            <p className="text-lg font-extrabold text-green-600">{formatCurrency(totalApproved)}</p>
-            <p className="text-[11px] text-ink-muted">Approved</p>
+        <div className="space-y-3">
+          {/* Expense approval summary */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white border border-border-default rounded-xl p-3 text-center">
+              <p className="text-lg font-extrabold text-green-600">{formatCurrency(totalApproved)}</p>
+              <p className="text-[11px] text-ink-muted">Approved</p>
+            </div>
+            <div className="bg-white border border-border-default rounded-xl p-3 text-center">
+              <p className="text-lg font-extrabold text-amber-600">{formatCurrency(totalPending)}</p>
+              <p className="text-[11px] text-ink-muted">Pending Approval</p>
+            </div>
           </div>
-          <div className="bg-white border border-border-default rounded-xl p-3 text-center">
-            <p className="text-lg font-extrabold text-amber-600">{formatCurrency(totalPending)}</p>
-            <p className="text-[11px] text-ink-muted">Pending Approval</p>
-          </div>
+
+          {/* Society dues collection summary for current month */}
+          {currentMonthApproved.length > 0 && (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-extrabold text-blue-900">
+                  💰 Society Dues Collection —{" "}
+                  {new Date(currentMonthStr + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+                </p>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${collectionPct >= 80 ? "bg-green-100 text-green-700" : collectionPct >= 40 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                  {collectionPct}% collected
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white rounded-xl p-2.5 text-center border border-blue-100">
+                  <p className="text-sm font-extrabold text-blue-700">{formatCurrency(totalExpected)}</p>
+                  <p className="text-[10px] text-ink-muted">Total Expected</p>
+                </div>
+                <div className="bg-white rounded-xl p-2.5 text-center border border-green-200">
+                  <p className="text-sm font-extrabold text-green-600">{formatCurrency(totalCollected)}</p>
+                  <p className="text-[10px] text-ink-muted">Collected</p>
+                </div>
+                <div className="bg-white rounded-xl p-2.5 text-center border border-red-200">
+                  <p className="text-sm font-extrabold text-red-500">{formatCurrency(totalRemaining)}</p>
+                  <p className="text-[10px] text-ink-muted">Remaining</p>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div>
+                <div className="w-full bg-blue-100 rounded-full h-2.5">
+                  <div
+                    className="bg-green-500 h-2.5 rounded-full transition-all duration-500"
+                    style={{ width: `${collectionPct}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-ink-muted mt-1">
+                  <span>{totalPaidFlats} flats fully paid</span>
+                  <span>{activeFlats.length - totalPaidFlats} flats pending</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
