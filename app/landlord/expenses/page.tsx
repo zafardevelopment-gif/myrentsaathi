@@ -18,6 +18,18 @@ type Expense = {
   created_at: string;
 };
 
+type SocietyExpense = {
+  id: string;
+  category: string;
+  description: string;
+  vendor_name: string | null;
+  amount: number;
+  expense_date: string;
+  approval_status: string;
+  is_recurring: boolean;
+  recurrence_type: string | null;
+};
+
 const CATEGORIES = ["AC Repair", "Painting", "Plumbing", "Electrical", "Other"];
 const CATEGORY_ICON: Record<string, string> = {
   "AC Repair": "❄️",
@@ -38,11 +50,13 @@ export default function MaintenanceExpensesPage() {
   const { user } = useAuth();
   const [flats, setFlats] = useState<LandlordFlat[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [societyExpenses, setSocietyExpenses] = useState<SocietyExpense[]>([]);
   const [landlordId, setLandlordId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [filterFlatId, setFilterFlatId] = useState("all");
+  const [activeTab, setActiveTab] = useState<"my" | "society">("society");
 
   const [form, setForm] = useState({
     flat_id: "",
@@ -70,6 +84,18 @@ export default function MaintenanceExpensesPage() {
         .in("flat_id", flatIds)
         .order("expense_date", { ascending: false });
       setExpenses(data ?? []);
+
+      // Load society expenses from the first flat's society
+      const societyId = f[0].society_id;
+      if (societyId) {
+        const { data: se } = await supabase
+          .from("society_expenses")
+          .select("id, category, description, vendor_name, amount, expense_date, approval_status, is_recurring, recurrence_type")
+          .eq("society_id", societyId)
+          .eq("approval_status", "approved")
+          .order("expense_date", { ascending: false });
+        setSocietyExpenses(se ?? []);
+      }
     }
   }
 
@@ -129,15 +155,85 @@ export default function MaintenanceExpensesPage() {
     return <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-20 bg-warm-100 rounded-[14px] animate-pulse" />)}</div>;
   }
 
+  const SEXP_ICON: Record<string, string> = {
+    electricity: "⚡", water: "💧", cleaning: "🧹", security: "🛡️",
+    lift_maintenance: "🔧", garden: "🌿", painting: "🎨", plumbing: "🔧",
+    electrical_repair: "⚡", pest_control: "🐛", insurance: "📄",
+    legal: "⚖️", audit: "📊", festival: "🎉", general: "🏗️", other: "📋",
+  };
+
   return (
     <div>
       <Toaster position="top-center" />
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-[15px] font-extrabold text-ink">🔧 Maintenance Expenses</h2>
-        <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer">
-          {showForm ? "Cancel" : "+ Add Expense"}
-        </button>
+        <h2 className="text-[15px] font-extrabold text-ink">💰 Expenses</h2>
+        {activeTab === "my" && (
+          <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer">
+            {showForm ? "Cancel" : "+ Add Expense"}
+          </button>
+        )}
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-warm-100 rounded-xl p-1 border border-border-default mb-4">
+        {([
+          { key: "society", label: "🏢 Society Expenses" },
+          { key: "my", label: "🔧 My Maintenance" },
+        ] as const).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === key ? "bg-brand-500 text-white shadow" : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Society Expenses Tab */}
+      {activeTab === "society" && (
+        <div className="space-y-2">
+          {societyExpenses.length === 0 ? (
+            <div className="text-center py-12 text-ink-muted text-sm">No approved society expenses yet.</div>
+          ) : (
+            <>
+              <div className="bg-white rounded-[14px] p-4 border border-border-default mb-2">
+                <div className="text-[10px] text-ink-muted uppercase tracking-wide mb-1">Total Society Expenses</div>
+                <div className="text-xl font-extrabold text-brand-600">{formatCurrency(societyExpenses.reduce((s, e) => s + e.amount, 0))}</div>
+                <div className="text-[10px] text-ink-muted">{societyExpenses.length} approved expenses</div>
+              </div>
+              {societyExpenses.map(e => (
+                <div key={e.id} className="bg-white rounded-[14px] p-4 border border-border-default flex justify-between items-start gap-3">
+                  <div className="flex gap-3 items-start">
+                    <div className="w-9 h-9 rounded-xl bg-warm-100 flex items-center justify-center text-base flex-shrink-0">
+                      {SEXP_ICON[e.category] ?? "📋"}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-ink">{e.description}</div>
+                      <div className="text-[11px] text-ink-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span>{e.category.replace(/_/g, " ")}{e.vendor_name ? ` · ${e.vendor_name}` : ""}</span>
+                        <span>· {e.expense_date}</span>
+                        {e.is_recurring && (
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">
+                            🔁 {e.recurrence_type ?? "recurring"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-sm font-extrabold text-brand-600 flex-shrink-0">{formatCurrency(e.amount)}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* My Maintenance Tab */}
+      {activeTab === "my" && (
+      <div>
 
       {showForm && (
         <form onSubmit={handleAdd} className="bg-white rounded-[14px] p-4 border border-brand-200 mb-5 space-y-3">
@@ -253,6 +349,8 @@ export default function MaintenanceExpensesPage() {
             </div>
           </div>
         ))
+      )}
+      </div>
       )}
     </div>
   );

@@ -594,16 +594,16 @@ export default function AdminFlats() {
 
           const ownerPhone = normalizePhone(row.owner_phone || "");
           const tenantPhone = normalizePhone(row.tenant_phone || "");
-          const wantsLandlord = !!(row.owner_name && row.owner_phone);
-          const wantsTenant = !!(row.tenant_name && row.tenant_phone);
+          const wantsLandlord = !!(row.owner_name?.trim());
+          const wantsTenant = !!(row.tenant_name?.trim());
 
-          // Phone validation — skip row if phone is invalid
-          if (wantsLandlord && !isValidPhone(row.owner_phone)) {
+          // Phone validation — skip row only if phone is provided but invalid
+          if (wantsLandlord && row.owner_phone && !isValidPhone(row.owner_phone)) {
             result.status = "invalid_phone";
             resultsArr.push(result);
             continue;
           }
-          if (wantsTenant && !isValidPhone(row.tenant_phone)) {
+          if (wantsTenant && row.tenant_phone && !isValidPhone(row.tenant_phone)) {
             result.status = "invalid_phone";
             resultsArr.push(result);
             continue;
@@ -658,6 +658,11 @@ export default function AdminFlats() {
               result.owner_password = lResult.generatedPassword ?? "";
               result.owner_login_email = lResult.loginEmail ?? "";
               availableLandlordSlots--;
+            } else {
+              console.error("Landlord creation failed for row", row.flat_number, ":", lResult.error);
+              result.status = "error";
+              resultsArr.push(result);
+              continue;
             }
           }
 

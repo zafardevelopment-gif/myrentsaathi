@@ -18,6 +18,7 @@ const ROLE_MAP: Record<string, MockRole> = {
 };
 
 interface MockUser {
+  id: string;
   role: MockRole;
   name: string;
   email: string;
@@ -70,6 +71,7 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
     }
 
     const newUser: MockUser = {
+      id: result.user.id,
       role: mappedRole,
       name: result.user.full_name,
       email: result.user.email,

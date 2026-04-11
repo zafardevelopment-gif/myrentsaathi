@@ -74,6 +74,8 @@ export type AdminExpense = {
   approval_status: string;
   approved_by: string | null;
   created_at: string;
+  is_recurring: boolean;
+  recurrence_type: string | null;
 };
 
 export type AdminTicket = {
@@ -223,7 +225,7 @@ export async function getAllSocietyMaintenancePayments(societyId: string): Promi
 export async function getSocietyExpenses(societyId: string): Promise<AdminExpense[]> {
   const { data, error } = await supabase
     .from("society_expenses")
-    .select("id, category, description, vendor_name, amount, expense_date, approval_status, approved_by, created_at")
+    .select("id, category, description, vendor_name, amount, expense_date, approval_status, approved_by, created_at, is_recurring, recurrence_type")
     .eq("society_id", societyId)
     .order("expense_date", { ascending: false });
   if (error) throw error;
@@ -686,6 +688,9 @@ export async function createExpense(societyId: string, expenseData: {
   vendor_name?: string;
   amount: number;
   expense_date: string;
+  created_by: string;
+  is_recurring?: boolean;
+  recurrence_type?: string;
 }) {
   const { data, error } = await supabase.from("society_expenses").insert({
     society_id: societyId,
@@ -695,9 +700,15 @@ export async function createExpense(societyId: string, expenseData: {
     amount: expenseData.amount,
     expense_date: expenseData.expense_date,
     approval_status: "pending",
-  }).select().single();
-  if (error) throw error;
-  return data;
+    created_by: expenseData.created_by,
+    is_recurring: expenseData.is_recurring ?? false,
+    recurrence_type: expenseData.is_recurring ? (expenseData.recurrence_type ?? "monthly") : null,
+  }).select();
+  if (error) {
+    console.error("createExpense Supabase error:", JSON.stringify(error, null, 2));
+    throw new Error(error.message || error.code || JSON.stringify(error));
+  }
+  return data?.[0] ?? null;
 }
 
 export async function updateExpense(expenseId: string, expenseData: Partial<{

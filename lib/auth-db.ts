@@ -413,18 +413,47 @@ export async function addLandlordBySocietyAdmin(params: {
   generatedPassword?: string;
   loginEmail?: string;
 }> {
-  const suffix = Math.floor(1000 + Math.random() * 9000).toString();
+  // If a real email was provided, check if user already exists and reuse
+  if (params.email?.trim()) {
+    const loginEmail = params.email.trim().toLowerCase();
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id, admin_user_id, password, email")
+      .eq("email", loginEmail)
+      .maybeSingle();
+    if (existingUser) {
+      if (params.flat_id) {
+        await supabase.from("flats").update({
+          owner_id: existingUser.id,
+          owner_name: params.full_name.trim(),
+          owner_phone: params.phone.trim(),
+          owner_email: loginEmail,
+          status: "occupied",
+        }).eq("id", params.flat_id);
+      }
+      return {
+        success: true,
+        userId: existingUser.id,
+        generatedUserId: existingUser.admin_user_id ?? loginEmail,
+        generatedPassword: existingUser.password ?? "",
+        loginEmail,
+      };
+    }
+  }
+
+  // Generate a unique suffix (retry up to 5 times to avoid collisions)
+  let suffix = Math.floor(1000 + Math.random() * 9000).toString();
+  let loginEmail = params.email?.trim().toLowerCase() || `lnd${suffix}@mrs.local`;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: collision } = await supabase
+      .from("users").select("id").eq("email", loginEmail).maybeSingle();
+    if (!collision) break;
+    suffix = Math.floor(1000 + Math.random() * 9000).toString();
+    loginEmail = `lnd${suffix}@mrs.local`;
+  }
+
   const displayId = `LND-${suffix}`;
   const autoPassword = params.full_name.trim().split(" ")[0] + "@" + suffix;
-  const loginEmail = params.email?.trim().toLowerCase() || `lnd${suffix}@mrs.local`;
-
-  // Check email not already taken
-  const { data: existing } = await supabase
-    .from("users")
-    .select("id")
-    .eq("email", loginEmail)
-    .maybeSingle();
-  if (existing) return { success: false, error: "Email already registered. Use a different email." };
 
   // Create landlord user
   const { data: user, error: userErr } = await supabase
@@ -452,7 +481,6 @@ export async function addLandlordBySocietyAdmin(params: {
   });
   if (memErr) {
     console.error("Society member link error:", memErr);
-    // Don't fail — user is created
   }
 
   // Link to flat if provided
