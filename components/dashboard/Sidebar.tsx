@@ -9,6 +9,7 @@ interface NavItem {
   icon: string;
   label: string;
   href: string;
+  requiresSociety?: boolean; // hide if user has no society
 }
 
 const NAV_ITEMS: Record<MockRole, NavItem[]> = {
@@ -29,15 +30,14 @@ const NAV_ITEMS: Record<MockRole, NavItem[]> = {
     { icon: "📊", label: "Overview",   href: "/admin" },
     { icon: "🏢", label: "Flats",      href: "/admin/flats" },
     { icon: "🏠", label: "Landlords",  href: "/admin/landlords" },
-    { icon: "💰", label: "Finance",    href: "/admin/finance" },
     { icon: "📋", label: "Expenses",   href: "/admin/expenses" },
-    { icon: "🚫", label: "Tickets",    href: "/admin/tickets" },
     { icon: "🚪", label: "Visitors",   href: "/admin/visitors" },
     { icon: "🅿️", label: "Parking",   href: "/admin/parking" },
     { icon: "👷", label: "Staff",      href: "/admin/staff" },
     { icon: "🏛️", label: "Facilities", href: "/admin/facilities" },
     { icon: "🗳️", label: "Polls",     href: "/admin/polls" },
     { icon: "📢", label: "Notices",    href: "/admin/notices" },
+    { icon: "🚫", label: "Tickets",    href: "/admin/tickets" },
     { icon: "📁", label: "Documents",  href: "/admin/documents" },
     { icon: "⚖️", label: "Governance", href: "/admin/governance" },
     { icon: "⚙️", label: "Settings",  href: "/admin/settings" },
@@ -48,32 +48,35 @@ const NAV_ITEMS: Record<MockRole, NavItem[]> = {
     { icon: "👥", label: "Tenants",      href: "/landlord/tenants" },
     { icon: "💰", label: "Rent",         href: "/landlord/rent" },
     { icon: "📈", label: "Rent Hike",    href: "/landlord/rent-hike" },
-    { icon: "🏢", label: "Society Dues", href: "/landlord/society-dues" },
+    { icon: "🏢", label: "Society Dues", href: "/landlord/society-dues",  requiresSociety: true },
     { icon: "📄", label: "Agreements",   href: "/landlord/agreements" },
     { icon: "📜", label: "NOC",          href: "/landlord/noc" },
-    { icon: "🚪", label: "Visitors",      href: "/landlord/visitors" },
-    { icon: "🅿️", label: "Parking",     href: "/landlord/parking" },
-    { icon: "🏛️", label: "Facilities",  href: "/landlord/facilities" },
+    { icon: "🚪", label: "Visitors",     href: "/landlord/visitors",      requiresSociety: true },
+    { icon: "🅿️", label: "Parking",     href: "/landlord/parking",       requiresSociety: true },
+    { icon: "🏛️", label: "Facilities",  href: "/landlord/facilities",    requiresSociety: true },
     { icon: "🚫", label: "Complaints",   href: "/landlord/complaints" },
-    { icon: "📢", label: "Notices",     href: "/landlord/notices" },
+    { icon: "📢", label: "Notices",      href: "/landlord/notices" },
     { icon: "💬", label: "WhatsApp",     href: "/landlord/whatsapp" },
-    { icon: "🗳️", label: "Polls",       href: "/landlord/polls" },
+    { icon: "🗳️", label: "Polls",       href: "/landlord/polls",         requiresSociety: true },
     { icon: "📊", label: "Reports",      href: "/landlord/reports" },
     { icon: "🔧", label: "Expenses",     href: "/landlord/expenses" },
+    { icon: "📁", label: "Documents",   href: "/landlord/documents",     requiresSociety: true },
+    { icon: "⚖️", label: "Governance",  href: "/landlord/governance",    requiresSociety: true },
     { icon: "⚙️", label: "Settings",    href: "/landlord/settings" },
   ],
   tenant: [
-    { icon: "🏠", label: "Home",       href: "/tenant" },
-    { icon: "💰", label: "Payments",   href: "/tenant/payments" },
-    { icon: "📄", label: "Agreement",  href: "/tenant/agreement" },
-    { icon: "🚪", label: "Visitors",   href: "/tenant/visitors" },
-    { icon: "🅿️", label: "Parking",   href: "/tenant/parking" },
-    { icon: "🏛️", label: "Facilities", href: "/tenant/facilities" },
-    { icon: "🚫", label: "Complaints", href: "/tenant/complaints" },
-    { icon: "📢", label: "Notices",    href: "/tenant/notices" },
-    { icon: "🗳️", label: "Polls",     href: "/tenant/polls" },
-    { icon: "📁", label: "Documents",  href: "/tenant/documents" },
-    { icon: "👤", label: "Profile",    href: "/tenant/profile" },
+    { icon: "🏠", label: "Home",        href: "/tenant" },
+    { icon: "💰", label: "Payments",    href: "/tenant/payments" },
+    { icon: "📄", label: "Agreement",   href: "/tenant/agreement" },
+    { icon: "🚪", label: "Visitors",    href: "/tenant/visitors",      requiresSociety: true },
+    { icon: "🅿️", label: "Parking",    href: "/tenant/parking",       requiresSociety: true },
+    { icon: "🏛️", label: "Facilities", href: "/tenant/facilities",    requiresSociety: true },
+    { icon: "🚫", label: "Complaints",  href: "/tenant/complaints" },
+    { icon: "📢", label: "Notices",     href: "/tenant/notices" },
+    { icon: "🗳️", label: "Polls",      href: "/tenant/polls",         requiresSociety: true },
+    { icon: "📁", label: "Documents",   href: "/tenant/documents" },
+    { icon: "⚖️", label: "Governance",  href: "/tenant/governance",    requiresSociety: true },
+    { icon: "👤", label: "Profile",     href: "/tenant/profile" },
   ],
   board: [
     { icon: "🚫", label: "My Tickets", href: "/board" },
@@ -98,6 +101,7 @@ interface SidebarProps {
   onToggle?: () => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  hasSociety?: boolean;
 }
 
 export default function Sidebar({
@@ -106,11 +110,13 @@ export default function Sidebar({
   onToggle,
   mobileOpen = false,
   onMobileClose,
+  hasSociety = true,
 }: SidebarProps) {
   const pathname = usePathname();
   const { logout } = useAuth();
   const router = useRouter();
-  const items = NAV_ITEMS[role] || [];
+  const allItems = NAV_ITEMS[role] || [];
+  const items = allItems.filter(item => !item.requiresSociety || hasSociety);
 
   const rootHref = role === "superadmin" ? "/superadmin" : `/${role}`;
   const isActive = (item: NavItem) =>

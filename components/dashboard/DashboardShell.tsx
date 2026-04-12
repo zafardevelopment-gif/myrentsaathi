@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth, type MockRole } from "@/components/providers/MockAuthProvider";
 import Sidebar from "./Sidebar";
 import DashHeader from "./DashHeader";
+import { supabase } from "@/lib/supabase";
 
 export default function DashboardShell({
   role,
@@ -17,22 +18,44 @@ export default function DashboardShell({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // null = loading, true/false = resolved
+  const [hasSociety, setHasSociety] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!hydrated) return;
     if (!user) {
-      // Redirect unauthenticated users based on role
-      if (role === "superadmin") {
-        router.push("/superadmin/login");
-      } else {
-        router.push("/");
-      }
+      if (role === "superadmin") router.push("/superadmin/login");
+      else router.push("/");
     } else if (user.role !== role) {
       const dest = user.role === "superadmin" ? "/superadmin" : `/${user.role}`;
-      // guard → /guard, all others follow the same pattern
       router.push(dest);
     }
   }, [hydrated, user, role, router]);
+
+  // For landlord/tenant: check if they belong to any society
+  useEffect(() => {
+    if (!hydrated || !user || (role !== "landlord" && role !== "tenant")) {
+      setHasSociety(true); // other roles always show full nav
+      return;
+    }
+    async function checkSociety() {
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", user!.email)
+        .maybeSingle();
+      if (!userRow) { setHasSociety(false); return; }
+
+      const { data } = await supabase
+        .from("society_members")
+        .select("society_id")
+        .eq("user_id", userRow.id)
+        .limit(1)
+        .maybeSingle();
+      setHasSociety(!!data?.society_id);
+    }
+    checkSociety();
+  }, [hydrated, user, role]);
 
   if (!hydrated) {
     return (
@@ -52,6 +75,7 @@ export default function DashboardShell({
         onToggle={() => setCollapsed(!collapsed)}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        hasSociety={hasSociety ?? true}
       />
 
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
