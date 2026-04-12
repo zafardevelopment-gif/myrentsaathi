@@ -155,6 +155,8 @@ export default function TenantPayments() {
           monthYear={payModal.monthYear}
           amount={payModal.amount}
           existingPaymentId={payModal.paymentId ?? null}
+          userName={user?.name}
+          userEmail={user?.email}
           onClose={() => setPayModal(null)}
           onSuccess={() => { setPayModal(null); loadData(); }}
         />

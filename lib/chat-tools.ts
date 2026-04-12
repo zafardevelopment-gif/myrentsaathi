@@ -288,35 +288,16 @@ export async function getMyVehicles(userId: string) {
 
   const { data: vehicles } = await supabase
     .from("vehicles")
-    .select("vehicle_number, vehicle_type, vehicle_model, color, flat_number, status, is_authorized")
+    .select("id, vehicle_number, vehicle_type, vehicle_model, color, flat_number, is_authorized")
     .eq("owner_id", userId)
     .eq("status", "active");
 
   if (!vehicles || vehicles.length === 0) return { vehicles: [], message: "No vehicles registered to your account. To register a vehicle, ask your society admin or go to your dashboard → Parking." };
 
-  const vehicleIds = vehicles.map((_, i) => i); // placeholder
-  const { data: passes } = await supabase
-    .from("vehicle_parking_passes")
-    .select("vehicle_id, slot:slot_id(slot_number, slot_type, level)")
-    .eq("owner_id", userId)
-    .eq("is_active", true);
-
-  const passMap: Record<string, { slot_number: string; slot_type: string; level: string | null }> = {};
-  for (const p of passes ?? []) {
-    passMap[p.vehicle_id] = p.slot as unknown as { slot_number: string; slot_type: string; level: string | null };
-  }
-
-  // Re-fetch with IDs
-  const { data: vWithIds } = await supabase
-    .from("vehicles")
-    .select("id, vehicle_number, vehicle_type, vehicle_model, color, flat_number, is_authorized")
-    .eq("owner_id", userId)
-    .eq("status", "active");
-
   const { data: fullPasses } = await supabase
     .from("vehicle_parking_passes")
     .select("vehicle_id, slot:slot_id(slot_number, slot_type, level)")
-    .in("vehicle_id", (vWithIds ?? []).map((v) => v.id))
+    .in("vehicle_id", vehicles.map((v) => v.id))
     .eq("is_active", true);
 
   const fullPassMap: Record<string, { slot_number: string; slot_type: string; level: string | null }> = {};
@@ -325,7 +306,7 @@ export async function getMyVehicles(userId: string) {
   }
 
   return {
-    vehicles: (vWithIds ?? []).map((v) => ({
+    vehicles: (vehicles ?? []).map((v) => ({
       number: v.vehicle_number,
       type: v.vehicle_type,
       model: v.vehicle_model ?? "",

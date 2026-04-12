@@ -7,6 +7,17 @@ import { getLandlordFlats, getLandlordUserId, type LandlordFlat } from "@/lib/la
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
 
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window !== "undefined" && window.Razorpay) { resolve(true); return; }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 type SocietyExpense = {
   id: string;
   category: string;
@@ -90,7 +101,7 @@ export default function LandlordSocietyDues() {
 
       // Load per-expense payment records for this landlord's flats
       if (f.length > 0) {
-        const flatIds = f.map(fl => fl.id);
+        const flatIds = f.map((fl: LandlordFlat) => fl.id);
         const { data: dp } = await supabase
           .from("society_due_payments")
           .select("id, expense_id, flat_id, amount, paid_at, month_year")
@@ -106,35 +117,80 @@ export default function LandlordSocietyDues() {
     loadAll(user.email).finally(() => setLoading(false));
   }, [user]);
 
-  // Mark one expense as paid for one flat
+  async function refreshDuePayments() {
+    if (flats.length === 0) return;
+    const flatIds = flats.map(fl => fl.id);
+    const { data: dp } = await supabase
+      .from("society_due_payments")
+      .select("id, expense_id, flat_id, amount, paid_at, month_year")
+      .in("flat_id", flatIds)
+      .eq("month_year", currentMonthStr);
+    setDuePayments((dp ?? []) as DuePayment[]);
+  }
+
+  // Mark one expense as paid for one flat (via Razorpay)
   async function handlePayExpense(flat: LandlordFlat, expense: SocietyExpense, shareAmount: number) {
     if (!landlordId) return;
     const key = `${flat.id}:${expense.id}`;
     setPaying(key);
     try {
-      const { error } = await supabase
-        .from("society_due_payments")
-        .upsert({
-          expense_id: expense.id,
-          flat_id: flat.id,
-          landlord_id: landlordId,
-          amount: shareAmount,
-          month_year: currentMonthStr,
-          paid_at: new Date().toISOString(),
-        }, { onConflict: "expense_id,flat_id,month_year" });
+      const loaded = await loadRazorpayScript();
+      if (!loaded) throw new Error("Payment gateway could not be loaded");
 
-      if (error) throw error;
+      // Create order
+      const orderRes = await fetch("/api/payment/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: shareAmount,
+          flatId: flat.id,
+          type: "maintenance",
+          description: `${expense.description} — Flat ${flat.flat_number}`,
+        }),
+      });
+      const orderData = await orderRes.json() as { orderId?: string; amount?: number; currency?: string; keyId?: string; error?: string };
+      if (!orderRes.ok || orderData.error) throw new Error(orderData.error ?? "Order creation failed");
+
+      await new Promise<void>((resolve, reject) => {
+        const rzp = new window.Razorpay({
+          key: orderData.keyId ?? "",
+          amount: orderData.amount ?? 0,
+          currency: orderData.currency ?? "INR",
+          name: "MyRentSaathi",
+          description: `${expense.description} — Flat ${flat.flat_number}`,
+          order_id: orderData.orderId ?? "",
+          theme: { color: "#6366f1" },
+          handler: async (response: RazorpayPaymentResponse) => {
+            try {
+              const verifyRes = await fetch("/api/payment/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  type: "maintenance",
+                  flatId: flat.id,
+                  expenseId: expense.id,
+                  landlordId,
+                  shareAmount,
+                }),
+              });
+              const verifyData = await verifyRes.json() as { success?: boolean; error?: string };
+              if (!verifyRes.ok || verifyData.error) throw new Error(verifyData.error ?? "Verification failed");
+              resolve();
+            } catch (e) { reject(e); }
+          },
+          modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
+        });
+        rzp.open();
+      });
+
       toast.success(`Paid: ${expense.description} — Flat ${flat.flat_number} ✓`);
-      // Refresh payments
-      const flatIds = flats.map(fl => fl.id);
-      const { data: dp } = await supabase
-        .from("society_due_payments")
-        .select("id, expense_id, flat_id, amount, paid_at, month_year")
-        .in("flat_id", flatIds)
-        .eq("month_year", currentMonthStr);
-      setDuePayments((dp ?? []) as DuePayment[]);
+      await refreshDuePayments();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Payment failed");
+      const msg = e instanceof Error ? e.message : "Payment failed";
+      if (msg !== "Payment cancelled") toast.error(msg);
     } finally {
       setPaying(null);
     }
