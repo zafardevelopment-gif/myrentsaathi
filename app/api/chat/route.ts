@@ -101,6 +101,12 @@ async function dispatchTool(
   const uid = user?.userId ?? "";
   const role = user?.role ?? "";
 
+  // Tools that require a logged-in user
+  const userRequiredTools = ["getUserDashboard","getMaintenanceDues","getMyComplaints","getSocietyNotices","getMyVehicles","getVisitorLog","getSocietyStaff","getAdminFinancialSummary","getSocietyOccupancy"];
+  if (userRequiredTools.includes(name) && !uid) {
+    return JSON.stringify({ error: "User not authenticated. Please ensure the user is logged in and refresh the page." });
+  }
+
   try {
     switch (name) {
       // ── Account & Data tools ──
@@ -175,6 +181,10 @@ export async function POST(request: NextRequest) {
       messageStore.set(threadId, [
         { role: "system", content: buildSystemPrompt(user) },
       ]);
+    } else {
+      // Always refresh system prompt so latest user context (userId, role) is current
+      const existing = messageStore.get(threadId)!;
+      existing[0] = { role: "system", content: buildSystemPrompt(user) };
     }
 
     const messages = messageStore.get(threadId)!;
