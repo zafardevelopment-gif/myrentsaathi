@@ -10,11 +10,32 @@ interface Message {
   isStreaming?: boolean;
 }
 
-const QUICK_REPLIES = [
+const GUEST_QUICK_REPLIES = [
   "Show me pricing plans",
   "How do I sign up?",
   "Is there a free trial?",
   "Talk to a human",
+];
+
+const TENANT_QUICK_REPLIES = [
+  "Mera kitna due hai?",
+  "Mere complaints dikhao",
+  "Society notices kya hain?",
+  "Meri vehicle details",
+];
+
+const LANDLORD_QUICK_REPLIES = [
+  "Meri property details",
+  "Maintenance dues status",
+  "Society notices",
+  "Vehicle / parking status",
+];
+
+const ADMIN_QUICK_REPLIES = [
+  "Society ka financial summary",
+  "Occupancy status dikhao",
+  "Staff directory",
+  "Is mahine ke dues",
 ];
 
 function genId() {
@@ -100,12 +121,19 @@ export default function ChatWidget() {
 
   useEffect(() => {
     if (open && messages.length === 0) {
+      const firstName = user?.name?.split(" ")[0] || "there";
+      const roleGreet: Record<string, string> = {
+        admin:    `Hi ${firstName}! 👋 I'm **Saathi**. I can help you with your society's finances, occupancy, notices, staff, and much more. What do you need?`,
+        landlord: `Hi ${firstName}! 👋 I'm **Saathi**. I can show you your property details, dues status, tenant info, and answer any question. What would you like to know?`,
+        tenant:   `Hi ${firstName}! 👋 I'm **Saathi**. I can tell you your pending dues, complaints, notices, parking — anything about your account. What do you need?`,
+        guard:    `Hi ${firstName}! 👋 I'm **Saathi**. How can I help you today?`,
+      };
       setMessages([{
         id: genId(),
         role: "assistant",
         content: user
-          ? `Hi ${user.name?.split(" ")[0] || "there"}! 👋 I'm Saathi. How can I help you today?`
-          : "Hi! 👋 I'm **Saathi**, your MyRentSaathi assistant.\n\nAsk me about pricing, features, or getting started!",
+          ? (roleGreet[user.role] ?? `Hi ${firstName}! 👋 I'm **Saathi**. How can I help?`)
+          : "Hi! 👋 I'm **Saathi**, your MyRentSaathi AI support assistant.\n\nAsk me anything about pricing, features, or getting started!",
       }]);
     }
   }, [open, messages.length, user]);
@@ -132,7 +160,8 @@ export default function ChatWidget() {
         body: JSON.stringify({
           prompt: trimmed,
           threadId,
-          user: user ? { role: user.role, name: user.name, email: user.email } : null,
+          user: user ? { userId: user.id, role: user.role, name: user.name, email: user.email } : null,
+          sessionId: threadId,
         }),
       });
 
@@ -231,7 +260,14 @@ export default function ChatWidget() {
           {/* Quick replies */}
           {messages.length === 1 && (
             <div className="px-3 pb-2 flex flex-wrap gap-1.5 bg-warm-50 flex-shrink-0">
-              {QUICK_REPLIES.map((qr) => (
+              {(user?.role === "admin"
+                ? ADMIN_QUICK_REPLIES
+                : user?.role === "landlord"
+                ? LANDLORD_QUICK_REPLIES
+                : user?.role === "tenant"
+                ? TENANT_QUICK_REPLIES
+                : GUEST_QUICK_REPLIES
+              ).map((qr) => (
                 <button key={qr} onClick={() => sendMessage(qr)}
                   className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-brand-300 text-brand-600 hover:bg-brand-50 transition-colors cursor-pointer whitespace-nowrap">
                   {qr}

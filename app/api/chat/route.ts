@@ -5,6 +5,16 @@ import {
   createSupportTicket,
   getSignupGuide,
   getFAQAnswer,
+  getUserDashboard,
+  getMaintenanceDues,
+  getMyComplaints,
+  getSocietyNotices,
+  getMyVehicles,
+  getVisitorLog,
+  getSocietyStaff,
+  getAdminFinancialSummary,
+  getSocietyOccupancy,
+  howToGuide,
   CHAT_TOOLS,
   type ChatUserContext,
 } from "@/lib/chat-tools";
@@ -28,22 +38,58 @@ function getClient() {
 const messageStore = new Map<string, OpenAI.Chat.ChatCompletionMessageParam[]>();
 
 function buildSystemPrompt(user: ChatUserContext | null): string {
-  const userBlock = user?.role
-    ? `\nLogged-in user — Role: ${user.role}, Name: ${user.name ?? "Unknown"}`
-    : "\nGuest user.";
+  const roleLabel: Record<string, string> = {
+    admin:    "Society Admin",
+    landlord: "Landlord",
+    tenant:   "Tenant",
+    guard:    "Security Guard",
+    board:    "Board Member",
+  };
 
-  return `You are Saathi, the friendly AI support assistant for MyRentSaathi — India's rent and society management platform.
+  const userBlock = user?.userId
+    ? `\n\n━━ LOGGED-IN USER ━━\nName: ${user.name ?? "Unknown"}\nEmail: ${user.email ?? ""}\nRole: ${roleLabel[user.role ?? ""] ?? user.role ?? "Unknown"}\nUser ID: ${user.userId}\n\nIMPORTANT: This user is logged in. When they ask about "my flat", "my dues", "my vehicles", "my complaints", "my society", or anything about their own account — ALWAYS use the getUserDashboard tool first to get their real data. Never say you can't access their data.`
+    : "\n\nGuest user (not logged in). Answer general questions about the platform. For account-specific questions, ask them to log in.";
 
-Answer questions about pricing, features, signup, billing, and common issues. Be warm and concise.
+  const capabilities = user?.role === "admin"
+    ? "\nAs an ADMIN, you can: view full society stats, financial summary, occupancy, all notices, staff directory, visitor logs, maintenance analytics."
+    : user?.role === "tenant"
+    ? "\nAs a TENANT, you can: view your flat/society details, pending dues, payment history, complaints, notices, vehicles, visitor log."
+    : user?.role === "landlord"
+    ? "\nAs a LANDLORD, you can: view your properties, tenant details, rent/maintenance dues, notices, vehicles, visitor log."
+    : "";
 
-Pricing:
-- Society: Starter ₹2,999/mo (50 flats), Growth ₹5,999/mo (200 flats), Enterprise ₹9,999/mo (unlimited)
-- Landlord: Basic ₹499/mo (5 props), Pro ₹999/mo (20 props), NRI ₹1,999/mo (unlimited)
-- 14-day free trial, no credit card required. Tenant access is FREE.
+  return `You are **Saathi**, the AI-powered customer support agent for MyRentSaathi — India's society and rent management platform. You replace human support and can answer ANY question a user has about their account, society, or the platform.
 
-Use tools when relevant. For human escalation, call createSupportTicket.
-Keep responses concise. Use bullet points for lists.
-${userBlock}`;
+Your personality: Warm, helpful, concise. Respond in the same language as the user (Hindi, Hinglish, or English). Use bullet points for lists. Bold important info.
+
+━━ WHAT YOU CAN DO ━━
+• Show users their real account data (flat, dues, society, vehicles, complaints, notices, visitors, staff)
+• Guide users step-by-step on how to use any feature
+• Answer financial questions (dues, payments, salary, expenses)
+• Provide society occupancy and analytics (admin only)
+• Escalate complex issues by creating support tickets
+• Answer FAQs about pricing, plans, features, refunds, WhatsApp, NRI, agreements
+
+━━ TOOL USAGE RULES ━━
+• When a logged-in user asks about THEIR data → call getUserDashboard first
+• For dues / payment history → call getMaintenanceDues
+• For complaints → call getMyComplaints
+• For notices → call getSocietyNotices
+• For vehicles / parking → call getMyVehicles
+• For visitors → call getVisitorLog
+• For staff contacts → call getSocietyStaff
+• Admin asks for finances → call getAdminFinancialSummary
+• Admin asks for occupancy → call getSocietyOccupancy
+• "How to..." questions → call howToGuide
+• Pricing questions → call getPricingPlans
+• General FAQs → call getFAQAnswer
+• Can't resolve → call createSupportTicket
+
+━━ PRICING (quick reference) ━━
+Society: Starter ₹2,999/mo (50 flats) · Growth ₹5,999/mo (200 flats) · Enterprise ₹9,999/mo (unlimited)
+Landlord: Basic ₹499/mo · Pro ₹999/mo · NRI ₹1,999/mo
+Tenant: FREE · 14-day free trial for all plans
+${userBlock}${capabilities}`;
 }
 
 async function dispatchTool(
@@ -52,29 +98,56 @@ async function dispatchTool(
   user: ChatUserContext | null,
   sessionId?: string
 ): Promise<string> {
+  const uid = user?.userId ?? "";
+  const role = user?.role ?? "";
+
   try {
     switch (name) {
+      // ── Account & Data tools ──
+      case "getUserDashboard":
+        return JSON.stringify(await getUserDashboard(uid, role));
+      case "getMaintenanceDues":
+        return JSON.stringify(await getMaintenanceDues(uid, role, Number(args.months ?? 6)));
+      case "getMyComplaints":
+        return JSON.stringify(await getMyComplaints(uid));
+      case "getSocietyNotices":
+        return JSON.stringify(await getSocietyNotices(uid, role));
+      case "getMyVehicles":
+        return JSON.stringify(await getMyVehicles(uid));
+      case "getVisitorLog":
+        return JSON.stringify(await getVisitorLog(uid, role));
+      case "getSocietyStaff":
+        return JSON.stringify(await getSocietyStaff(uid, role));
+      case "getAdminFinancialSummary":
+        return JSON.stringify(await getAdminFinancialSummary(uid));
+      case "getSocietyOccupancy":
+        return JSON.stringify(await getSocietyOccupancy(uid));
+
+      // ── How-to guide ──
+      case "howToGuide":
+        return JSON.stringify(howToGuide(String(args.topic ?? "")));
+
+      // ── Generic/marketing tools ──
       case "getPricingPlans":
         return JSON.stringify(await getPricingPlans());
+      case "getSignupGuide":
+        return JSON.stringify(getSignupGuide((args.userType as "society" | "landlord" | "tenant") ?? "society"));
+      case "getFAQAnswer":
+        return JSON.stringify(getFAQAnswer(String(args.topic ?? "")));
       case "createSupportTicket":
         return JSON.stringify(
           await createSupportTicket({
             subject: String(args.subject ?? "Support Request"),
             message: String(args.message ?? ""),
             priority: (args.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
-            userId: user?.userId,
+            userId: uid || undefined,
             userName: user?.name,
             userEmail: user?.email,
-            userRole: user?.role,
+            userRole: role,
             sessionId,
           })
         );
-      case "getSignupGuide":
-        return JSON.stringify(
-          getSignupGuide((args.userType as "society" | "landlord" | "tenant") ?? "society")
-        );
-      case "getFAQAnswer":
-        return JSON.stringify(getFAQAnswer(String(args.topic ?? "")));
+
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -110,8 +183,8 @@ export async function POST(request: NextRequest) {
     const client = getClient();
     let finalContent = "";
 
-    // Agentic loop — max 5 iterations for tool calls
-    for (let i = 0; i < 5; i++) {
+    // Agentic loop — max 6 iterations for tool chains
+    for (let i = 0; i < 6; i++) {
       const response = await client.chat.completions.create({
         model: "google/gemini-2.0-flash-001",
         messages,
@@ -132,7 +205,7 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      // Execute tool calls
+      // Execute tool calls in parallel
       const toolResults = await Promise.all(
         toolCalls.map(async (tc) => {
           const fn = tc as unknown as { id: string; function: { name: string; arguments: string } };
@@ -144,15 +217,15 @@ export async function POST(request: NextRequest) {
       messages.push(...toolResults);
     }
 
-    // Trim history
+    // Trim history — keep system + last 40 messages
     if (messages.length > 42) {
       messageStore.set(threadId, [messages[0], ...messages.slice(-40)]);
     }
 
-    return NextResponse.json({ content: finalContent || "Sorry, I couldn't generate a response." });
+    return NextResponse.json({ content: finalContent || "Sorry, I couldn't generate a response. Please try again." });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[chat/route] ERROR:", msg);
-    return NextResponse.json({ content: `Error: ${msg}` });
+    return NextResponse.json({ content: `Something went wrong. Please try again.` });
   }
 }
