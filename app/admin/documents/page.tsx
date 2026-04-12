@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import {
   getAdminSocietyId,
@@ -78,22 +78,34 @@ export default function AdminDocuments() {
 
     setUploading(true);
     try {
+      // Upload file to Supabase Storage
+      const ext = file.name.split(".").pop();
+      const path = `documents/${societyId}/${Date.now()}.${ext}`;
+      const { error: storageErr } = await supabase.storage
+        .from("documents")
+        .upload(path, file, { upsert: false });
+
+      let fileUrl: string | null = null;
+      if (storageErr) {
+        console.warn("Storage upload failed, saving without URL:", storageErr.message);
+      } else {
+        const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
+        fileUrl = urlData.publicUrl;
+      }
+
       // Save document metadata to database
       const { error: dbErr } = await supabase.from("documents").insert({
         society_id: societyId,
         category: selectedCategory,
         file_name: file.name,
-        file_url: `https://documents.${societyId}/${file.name}`, // Placeholder URL
+        file_url: fileUrl,
         file_size: file.size,
         uploaded_by: userId,
       });
 
-      if (dbErr) {
-        console.error("DB error:", dbErr);
-        throw new Error(dbErr.message || "Failed to save document");
-      }
+      if (dbErr) throw new Error(dbErr.message || "Failed to save document");
 
-      // Reload documents from database
+      // Reload documents
       const { data: updated, error: loadErr } = await supabase
         .from("documents")
         .select("*")
@@ -101,7 +113,6 @@ export default function AdminDocuments() {
         .order("created_at", { ascending: false });
 
       if (loadErr) throw loadErr;
-
       setDocuments((updated ?? []) as AdminDocument[]);
 
       toast.success("Document uploaded!");
@@ -132,6 +143,7 @@ export default function AdminDocuments() {
 
   return (
     <div>
+      <Toaster position="top-center" />
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-[15px] font-extrabold text-ink">📁 Document Management</h2>
         <button
@@ -186,30 +198,47 @@ export default function AdminDocuments() {
                   {cat.icon} {cat.type} ({cat.docs.length})
                 </div>
                 <div className="space-y-2 mb-3">
-                  {cat.docs.map((doc) => (
-                    <a
-                      key={doc.id}
-                      href={doc.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-white rounded-[14px] p-3 border border-border-default flex justify-between items-center hover:bg-warm-50 transition-colors group"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-bold text-ink truncate group-hover:text-brand-500">
-                          📄 {doc.file_name}
+                  {cat.docs.map((doc) => {
+                    const isValidUrl = doc.file_url && doc.file_url.startsWith("http") && !doc.file_url.startsWith(`https://documents.`);
+                    return (
+                      <div key={doc.id} className="bg-white rounded-[14px] p-3 border border-border-default flex justify-between items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] font-bold text-ink truncate">
+                            📄 {doc.file_name}
+                          </div>
+                          <div className="text-[11px] text-ink-muted">
+                            {(doc.file_size ?? 0) / 1024 > 1024
+                              ? `${(((doc.file_size ?? 0) / 1024) / 1024).toFixed(1)}MB`
+                              : `${((doc.file_size ?? 0) / 1024).toFixed(1)}KB`}{" "}
+                            • {new Date(doc.created_at).toLocaleDateString("en-IN")}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-ink-muted">
-                          {(doc.file_size ?? 0) / 1024 > 1024
-                            ? `${(((doc.file_size ?? 0) / 1024) / 1024).toFixed(1)}MB`
-                            : `${((doc.file_size ?? 0) / 1024).toFixed(1)}KB`}{" "}
-                          • {new Date(doc.created_at).toLocaleDateString("en-IN")}
+                        <div className="flex gap-2 flex-shrink-0">
+                          {isValidUrl ? (
+                            <a href={doc.file_url!} target="_blank" rel="noopener noreferrer"
+                              className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-[11px] font-bold cursor-pointer hover:bg-blue-700">
+                              ⬇️ View
+                            </a>
+                          ) : (
+                            <span className="px-2.5 py-1.5 rounded-lg border border-red-200 text-red-400 text-[11px] font-semibold">
+                              Invalid URL
+                            </span>
+                          )}
+                          <button
+                            onClick={async () => {
+                              if (!confirm("Delete this document?")) return;
+                              await supabase.from("documents").delete().eq("id", doc.id);
+                              setDocuments(prev => prev.filter(d => d.id !== doc.id));
+                              toast.success("Deleted.");
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg border border-red-200 text-red-500 text-[11px] font-semibold cursor-pointer hover:bg-red-50"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
-                      <button className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-[11px] font-bold cursor-pointer hover:bg-blue-700 flex-shrink-0 ml-2">
-                        ⬇️ View
-                      </button>
-                    </a>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
