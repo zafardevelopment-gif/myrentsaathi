@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getAdminSocietyId } from "@/lib/admin-data";
 import { formatCurrency } from "@/lib/utils";
@@ -20,11 +20,43 @@ import {
   getAttendanceByDate,
   upsertAttendance,
   getMonthlyAttendanceSummary,
+  bulkImportStaff,
   STAFF_ROLES,
   DOC_TYPES,
   type StaffMember,
   type SalaryRecord,
+  type BulkStaffImportResult,
 } from "@/lib/staff-data";
+
+// ─── CSV HELPERS ─────────────────────────────────────────────
+
+function downloadCSV(filename: string, rows: string[][]): void {
+  const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const csv = rows.map((r) => r.map(escape).join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  for (const line of text.split(/\r?\n/).filter((l) => l.trim())) {
+    const cells: string[] = [];
+    let cur = "", inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ;
+      } else if (ch === "," && !inQ) { cells.push(cur.trim()); cur = ""; }
+      else cur += ch;
+    }
+    cells.push(cur.trim());
+    rows.push(cells);
+  }
+  return rows;
+}
 
 // ─── ROLE ICON ────────────────────────────────────────────────
 
@@ -128,6 +160,11 @@ export default function AdminStaffPage() {
 
   // Generating
   const [generating, setGenerating] = useState(false);
+
+  // Import / Export
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<BulkStaffImportResult | null>(null);
 
   const loadStaff = useCallback(async (sid: string) => {
     const data = await getStaff(sid);
@@ -322,6 +359,86 @@ export default function AdminStaffPage() {
     });
   };
 
+  // ── IMPORT / EXPORT HANDLERS ──────────────────────────────
+
+  const downloadStaffTemplate = () => {
+    downloadCSV("staff_import_template.csv", [
+      ["full_name", "mobile", "role", "monthly_salary", "joining_date", "address", "notes"],
+      ["Ramesh Kumar", "9876543210", "Guard", "12000", "2024-01-15", "Near Main Gate", "Night shift"],
+      ["Sunita Devi", "9123456780", "Cleaner", "8000", "2024-03-01", "", ""],
+      ["Anil Sharma", "9001234567", "Gardener", "9000", "2023-06-10", "Block B", ""],
+    ]);
+  };
+
+  const exportStaff = () => {
+    const rows: string[][] = [
+      ["Full Name", "Mobile", "Role", "Monthly Salary", "Joining Date", "Address", "Active", "Notes"],
+    ];
+    for (const s of staff) {
+      rows.push([
+        s.full_name, s.mobile, s.role, String(s.monthly_salary),
+        s.joining_date, s.address ?? "", s.is_active ? "Yes" : "No", s.notes ?? "",
+      ]);
+    }
+    downloadCSV("staff_export.csv", rows);
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !societyId) return;
+    setImportLoading(true);
+    setImportResult(null);
+
+    const text = await file.text();
+    const cleanText = text.replace(/^\uFEFF/, "");
+    const allRows = parseCSV(cleanText);
+
+    if (allRows.length < 2) {
+      setImportResult({ created: 0, skipped: 0, errors: ["File is empty or has only headers."] });
+      setImportLoading(false);
+      if (importFileRef.current) importFileRef.current.value = "";
+      return;
+    }
+
+    const rawHeader = allRows[0].map((h) => h.toLowerCase().replace(/[\s\-]/g, "_"));
+    const col = (names: string[]) => rawHeader.findIndex((h) => names.some((n) => h === n || h.includes(n)));
+
+    const idxName    = col(["full_name", "name"]);
+    const idxMobile  = col(["mobile", "phone", "contact"]);
+    const idxRole    = col(["role"]);
+    const idxSalary  = col(["monthly_salary", "salary"]);
+    const idxDate    = col(["joining_date", "date"]);
+    const idxAddress = col(["address"]);
+    const idxNotes   = col(["notes", "remarks"]);
+
+    if (idxName === -1 || idxMobile === -1) {
+      setImportResult({ created: 0, skipped: 0, errors: ["Columns 'full_name' and 'mobile' are required in the header row."] });
+      setImportLoading(false);
+      if (importFileRef.current) importFileRef.current.value = "";
+      return;
+    }
+
+    const get = (row: string[], idx: number) => (idx >= 0 ? row[idx]?.trim() ?? "" : "");
+
+    const bulkRows = allRows.slice(1)
+      .filter((row) => row[idxName]?.trim())
+      .map((row) => ({
+        full_name:      get(row, idxName),
+        mobile:         get(row, idxMobile),
+        role:           get(row, idxRole),
+        monthly_salary: get(row, idxSalary),
+        joining_date:   get(row, idxDate),
+        address:        get(row, idxAddress),
+        notes:          get(row, idxNotes),
+      }));
+
+    const result = await bulkImportStaff(societyId, bulkRows);
+    setImportResult(result);
+    if (result.created > 0) await loadStaff(societyId);
+    setImportLoading(false);
+    if (importFileRef.current) importFileRef.current.value = "";
+  };
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -440,13 +557,77 @@ export default function AdminStaffPage() {
                 Show inactive
               </label>
             </div>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-4 py-1.5 rounded-xl cursor-pointer transition-colors"
-            >
-              + Add Staff
-            </button>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-4 py-1.5 rounded-xl cursor-pointer transition-colors"
+              >
+                + Add Staff
+              </button>
+              <button
+                onClick={() => { setShowAddForm(false); importFileRef.current?.click(); }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded-xl cursor-pointer border border-blue-200 text-xs transition-colors"
+              >
+                ⬆ Import CSV
+              </button>
+              <button
+                onClick={downloadStaffTemplate}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 font-semibold rounded-xl cursor-pointer border border-gray-200 text-xs transition-colors"
+              >
+                ⬇ Template
+              </button>
+              {staff.length > 0 && (
+                <button
+                  onClick={exportStaff}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 font-semibold rounded-xl cursor-pointer border border-green-200 text-xs transition-colors"
+                >
+                  ⬇ Export
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Hidden file input */}
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".csv"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+
+          {/* Import loading */}
+          {importLoading && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700 font-semibold animate-pulse">
+              Importing staff…
+            </div>
+          )}
+
+          {/* Import result */}
+          {importResult && (
+            <div className={`rounded-xl p-4 border space-y-2 ${
+              importResult.errors.length > 0 ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200"
+            }`}>
+              <p className="text-sm font-bold text-ink">Import Complete</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                <span className="text-green-700 font-semibold">👷 {importResult.created} staff added</span>
+                {importResult.skipped > 0 && (
+                  <span className="text-amber-700 font-semibold">⊘ {importResult.skipped} skipped (duplicates)</span>
+                )}
+              </div>
+              {importResult.errors.length > 0 && (
+                <div className="space-y-0.5 border-t border-amber-200 pt-2">
+                  <p className="text-xs font-semibold text-red-600">Errors:</p>
+                  {importResult.errors.map((err, i) => (
+                    <p key={i} className="text-xs text-red-600">· {err}</p>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setImportResult(null)} className="text-xs text-ink-muted underline cursor-pointer">
+                Dismiss
+              </button>
+            </div>
+          )}
 
           {/* Add form */}
           {showAddForm && (

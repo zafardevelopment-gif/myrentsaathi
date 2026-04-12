@@ -488,6 +488,52 @@ export async function deactivateGuard(guardId: string): Promise<void> {
   await supabase.from("users").update({ is_active: false }).eq("id", guardId);
 }
 
+// ─── GUARD: FLAT RESIDENT LOOKUP ─────────────────────────────
+
+export type FlatResidentInfo = {
+  flat_number: string;
+  resident_name: string;
+  resident_role: "tenant" | "landlord";
+  phone: string | null;
+};
+
+/** Given a flat number, return the active resident (tenant preferred over landlord) */
+export async function getFlatResidentInfo(
+  societyId: string,
+  flatNumber: string
+): Promise<FlatResidentInfo | null> {
+  const { data: flat } = await supabase
+    .from("flats")
+    .select("flat_number, current_tenant_id, owner_id")
+    .eq("society_id", societyId)
+    .eq("flat_number", flatNumber.trim())
+    .single();
+
+  if (!flat) return null;
+
+  // Prefer tenant; fall back to landlord/owner
+  const residentId = flat.current_tenant_id ?? flat.owner_id;
+  const role: "tenant" | "landlord" = flat.current_tenant_id ? "tenant" : "landlord";
+
+  if (!residentId) return null;
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("full_name, phone")
+    .eq("id", residentId)
+    .eq("is_active", true)
+    .single();
+
+  if (!user) return null;
+
+  return {
+    flat_number: flat.flat_number,
+    resident_name: user.full_name,
+    resident_role: role,
+    phone: user.phone ?? null,
+  };
+}
+
 // ─── RESIDENT: RESOLVE FLAT INFO ──────────────────────────────
 
 export async function getResidentFlatInfo(

@@ -385,6 +385,260 @@ export async function getResidentInfo(
   return { userId: user.id, flatId: flat.id, flatNumber: flat.flat_number, societyId: flat.society_id };
 }
 
+// ─── ADMIN: BULK FULL IMPORT (slots + vehicles + assign) ─────
+
+// DB CHECK constraint allows only: car, bike
+const VALID_SLOT_TYPES = ["car", "bike"] as const;
+
+export type BulkFullRow = {
+  slot_number: string;      // required
+  slot_type?: string;       // car | bike  (default: car)
+  level?: string;           // e.g. Ground, B1, Level 2
+  flat_number?: string;     // needed for vehicle registration + assignment
+  vehicle_number?: string;  // if provided, register this vehicle
+  vehicle_type?: string;    // car | bike  (default: car)
+  vehicle_model?: string;
+  color?: string;
+};
+
+export type BulkImportResult = {
+  slotsCreated: number;
+  vehiclesRegistered: number;
+  assigned: number;
+  skipped: number;
+  errors: string[];
+};
+
+export type BulkSlotRow = BulkFullRow; // keep old alias for compatibility
+
+export async function bulkCreateSlots(
+  societyId: string,
+  rows: BulkFullRow[],
+  adminUserId?: string
+): Promise<BulkImportResult> {
+  return bulkFullImport(societyId, rows, adminUserId);
+}
+
+export async function bulkFullImport(
+  societyId: string,
+  rows: BulkFullRow[],
+  adminUserId?: string
+): Promise<BulkImportResult> {
+  let slotsCreated = 0, vehiclesRegistered = 0, assigned = 0, skipped = 0;
+  const errors: string[] = [];
+
+  for (const row of rows) {
+    const slotNum = row.slot_number?.trim().toUpperCase();
+    if (!slotNum) { skipped++; continue; }
+
+    // ── 1. Create slot ──────────────────────────────────────
+    const rawSlotType = row.slot_type?.toLowerCase().trim() ?? "";
+    const slotType = (VALID_SLOT_TYPES as readonly string[]).includes(rawSlotType) ? rawSlotType : "car";
+    const levelVal = row.level?.trim() || null;
+
+    const slotData: Record<string, unknown> = {
+      society_id: societyId,
+      slot_number: slotNum,
+      slot_type: slotType,
+      status: "available",
+    };
+    if (levelVal) slotData.level = levelVal;
+
+    const { data: newSlot, error: slotErr } = await supabase
+      .from("parking_slots")
+      .insert(slotData)
+      .select("id")
+      .single();
+
+    if (slotErr) {
+      if (slotErr.code === "23505") { skipped++; } // duplicate slot
+      else errors.push(`Slot ${slotNum}: ${slotErr.message}`);
+      continue;
+    }
+    slotsCreated++;
+
+    const flatNum = row.flat_number?.trim().toUpperCase();
+    const vehicleNum = row.vehicle_number?.trim().toUpperCase();
+    if (!flatNum || !newSlot?.id) continue; // no flat = no vehicle/assign needed
+
+    // ── 2. Find flat owner/tenant ───────────────────────────
+    const { data: flat } = await supabase
+      .from("flats")
+      .select("id, current_tenant_id, owner_id")
+      .eq("society_id", societyId)
+      .eq("flat_number", flatNum)
+      .single();
+
+    const ownerId = flat?.current_tenant_id ?? flat?.owner_id ?? null;
+    const flatId = flat?.id ?? null;
+    if (!ownerId) continue; // flat not found or no resident
+
+    // ── 3. Register vehicle (if vehicle_number provided) ────
+    let vehicleId: string | null = null;
+
+    if (vehicleNum) {
+      // Check if already exists
+      const { data: existingVehicle } = await supabase
+        .from("vehicles")
+        .select("id")
+        .eq("society_id", societyId)
+        .eq("vehicle_number", vehicleNum)
+        .single();
+
+      if (existingVehicle) {
+        vehicleId = existingVehicle.id;
+      } else {
+        const rawVType = row.vehicle_type?.toLowerCase().trim() ?? "";
+        const vType = (VALID_SLOT_TYPES as readonly string[]).includes(rawVType) ? rawVType : "car";
+
+        const { data: newVehicle, error: vErr } = await supabase
+          .from("vehicles")
+          .insert({
+            society_id: societyId,
+            owner_id: ownerId,
+            flat_id: flatId,
+            flat_number: flatNum,
+            vehicle_number: vehicleNum,
+            vehicle_type: vType,
+            vehicle_model: row.vehicle_model?.trim() || null,
+            color: row.color?.trim() || null,
+            status: "active",
+            is_authorized: true,
+          })
+          .select("id")
+          .single();
+
+        if (vErr) {
+          errors.push(`Vehicle ${vehicleNum}: ${vErr.message}`);
+        } else {
+          vehicleId = newVehicle.id;
+          vehiclesRegistered++;
+        }
+      }
+    } else {
+      // No vehicle number — try to find an existing unassigned vehicle for this flat
+      const { data: existingVehicles } = await supabase
+        .from("vehicles")
+        .select("id")
+        .eq("society_id", societyId)
+        .eq("flat_number", flatNum)
+        .eq("status", "active")
+        .limit(1);
+      vehicleId = existingVehicles?.[0]?.id ?? null;
+    }
+
+    if (!vehicleId || !adminUserId) continue;
+
+    // ── 4. Assign slot to vehicle ────────────────────────────
+    const { data: existingPass } = await supabase
+      .from("vehicle_parking_passes")
+      .select("id")
+      .eq("vehicle_id", vehicleId)
+      .eq("is_active", true)
+      .single();
+
+    if (existingPass) continue; // already has a pass
+
+    const { error: passErr } = await supabase.from("vehicle_parking_passes").insert({
+      society_id: societyId,
+      vehicle_id: vehicleId,
+      slot_id: newSlot.id,
+      owner_id: ownerId,
+      issued_by: adminUserId,
+      is_active: true,
+    });
+
+    if (!passErr) {
+      // Update slot status — only use columns that exist in parking_slots
+      const slotUpdate: Record<string, unknown> = { status: "occupied" };
+      if (flatId) slotUpdate.flat_id = flatId;
+      // vehicle_number and vehicle_model exist per create-new-society.sql
+      if (vehicleNum) slotUpdate.vehicle_number = vehicleNum;
+      if (row.vehicle_model?.trim()) slotUpdate.vehicle_model = row.vehicle_model.trim();
+
+      await supabase.from("parking_slots").update(slotUpdate).eq("id", newSlot.id);
+      assigned++;
+    } else {
+      errors.push(`Assign ${slotNum}→${vehicleNum ?? flatNum}: ${passErr.message}`);
+    }
+  }
+
+  return { slotsCreated, vehiclesRegistered, assigned, skipped, errors };
+}
+
+// ─── ADMIN: GET FLAT RESIDENTS (for vehicle registration) ────
+
+export async function getFlatResidents(
+  societyId: string,
+  flatNumber: string
+): Promise<{ id: string; full_name: string; role: string; flat_id: string | null }[]> {
+  const { data: flat } = await supabase
+    .from("flats")
+    .select("id, current_tenant_id, owner_id")
+    .eq("society_id", societyId)
+    .eq("flat_number", flatNumber.trim())
+    .single();
+
+  if (!flat) return [];
+
+  const ids = [flat.current_tenant_id, flat.owner_id].filter(Boolean) as string[];
+  if (ids.length === 0) return [];
+
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, full_name, role")
+    .in("id", ids)
+    .eq("is_active", true);
+
+  return (users ?? []).map((u) => ({ ...u, flat_id: flat.id }));
+}
+
+// Admin registers a vehicle on behalf of a resident
+export async function adminRegisterVehicle(params: {
+  societyId: string;
+  ownerId: string;
+  flatId: string | null;
+  flatNumber: string;
+  vehicleNumber: string;
+  vehicleType: string;
+  vehicleModel?: string;
+  color?: string;
+}): Promise<{ success: boolean; vehicleId?: string; error?: string }> {
+  const num = params.vehicleNumber.trim().toUpperCase();
+
+  const { data: existing } = await supabase
+    .from("vehicles")
+    .select("id")
+    .eq("society_id", params.societyId)
+    .eq("vehicle_number", num)
+    .single();
+
+  if (existing) return { success: false, error: "Vehicle already registered in this society." };
+
+  const validTypes = ["car", "bike"] as const;
+  const type = (validTypes as readonly string[]).includes(params.vehicleType) ? params.vehicleType : "car";
+
+  const { data, error } = await supabase
+    .from("vehicles")
+    .insert({
+      society_id: params.societyId,
+      owner_id: params.ownerId,
+      flat_id: params.flatId ?? null,
+      flat_number: params.flatNumber,
+      vehicle_number: num,
+      vehicle_type: type,
+      vehicle_model: params.vehicleModel?.trim() || null,
+      color: params.color?.trim() || null,
+      status: "active",
+      is_authorized: true,
+    })
+    .select("id")
+    .single();
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, vehicleId: data.id };
+}
+
 // ─── ADMIN: GET AVAILABLE VEHICLES (for assignment dropdown) ──
 
 export async function getUnassignedVehicles(societyId: string): Promise<Vehicle[]> {

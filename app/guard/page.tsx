@@ -13,9 +13,40 @@ import {
   getGuardPendingVisits,
   markExit,
   auditLog,
+  getFlatResidentInfo,
   type VMSVisit,
   type VMSVisitor,
+  type FlatResidentInfo,
 } from "@/lib/vms-data";
+
+// ─── FLAT RESIDENT CARD ───────────────────────────────────────
+
+function FlatResidentCard({ info, loading }: { info: FlatResidentInfo | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-600 animate-pulse">
+        Flat details dhundh rahe hain…
+      </div>
+    );
+  }
+  if (!info) return null;
+
+  const isTenant = info.resident_role === "tenant";
+  return (
+    <div className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${isTenant ? "bg-blue-50 border-blue-200" : "bg-purple-50 border-purple-200"}`}>
+      <span className="text-2xl">{isTenant ? "🏠" : "👑"}</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-sm text-ink truncate">{info.resident_name}</p>
+        <p className={`text-xs font-semibold ${isTenant ? "text-blue-600" : "text-purple-600"}`}>
+          {isTenant ? "Tenant" : "Landlord"} · Flat {info.flat_number}
+        </p>
+        {info.phone && (
+          <p className="text-xs text-ink-muted font-mono">{info.phone}</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── STATUS BADGE ─────────────────────────────────────────────
 
@@ -98,6 +129,10 @@ export default function GuardGatePage() {
   const [selectedBlock, setSelectedBlock] = useState("");
   const [selectedPurpose, setSelectedPurpose] = useState("");
 
+  // Flat resident lookup
+  const [flatResidentInfo, setFlatResidentInfo] = useState<FlatResidentInfo | null>(null);
+  const [flatLookupLoading, setFlatLookupLoading] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [lastVisit, setLastVisit] = useState<VMSVisit | null>(null);
   const [error, setError] = useState("");
@@ -126,6 +161,27 @@ export default function GuardGatePage() {
     setPendingVisits(visits);
   }, []);
 
+  // Active flat input — whichever step is showing
+  const activeFlatInput = step === "new_form" ? newFlat : step === "select_flat" ? selectedFlat : "";
+
+  // Debounced flat resident lookup
+  useEffect(() => {
+    const flat = activeFlatInput.trim();
+    if (!flat || flat.length < 1 || !guardInfo) {
+      setFlatResidentInfo(null);
+      setFlatLookupLoading(false);
+      return;
+    }
+    setFlatLookupLoading(true);
+    const timer = setTimeout(async () => {
+      const info = await getFlatResidentInfo(guardInfo.society_id, flat);
+      setFlatResidentInfo(info);
+      setFlatLookupLoading(false);
+    }, 600);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFlatInput, guardInfo]);
+
   const reset = () => {
     setMobile("");
     setNewName(""); setNewPurpose(""); setNewFlat(""); setNewBlock(""); setNewVehicle("");
@@ -134,6 +190,8 @@ export default function GuardGatePage() {
     setStep("search");
     setError("");
     setLastVisit(null);
+    setFlatResidentInfo(null);
+    setFlatLookupLoading(false);
   };
 
   const handleSearch = async () => {
@@ -279,7 +337,33 @@ export default function GuardGatePage() {
           {[
             { label: "Full Name *", value: newName, onChange: setNewName, placeholder: "Visitor name" },
             { label: "Purpose", value: newPurpose, onChange: setNewPurpose, placeholder: "e.g. Delivery, Guest, Repair" },
-            { label: "Flat Number *", value: newFlat, onChange: setNewFlat, placeholder: "e.g. 4B" },
+          ].map(({ label, value, onChange, placeholder }) => (
+            <div key={label}>
+              <label className="text-xs font-semibold text-ink-muted mb-1 block">{label}</label>
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                className="w-full border border-border-default rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+          ))}
+
+          {/* Flat Number with resident lookup */}
+          <div>
+            <label className="text-xs font-semibold text-ink-muted mb-1 block">Flat Number *</label>
+            <input
+              type="text"
+              value={newFlat}
+              onChange={(e) => setNewFlat(e.target.value)}
+              placeholder="e.g. 4B"
+              className="w-full border border-border-default rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </div>
+          <FlatResidentCard info={flatResidentInfo} loading={flatLookupLoading && newFlat.trim().length > 0} />
+
+          {[
             { label: "Block / Tower", value: newBlock, onChange: setNewBlock, placeholder: "e.g. A, Tower 2" },
             { label: "Vehicle Number", value: newVehicle, onChange: setNewVehicle, placeholder: "Optional" },
           ].map(({ label, value, onChange, placeholder }) => (
@@ -323,8 +407,20 @@ export default function GuardGatePage() {
             </div>
           </div>
 
+          {/* Flat Number with resident lookup */}
+          <div>
+            <label className="text-xs font-semibold text-ink-muted mb-1 block">Flat Number *</label>
+            <input
+              type="text"
+              value={selectedFlat}
+              onChange={(e) => setSelectedFlat(e.target.value)}
+              placeholder="e.g. 4B"
+              className="w-full border border-border-default rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </div>
+          <FlatResidentCard info={flatResidentInfo} loading={flatLookupLoading && selectedFlat.trim().length > 0} />
+
           {[
-            { label: "Flat Number *", value: selectedFlat, onChange: setSelectedFlat, placeholder: "e.g. 4B" },
             { label: "Block / Tower", value: selectedBlock, onChange: setSelectedBlock, placeholder: "Optional" },
             { label: "Purpose", value: selectedPurpose, onChange: setSelectedPurpose, placeholder: "e.g. Guest, Delivery" },
           ].map(({ label, value, onChange, placeholder }) => (

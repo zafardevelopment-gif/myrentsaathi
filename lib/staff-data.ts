@@ -284,6 +284,79 @@ export async function upsertAttendance(params: {
   );
 }
 
+// ─── ADMIN: BULK IMPORT STAFF ─────────────────────────────────
+
+export type BulkStaffRow = {
+  full_name: string;
+  mobile: string;
+  role?: string;
+  address?: string;
+  joining_date?: string;
+  monthly_salary?: string | number;
+  notes?: string;
+};
+
+export type BulkStaffImportResult = {
+  created: number;
+  skipped: number;
+  errors: string[];
+};
+
+export async function bulkImportStaff(
+  societyId: string,
+  rows: BulkStaffRow[]
+): Promise<BulkStaffImportResult> {
+  let created = 0, skipped = 0;
+  const errors: string[] = [];
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const row of rows) {
+    const name = row.full_name?.trim();
+    const mobile = row.mobile?.trim();
+    if (!name || !mobile) { skipped++; continue; }
+
+    // Validate / normalise role
+    const role = STAFF_ROLES.includes(row.role?.trim() ?? "") ? (row.role!.trim()) : "Other";
+
+    // Parse salary
+    const salary = parseFloat(String(row.monthly_salary ?? "0")) || 0;
+
+    // Parse date — accept YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY
+    let joiningDate = today;
+    const rawDate = row.joining_date?.trim() ?? "";
+    if (rawDate) {
+      const isoMatch = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      const dmyMatch = rawDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (isoMatch) {
+        joiningDate = rawDate;
+      } else if (dmyMatch) {
+        joiningDate = `${dmyMatch[3]}-${dmyMatch[2].padStart(2, "0")}-${dmyMatch[1].padStart(2, "0")}`;
+      }
+    }
+
+    const { error } = await supabase.from("staff").insert({
+      society_id: societyId,
+      full_name: name,
+      mobile,
+      role,
+      address: row.address?.trim() || null,
+      joining_date: joiningDate,
+      monthly_salary: salary,
+      notes: row.notes?.trim() || null,
+      is_active: true,
+    });
+
+    if (error) {
+      if (error.code === "23505") skipped++; // duplicate
+      else errors.push(`${name}: ${error.message}`);
+    } else {
+      created++;
+    }
+  }
+
+  return { created, skipped, errors };
+}
+
 export async function getMonthlyAttendanceSummary(
   societyId: string,
   monthYear: string
