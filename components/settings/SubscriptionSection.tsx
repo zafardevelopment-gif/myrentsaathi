@@ -156,7 +156,7 @@ function InvoiceModal({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
 
           {/* Note */}
           <div className="text-[10px] text-ink-muted text-center border-t border-border-light pt-3">
-            PDF download — payment gateway active hone ke baad available hoga
+            PDF download will be available once the payment gateway is live.
           </div>
         </div>
 
@@ -219,14 +219,14 @@ export default function SubscriptionSection({ planType }: { planType: "society" 
           <span className="text-[22px]">🔑</span>
           <div>
             <div className="text-sm font-bold text-ink">Subscription</div>
-            <div className="text-[11px] text-ink-muted">Koi active plan nahi hai</div>
+            <div className="text-[11px] text-ink-muted">No active plan</div>
           </div>
         </div>
         <button
           onClick={() => router.push(`/select-plan?type=${planType}`)}
           className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer hover:bg-brand-600"
         >
-          Plan Choose Karein →
+          Choose a Plan →
         </button>
       </div>
     );
@@ -278,7 +278,7 @@ export default function SubscriptionSection({ planType }: { planType: "society" 
               <div className="flex justify-between text-[11px] mb-1">
                 <span className="text-ink-muted">Free Trial Progress</span>
                 <span className={`font-bold ${daysLeft <= 5 ? "text-red-500" : "text-ink"}`}>
-                  {daysLeft} din baaki
+                  {daysLeft} days left
                 </span>
               </div>
               <div className="h-1.5 bg-warm-100 rounded-full overflow-hidden">
@@ -312,7 +312,7 @@ export default function SubscriptionSection({ planType }: { planType: "society" 
             <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 flex items-center gap-2">
               <span>⚠️</span>
               <div className="text-[11px] text-red-600 font-semibold">
-                Aapka plan {daysLeft} din mein expire hoga. Abhi renew karein.
+                Your plan expires in {daysLeft} day{daysLeft === 1 ? "" : "s"}. Renew now to avoid interruption.
               </div>
             </div>
           )}
@@ -320,7 +320,7 @@ export default function SubscriptionSection({ planType }: { planType: "society" 
             <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 flex items-center gap-2">
               <span>🔴</span>
               <div className="text-[11px] text-red-600 font-semibold">
-                Plan expire ho gaya hai. Dashboard access ke liye renew karein.
+                Your plan has expired. Renew to restore dashboard access.
               </div>
             </div>
           )}
@@ -348,8 +348,8 @@ export default function SubscriptionSection({ planType }: { planType: "society" 
                 {sub.status === "trial" || invoices.length === 0 ? (
                   <div className="text-center py-6 text-[11px] text-ink-muted">
                     {sub.status === "trial"
-                      ? "Free trial mein koi invoice nahi hota. Plan activate karne ke baad invoices yahan dikhenge."
-                      : "Abhi koi payment record nahi hai."}
+                      ? "No invoices during free trial. Invoices will appear here once you activate a paid plan."
+                      : "No payment records yet."}
                   </div>
                 ) : (
                   <>
@@ -380,7 +380,7 @@ export default function SubscriptionSection({ planType }: { planType: "society" 
                     ))}
 
                     <div className="text-[10px] text-ink-muted text-center pt-1">
-                      PDF download — payment gateway active hone ke baad available hoga
+                      PDF download will be available once the payment gateway is live.
                     </div>
                   </>
                 )}
