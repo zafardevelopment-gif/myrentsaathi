@@ -7,6 +7,7 @@
 import PricingCards from "./PricingCards";
 import { getActivePricingPlans } from "@/lib/pricing-data";
 import type { PricingPlan } from "@/lib/pricing-data";
+import { getFreeTiralDays } from "@/lib/subscription";
 
 // ── Static fallback data (mirrors original mock) ───────────
 const FALLBACK_SOCIETY: PricingPlan[] = [
@@ -107,14 +108,17 @@ const FALLBACK_LANDLORD: PricingPlan[] = [
 export default async function Pricing() {
   let societyPlans: PricingPlan[] = FALLBACK_SOCIETY;
   let landlordPlans: PricingPlan[] = FALLBACK_LANDLORD;
+  let freeTrialDays = 14;
 
   try {
-    const [society, landlord] = await Promise.all([
+    const [society, landlord, trialDays] = await Promise.all([
       getActivePricingPlans("society"),
       getActivePricingPlans("landlord"),
+      getFreeTiralDays(),
     ]);
     if (society.length > 0) societyPlans = society;
     if (landlord.length > 0) landlordPlans = landlord;
+    freeTrialDays = trialDays;
   } catch {
     // DB unavailable — use static fallback silently
   }
@@ -131,12 +135,12 @@ export default async function Pricing() {
             Simple, Transparent Pricing
           </h2>
           <p className="text-[17px] text-white/70 mt-3.5 leading-relaxed max-w-[600px] mx-auto">
-            14-day free trial. No credit card. Cancel anytime.
+            {freeTrialDays}-day free trial. No credit card. Cancel anytime.
           </p>
         </div>
 
         {/* Dynamic Cards (client component for tab interaction) */}
-        <PricingCards societyPlans={societyPlans} landlordPlans={landlordPlans} />
+        <PricingCards societyPlans={societyPlans} landlordPlans={landlordPlans} freeTrialDays={freeTrialDays} />
       </div>
     </section>
   );

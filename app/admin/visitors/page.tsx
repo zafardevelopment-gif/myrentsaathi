@@ -138,6 +138,7 @@ export default function AdminVisitorsPage() {
 
   const handleAddGuard = async () => {
     if (!gName.trim() || !gEmail.trim() || !societyId) { setGError("Name and email are required."); return; }
+    if (gPhone.trim() && gPhone.replace(/\D/g, "").length !== 10) { setGError("Phone must be exactly 10 digits."); return; }
     setGSubmitting(true);
     setGError(""); setGSuccess("");
     const result = await addGuard({ full_name: gName, email: gEmail, phone: gPhone, society_id: societyId });
@@ -417,7 +418,6 @@ export default function AdminVisitorsPage() {
               {[
                 { label: "Full Name *", value: gName, onChange: setGName, placeholder: "Guard's name" },
                 { label: "Email *", value: gEmail, onChange: setGEmail, placeholder: "guard@example.com" },
-                { label: "Phone", value: gPhone, onChange: setGPhone, placeholder: "Mobile number" },
               ].map(({ label, value, onChange, placeholder }) => (
                 <div key={label}>
                   <label className="text-xs font-semibold text-ink-muted block mb-1">{label}</label>
@@ -430,6 +430,18 @@ export default function AdminVisitorsPage() {
                   />
                 </div>
               ))}
+              <div>
+                <label className="text-xs font-semibold text-ink-muted block mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={gPhone}
+                  onChange={(e) => setGPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  placeholder="10-digit mobile"
+                  maxLength={10}
+                  inputMode="numeric"
+                  className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
               <p className="text-xs text-ink-muted">
                 Auto-generated password: <span className="font-mono font-semibold">{gName ? gName.split(" ")[0] + "@guard" : "FirstName@guard"}</span>
               </p>

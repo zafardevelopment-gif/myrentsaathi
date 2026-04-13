@@ -235,6 +235,9 @@ export default function AdminStaffPage() {
     if (!form.full_name.trim() || !form.mobile.trim() || !societyId) {
       toast.error("Name and mobile are required."); return;
     }
+    if (form.mobile.replace(/\D/g, "").length !== 10) {
+      toast.error("Mobile must be exactly 10 digits."); return;
+    }
     setFormSubmitting(true);
     const res = await addStaff({
       societyId,
@@ -634,21 +637,28 @@ export default function AdminStaffPage() {
             <div className="bg-white border border-amber-200 rounded-2xl p-5 space-y-3 shadow-sm">
               <p className="font-bold text-ink text-sm">Add New Staff Member</p>
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Full Name *", key: "full_name", placeholder: "e.g. Ramesh Kumar" },
-                  { label: "Mobile *", key: "mobile", placeholder: "10-digit number" },
-                ].map(({ label, key, placeholder }) => (
-                  <div key={key}>
-                    <label className="text-xs font-semibold text-ink-muted block mb-1">{label}</label>
-                    <input
-                      type="text"
-                      value={form[key as keyof typeof form]}
-                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                      placeholder={placeholder}
-                      className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    />
-                  </div>
-                ))}
+                <div>
+                  <label className="text-xs font-semibold text-ink-muted block mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    value={form.full_name}
+                    onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+                    placeholder="e.g. Ramesh Kumar"
+                    className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-ink-muted block mb-1">Mobile *</label>
+                  <input
+                    type="tel"
+                    value={form.mobile}
+                    onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                    placeholder="10-digit number"
+                    maxLength={10}
+                    inputMode="numeric"
+                    className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

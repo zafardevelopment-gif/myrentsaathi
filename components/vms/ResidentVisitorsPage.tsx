@@ -140,6 +140,7 @@ export default function ResidentVisitorsPage() {
 
   const handleAddPreApproved = async () => {
     if (!addMobile.trim() || !flatInfo) { setAddError("Mobile number is required."); return; }
+    if (addMobile.replace(/\D/g, "").length !== 10) { setAddError("Mobile number must be exactly 10 digits."); return; }
     setAddSubmitting(true);
     setAddError("");
 
@@ -309,8 +310,19 @@ export default function ResidentVisitorsPage() {
           {showAddForm && (
             <div className="bg-white border border-amber-200 rounded-2xl p-5 space-y-3 shadow-sm">
               <p className="font-bold text-ink text-sm">Add Pre-Approved Visitor</p>
+              <div>
+                <label className="text-xs font-semibold text-ink-muted block mb-1">Mobile Number *</label>
+                <input
+                  type="tel"
+                  value={addMobile}
+                  onChange={(e) => setAddMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  placeholder="10-digit mobile"
+                  maxLength={10}
+                  inputMode="numeric"
+                  className="w-full border border-border-default rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
               {[
-                { label: "Mobile Number *", value: addMobile, onChange: setAddMobile, placeholder: "Visitor's mobile", type: "tel" },
                 { label: "Name (if new visitor)", value: addName, onChange: setAddName, placeholder: "e.g. Kamla Bai", type: "text" },
                 { label: "Label", value: addLabel, onChange: setAddLabel, placeholder: "e.g. Maid, Driver, Cook", type: "text" },
                 { label: "Valid Until (optional)", value: addUntil, onChange: setAddUntil, placeholder: "", type: "date" },

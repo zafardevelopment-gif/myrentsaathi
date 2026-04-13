@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getFreeTiralDays, setFreeTrialDays } from "@/lib/subscription";
+import toast, { Toaster } from "react-hot-toast";
 
 const SETTING_GROUPS = [
   {
@@ -19,6 +21,7 @@ const SETTING_GROUPS = [
       { icon: "🏦", title: "Platform Bank Account",     desc: "Bank details for subscription revenue collection",            tag: null,       editable: true },
       { icon: "💳", title: "Razorpay Master Account",   desc: "Platform Razorpay keys, Route API for agent payouts",        tag: "Connected", editable: false },
       { icon: "💰", title: "Pricing Configuration",     desc: "Society plans, landlord plans, agreement pricing, markup",    tag: "Editable", editable: true },
+      { icon: "🎁", title: "Free Trial Duration",        desc: "Kitne din ka free trial naye users ko milega (society + landlord)", tag: "Editable", editable: true },
       { icon: "📑", title: "Invoice Settings",           desc: "Invoice template, GST number, billing cycle",                tag: null,       editable: true },
     ],
   },
@@ -65,9 +68,38 @@ const SETTING_GROUPS = [
 export default function SuperAdminSettings() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [freeTrialDays, setFreeTrialDaysState] = useState<number>(30);
+  const [freeTrialInput, setFreeTrialInput] = useState<string>("30");
+  const [savingTrial, setSavingTrial] = useState(false);
+
+  useEffect(() => {
+    getFreeTiralDays().then((days) => {
+      setFreeTrialDaysState(days);
+      setFreeTrialInput(String(days));
+    });
+  }, []);
+
+  async function handleSaveFreeTrial() {
+    const days = parseInt(freeTrialInput, 10);
+    if (isNaN(days) || days < 1 || days > 365) {
+      toast.error("Valid range: 1–365 days");
+      return;
+    }
+    setSavingTrial(true);
+    const result = await setFreeTrialDays(days);
+    setSavingTrial(false);
+    if (!result.success) {
+      toast.error(result.error ?? "Save failed.");
+      return;
+    }
+    setFreeTrialDaysState(days);
+    toast.success(`Free trial duration set to ${days} days.`);
+    setEditingItem(null);
+  }
 
   return (
     <div>
+      <Toaster position="top-center" />
       {/* Header */}
       <div className="bg-gradient-to-r from-ink to-ink-soft rounded-[14px] p-4 mb-4 border border-border-default">
         <div className="text-[16px] font-extrabold text-white mb-1">⚙️ Platform Settings</div>
@@ -83,7 +115,7 @@ export default function SuperAdminSettings() {
             {/* Group Header */}
             <button
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-warm-50 cursor-pointer transition-colors border-b border-border-light"
-              onClick={() => setActiveGroup(activeGroup === grp.group ? null : grp.group)}
+              onClick={() => { setActiveGroup(activeGroup === grp.group ? null : grp.group); setEditingItem(null); }}
             >
               <div className="flex items-center gap-2">
                 <span className="text-lg">{grp.icon}</span>
@@ -100,7 +132,7 @@ export default function SuperAdminSettings() {
                   <div key={item.title}>
                     <div
                       className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-warm-50 transition-colors ${i < grp.items.length - 1 ? "border-b border-border-light" : ""}`}
-                      onClick={() => setEditingItem(editingItem === `${grp.group}-${item.title}` ? null : `${grp.group}-${item.title}`)}
+                      onClick={(e) => { e.stopPropagation(); setEditingItem(editingItem === `${grp.group}-${item.title}` ? null : `${grp.group}-${item.title}`); }}
                     >
                       <span className="text-xl flex-shrink-0">{item.icon}</span>
                       <div className="flex-1 min-w-0">
@@ -116,7 +148,7 @@ export default function SuperAdminSettings() {
                               ? "bg-gray-100 text-gray-500"
                               : "bg-amber-100 text-amber-700"
                           }`}>
-                            {item.tag}
+                            {item.title === "Free Trial Duration" ? `${freeTrialDays} days` : item.tag}
                           </span>
                         )}
                         <span className="text-ink-muted text-sm">›</span>
@@ -130,7 +162,27 @@ export default function SuperAdminSettings() {
                           Edit: {item.title}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                          {item.title === "Pricing Configuration" ? (
+                          {item.title === "Free Trial Duration" ? (
+                            <div className="col-span-2">
+                              <div className="text-[10px] font-bold text-ink-muted mb-1">
+                                Free Trial Duration (days)
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="365"
+                                  value={freeTrialInput}
+                                  onChange={(e) => setFreeTrialInput(e.target.value)}
+                                  className="w-32 px-3 py-2 rounded-xl border border-border-default text-[13px] font-bold text-ink bg-white focus:outline-none focus:border-amber-400"
+                                />
+                                <span className="text-[12px] text-ink-muted">days</span>
+                              </div>
+                              <p className="text-[10px] text-ink-muted mt-2">
+                                Currently: <strong>{freeTrialDays} din</strong> ka free trial naye users ko milta hai. Signup ke baad yeh automatically apply hoga.
+                              </p>
+                            </div>
+                          ) : item.title === "Pricing Configuration" ? (
                             <>
                               {[
                                 { l: "Society Starter (₹/mo)", v: "2999" },
@@ -174,8 +226,12 @@ export default function SuperAdminSettings() {
                           )}
                         </div>
                         <div className="flex gap-2">
-                          <button className="px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold cursor-pointer hover:bg-amber-600 transition-colors">
-                            Save Changes
+                          <button
+                            onClick={item.title === "Free Trial Duration" ? handleSaveFreeTrial : undefined}
+                            disabled={item.title === "Free Trial Duration" && savingTrial}
+                            className="px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold cursor-pointer hover:bg-amber-600 transition-colors disabled:opacity-60"
+                          >
+                            {item.title === "Free Trial Duration" && savingTrial ? "Saving..." : "Save Changes"}
                           </button>
                           <button
                             onClick={() => setEditingItem(null)}

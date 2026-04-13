@@ -171,6 +171,9 @@ export default function AdminGovernance() {
   async function handleAddNew(e: React.FormEvent) {
     e.preventDefault();
     if (!societyId) return;
+    if (form.phone && form.phone.replace(/\D/g, "").length !== 10) {
+      toast.error("Phone must be exactly 10 digits."); return;
+    }
     setSaving(true);
     const result = await addBoardMember({
       full_name: form.full_name,

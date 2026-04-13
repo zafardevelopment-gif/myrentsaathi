@@ -1,16 +1,16 @@
 "use client";
 
 import { useAuth } from "@/components/providers/MockAuthProvider";
+import SubscriptionSection from "@/components/settings/SubscriptionSection";
 
 export default function LandlordSettings() {
   const { user } = useAuth();
 
   const SETTINGS = [
-    { label: "My Profile", desc: `${user?.name ?? "—"} · ${user?.email ?? ""}`, icon: "👤" },
-    { label: "Bank Account", desc: "Linked for rent collection", icon: "🏦" },
-    { label: "Razorpay", desc: "Payment gateway connected", icon: "💳" },
-    { label: "WhatsApp Notifications", desc: "Alerts & reminders", icon: "📱" },
-    { label: "Subscription", desc: "Pro Plan · ₹999/mo", icon: "🔑" },
+    { label: "My Profile",             desc: `${user?.name ?? "—"} · ${user?.email ?? ""}`, icon: "👤" },
+    { label: "Bank Account",           desc: "Linked for rent collection",                   icon: "🏦" },
+    { label: "Razorpay",               desc: "Payment gateway connected",                    icon: "💳" },
+    { label: "WhatsApp Notifications", desc: "Alerts & reminders",                           icon: "📱" },
   ];
 
   return (
@@ -32,6 +32,8 @@ export default function LandlordSettings() {
           <span className="text-ink-muted">→</span>
         </div>
       ))}
+
+      <SubscriptionSection planType="landlord" />
     </div>
   );
 }

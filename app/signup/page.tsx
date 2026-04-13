@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signupSocietyAdmin, signupLandlord } from "@/lib/auth-db";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import toast, { Toaster } from "react-hot-toast";
@@ -10,8 +10,11 @@ type Tab = "society" | "landlord";
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
-  const [tab, setTab] = useState<Tab>("society");
+  const [tab, setTab] = useState<Tab>(
+    searchParams.get("type") === "landlord" ? "landlord" : "society"
+  );
   const [loading, setLoading] = useState(false);
 
   // ── Society Admin form ──
@@ -48,6 +51,10 @@ export default function SignupPage() {
       toast.error("Password must be at least 6 characters.");
       return;
     }
+    if (society.phone.replace(/\D/g, "").length !== 10) {
+      toast.error("Phone number must be exactly 10 digits.");
+      return;
+    }
     setLoading(true);
     const result = await signupSocietyAdmin({
       full_name: society.full_name,
@@ -68,10 +75,11 @@ export default function SignupPage() {
       return;
     }
 
-    toast.success("Society created! Logging you in...");
+    toast.success("Society created! Ab apna plan chunein...");
     const loginResult = await login(society.email, society.password);
     if (loginResult.success) {
-      router.push("/admin");
+      // Redirect to plan selection with type=society and societyId
+      router.push(`/select-plan?type=society&society=${result.societyId}`);
     }
   }
 
@@ -83,6 +91,10 @@ export default function SignupPage() {
     }
     if (landlord.password.length < 6) {
       toast.error("Password must be at least 6 characters.");
+      return;
+    }
+    if (landlord.phone.replace(/\D/g, "").length !== 10) {
+      toast.error("Phone number must be exactly 10 digits.");
       return;
     }
     setLoading(true);
@@ -99,10 +111,11 @@ export default function SignupPage() {
       return;
     }
 
-    toast.success("Account created! Logging you in...");
+    toast.success("Account created! Ab apna plan chunein...");
     const loginResult = await login(landlord.email, landlord.password);
     if (loginResult.success) {
-      router.push("/landlord");
+      // Redirect to plan selection with type=landlord
+      router.push(`/select-plan?type=landlord`);
     }
   }
 

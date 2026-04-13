@@ -5,6 +5,7 @@ import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getAdminSociety, updateSocietyDetails, type AdminSociety } from "@/lib/admin-data";
 import toast from "react-hot-toast";
 import { Toaster } from "react-hot-toast";
+import SubscriptionSection from "@/components/settings/SubscriptionSection";
 
 export default function AdminSettings() {
   const { user } = useAuth();
@@ -85,10 +86,9 @@ export default function AdminSettings() {
   }
 
   const STATIC_SETTINGS = [
-    { label: "Bank Account", desc: "Bank details for maintenance collection", icon: "🏦" },
-    { label: "Razorpay Integration", desc: "Payment gateway for online collection", icon: "💳" },
-    { label: "WhatsApp API", desc: "Meta Business API for notifications", icon: "📱" },
-    { label: "Subscription Plan", desc: `Current: ${(society?.plan ?? society?.subscription_plan)?.toUpperCase() ?? "—"}`, icon: "🔑" },
+    { label: "Bank Account",        desc: "Bank details for maintenance collection",  icon: "🏦" },
+    { label: "Razorpay Integration",desc: "Payment gateway for online collection",     icon: "💳" },
+    { label: "WhatsApp API",        desc: "Meta Business API for notifications",       icon: "📱" },
   ];
 
   return (
@@ -278,6 +278,8 @@ export default function AdminSettings() {
           <span className="text-ink-muted">→</span>
         </div>
       ))}
+
+      <SubscriptionSection planType="society" />
     </div>
   );
 }

@@ -22,7 +22,7 @@ function formatINR(n: number) {
 
 const EMPTY_PLAN: PricingPlanInput = {
   plan_type: "society",
-  name: "",
+  name: "Starter",
   price: 0,
   price_yearly: null,
   duration: "monthly",
@@ -34,6 +34,67 @@ const EMPTY_PLAN: PricingPlanInput = {
   description: "",
   badge_text: null,
 };
+
+const PLAN_NAMES: Record<"society" | "landlord", string[]> = {
+  society:  ["Starter", "Professional", "Enterprise"],
+  landlord: ["Basic", "Pro", "NRI"],
+};
+
+// ── Suggested features per plan type ─────────────────────────
+const SUGGESTED_FEATURES: Record<string, string> = {
+  "society-starter":
+`30 flats management
+Maintenance collection
+Complaint tickets
+WhatsApp reminders (500/mo)
+Basic reports
+Email support`,
+  "society-professional":
+`100 flats management
+Everything in Starter
+Expense management + approval
+Parking management
+Polls & voting
+WhatsApp reminders (2,000/mo)
+Document vault
+Priority support`,
+  "society-enterprise":
+`Unlimited flats
+Everything in Professional
+Multi-wing/tower support
+WhatsApp unlimited
+Custom reports
+Dedicated account manager
+API access
+On-call support`,
+  "landlord-basic":
+`3 property management
+Rent collection + tracking
+Tenant management
+WhatsApp reminders
+Payment receipts
+Basic reports`,
+  "landlord-pro":
+`10 property management
+Everything in Basic
+Agreement generator (free drafts)
+Tax-ready reports
+Multi-society view
+Priority support`,
+  "landlord-nri":
+`Unlimited properties
+Everything in Pro
+NRI tax reports
+Power of Attorney support
+Multi-city dashboard
+WhatsApp-only management
+Dedicated NRI support`,
+};
+
+function getSuggestedFeatures(planType: string, planName: string): string {
+  const key = `${planType}-${planName.toLowerCase()}`;
+  return SUGGESTED_FEATURES[key] ?? "";
+}
 
 // ── Plan Form Modal ───────────────────────────────────────────
 function PlanFormModal({
@@ -62,10 +123,11 @@ function PlanFormModal({
       badge_text: plan.badge_text ?? "",
     } : EMPTY_PLAN
   );
-  // Features as newline-separated text for easy editing
-  const [featuresText, setFeaturesText] = useState(
-    plan?.features?.map((f) => f.feature_text).join("\n") ?? ""
-  );
+  // Features as newline-separated text — pre-fill with existing or suggested
+  const [featuresText, setFeaturesText] = useState(() => {
+    if (plan?.features?.length) return plan.features.map((f) => f.feature_text).join("\n");
+    return getSuggestedFeatures(plan?.plan_type ?? "society", plan?.name ?? "Starter");
+  });
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -131,7 +193,13 @@ function PlanFormModal({
               <label className="block text-[12px] font-bold text-ink mb-1">Plan Type</label>
               <select
                 value={form.plan_type}
-                onChange={(e) => setForm({ ...form, plan_type: e.target.value as "society" | "landlord" })}
+                onChange={(e) => {
+                  const newType = e.target.value as "society" | "landlord";
+                  const defaultName = PLAN_NAMES[newType][0];
+                  setForm({ ...form, plan_type: newType, name: defaultName });
+                  const suggested = getSuggestedFeatures(newType, defaultName);
+                  if (suggested) setFeaturesText(suggested);
+                }}
                 className="w-full border border-border-default rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="society">🏢 Society</option>
@@ -140,12 +208,20 @@ function PlanFormModal({
             </div>
             <div>
               <label className="block text-[12px] font-bold text-ink mb-1">Plan Name *</label>
-              <input
+              <select
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Professional"
+                onChange={(e) => {
+                  const newName = e.target.value;
+                  setForm({ ...form, name: newName });
+                  const suggested = getSuggestedFeatures(form.plan_type, newName);
+                  if (suggested) setFeaturesText(suggested);
+                }}
                 className="w-full border border-border-default rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
+              >
+                {PLAN_NAMES[form.plan_type].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -244,9 +320,21 @@ function PlanFormModal({
 
           {/* Features */}
           <div>
-            <label className="block text-[12px] font-bold text-ink mb-1">
-              Features — one per line
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[12px] font-bold text-ink">
+                Features — one per line
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const suggested = getSuggestedFeatures(form.plan_type, form.name);
+                  if (suggested) setFeaturesText(suggested);
+                }}
+                className="text-[11px] font-bold text-brand-500 hover:text-brand-600 cursor-pointer px-2 py-0.5 rounded-lg bg-brand-50 hover:bg-brand-100 transition-colors"
+              >
+                ✨ Reset to suggested
+              </button>
+            </div>
             <textarea
               value={featuresText}
               onChange={(e) => setFeaturesText(e.target.value)}
