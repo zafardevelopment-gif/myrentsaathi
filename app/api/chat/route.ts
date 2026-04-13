@@ -14,6 +14,7 @@ import {
   getSocietyStaff,
   getAdminFinancialSummary,
   getSocietyOccupancy,
+  getSubscriptionInfo,
   howToGuide,
   CHAT_TOOLS,
   type ChatUserContext,
@@ -80,6 +81,7 @@ Your personality: Warm, helpful, concise. Respond in the same language as the us
 • For staff contacts → call getSocietyStaff
 • Admin asks for finances → call getAdminFinancialSummary
 • Admin asks for occupancy → call getSocietyOccupancy
+• Subscription / plan status / expiry / "kab tak valid" → call getSubscriptionInfo
 • "How to..." questions → call howToGuide
 • Pricing questions → call getPricingPlans
 • General FAQs → call getFAQAnswer
@@ -102,7 +104,7 @@ async function dispatchTool(
   const role = user?.role ?? "";
 
   // Tools that require a logged-in user
-  const userRequiredTools = ["getUserDashboard","getMaintenanceDues","getMyComplaints","getSocietyNotices","getMyVehicles","getVisitorLog","getSocietyStaff","getAdminFinancialSummary","getSocietyOccupancy"];
+  const userRequiredTools = ["getUserDashboard","getMaintenanceDues","getMyComplaints","getSocietyNotices","getMyVehicles","getVisitorLog","getSocietyStaff","getAdminFinancialSummary","getSocietyOccupancy","getSubscriptionInfo"];
   if (userRequiredTools.includes(name) && !uid) {
     return JSON.stringify({ error: "User not authenticated. Please ensure the user is logged in and refresh the page." });
   }
@@ -128,6 +130,8 @@ async function dispatchTool(
         return JSON.stringify(await getAdminFinancialSummary(uid));
       case "getSocietyOccupancy":
         return JSON.stringify(await getSocietyOccupancy(uid));
+      case "getSubscriptionInfo":
+        return JSON.stringify(await getSubscriptionInfo(uid));
 
       // ── How-to guide ──
       case "howToGuide":

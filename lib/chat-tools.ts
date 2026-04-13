@@ -762,6 +762,40 @@ export function getFAQAnswer(topic: string) {
   return { answer: "I don't have a specific answer for that. Let me create a support ticket so our team can help you." };
 }
 
+// ─── TOOL: getSubscriptionInfo ───────────────────────────────
+// Returns the user's current subscription / plan details
+
+export async function getSubscriptionInfo(userId: string) {
+  if (!userId) return { error: "Not logged in." };
+
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("plan_name, plan_type, status, plan_price, starts_at, expires_at, trial_days, activated_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!sub) return { plan: "None", status: "No active subscription found." };
+
+  const now = new Date();
+  const expires = sub.expires_at ? new Date(sub.expires_at) : null;
+  const daysLeft = expires ? Math.max(0, Math.ceil((expires.getTime() - now.getTime()) / 86400000)) : null;
+
+  return {
+    plan: sub.plan_name,
+    plan_type: sub.plan_type,
+    status: sub.status,
+    price: fmt(sub.plan_price),
+    starts_at: fmtDate(sub.starts_at),
+    expires_at: fmtDate(sub.expires_at),
+    days_remaining: daysLeft !== null ? `${daysLeft} days` : "N/A",
+    is_trial: sub.status === "trial",
+    trial_days: sub.trial_days ?? null,
+    activated_at: fmtDate(sub.activated_at),
+  };
+}
+
 // ─── OPENAI TOOL DEFINITIONS ─────────────────────────────────
 
 export const CHAT_TOOLS = [
@@ -855,6 +889,14 @@ export const CHAT_TOOLS = [
         },
         required: ["topic"],
       },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "getSubscriptionInfo",
+      description: "Get the user's current subscription / plan details: plan name, status (trial/active/expired), expiry date, days remaining, price. Use when user asks about 'mera plan', 'plan kab tak valid hai', 'subscription expiry', 'kitne din baaki hain', 'plan status', 'kab expire hoga'.",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {

@@ -11,7 +11,7 @@ const SETTING_GROUPS = [
     items: [
       { icon: "🔐", title: "Super Admin Profile",        desc: "Name, email, phone, password change",                        tag: null,       editable: true },
       { icon: "🔑", title: "Security & 2FA",             desc: "Two-factor auth, IP whitelist, session timeout",             tag: "Active",   editable: false },
-      { icon: "🌐", title: "API Keys",                   desc: "Platform API keys for integrations, rate limits",            tag: null,       editable: false },
+      { icon: "🌐", title: "API Keys",                   desc: "Platform API keys for integrations, rate limits",            tag: null,       editable: true },
     ],
   },
   {
