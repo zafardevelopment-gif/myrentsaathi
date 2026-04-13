@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { activatePaidPlan } from "@/lib/subscription";
@@ -47,7 +47,7 @@ function applyPromo(price: number, promo: PromoResult | null): number {
   return Math.max(0, price - promo.value);
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -291,5 +291,13 @@ export default function CheckoutPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center text-gray-400 text-sm">Loading checkout...</div>}>
+      <CheckoutContent />
+    </Suspense>
   );
 }

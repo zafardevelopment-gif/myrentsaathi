@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signupSocietyAdmin, signupLandlord } from "@/lib/auth-db";
 import { useAuth } from "@/components/providers/MockAuthProvider";
@@ -8,7 +8,7 @@ import toast, { Toaster } from "react-hot-toast";
 
 type Tab = "society" | "landlord";
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -318,5 +318,13 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-warm-50 flex items-center justify-center text-ink-muted text-sm">Loading...</div>}>
+      <SignupContent />
+    </Suspense>
   );
 }
