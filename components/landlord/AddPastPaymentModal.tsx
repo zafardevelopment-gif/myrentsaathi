@@ -107,12 +107,16 @@ export default function AddPastPaymentModal({ landlordEmail, onClose, onSuccess 
 
       const options: FlatOption[] = flatRows.map(f => {
         const t = tenantByFlat.get(f.id);
+        const rawSociety = f.society;
+        const society = Array.isArray(rawSociety)
+          ? (rawSociety[0] as { name: string } | undefined) ?? null
+          : (rawSociety as { name: string } | null) ?? null;
         return {
           id: f.id,
           flat_number: f.flat_number,
           block: f.block,
           monthly_rent: f.monthly_rent,
-          society: (f.society as { name: string } | null),
+          society,
           tenantId: t?.tenantId ?? null,
           tenantName: t?.name ?? null,
         };

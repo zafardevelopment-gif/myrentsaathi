@@ -79,19 +79,13 @@ export default function LandlordRent() {
       societyId = flatRow?.society_id ?? null;
     }
 
-    if (!societyId) {
-      toast.error("Society not found — notice cannot be sent.");
-      setReminding(null);
-      return;
-    }
-
     const { error } = await supabase.from("notices").insert({
-      society_id: societyId,
+      ...(societyId ? { society_id: societyId } : {}),
       created_by: landlordId,
       title: `Rent Reminder — ${monthLabel}`,
       content: `Dear ${tenantName}, this is a reminder that your rent of ${formatCurrency(rp.expected_amount)} for ${monthLabel} (${flatLabel}) is pending. Please make the payment at the earliest. Thank you.`,
       notice_type: "reminder",
-      audience: "tenants",
+      target_audience: "tenants",
       is_active: true,
     });
 
