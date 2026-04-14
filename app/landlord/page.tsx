@@ -306,6 +306,7 @@ export default function LandlordOverview() {
 
   const overduePayments = payments.filter((p) => p.status === "overdue");
   const pendingPayments = payments.filter((p) => p.status === "pending");
+  const pendingVerifications = payments.filter((p) => p.receipt_status === "pending_verification");
   const openTickets = tickets.filter(t => t.status === "open" || t.status === "in_progress");
   const vacantFlatsCount = stats ? stats.totalFlats - stats.occupiedFlats : 0;
 
@@ -500,6 +501,46 @@ export default function LandlordOverview() {
         </div>
       </CollapsibleSection>
 
+      {/* Pending Receipt Verifications */}
+      {!loading && pendingVerifications.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-[14px] p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🕐</span>
+              <span className="text-sm font-extrabold text-yellow-800">
+                {pendingVerifications.length} Payment Receipt{pendingVerifications.length > 1 ? "s" : ""} to Verify
+              </span>
+            </div>
+            <Link href="/landlord/rent" className="text-[11px] text-brand-500 font-bold no-underline">View all →</Link>
+          </div>
+          {pendingVerifications.slice(0, 2).map(p => {
+            const tenantName = (p.tenant as { user?: { full_name: string } | null } | null)?.user?.full_name ?? "Tenant";
+            const flat = p.flat as { flat_number: string; block: string | null } | null;
+            const paidAmt = p.paid_amount && p.paid_amount > 0 ? p.paid_amount : p.expected_amount;
+            const isPartial = paidAmt < p.expected_amount;
+            return (
+              <div key={p.id} className="bg-white rounded-[12px] p-3 border border-yellow-200 mb-2 flex justify-between items-center gap-3">
+                <div>
+                  <div className="text-xs font-bold text-ink">{tenantName}</div>
+                  <div className="text-[11px] text-ink-muted">
+                    {flat ? `Flat ${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : "—"}
+                    {" · "}{isPartial ? `Partial ${formatCurrency(paidAmt)} of ${formatCurrency(p.expected_amount)}` : formatCurrency(paidAmt)}
+                  </div>
+                </div>
+                <Link href="/landlord/rent" className="px-3 py-1.5 rounded-lg bg-yellow-500 text-white text-[10px] font-bold flex-shrink-0 no-underline cursor-pointer">
+                  Review
+                </Link>
+              </div>
+            );
+          })}
+          {pendingVerifications.length > 2 && (
+            <Link href="/landlord/rent" className="text-[11px] text-yellow-700 font-semibold no-underline">
+              +{pendingVerifications.length - 2} more →
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Alerts */}
       {!loading && (overduePayments.length > 0 || pendingPayments.length > 0 || vacantFlatsCount > 0 || expiringAgreements.length > 0) && (
         <CollapsibleSection
@@ -567,7 +608,7 @@ export default function LandlordOverview() {
         </CollapsibleSection>
       )}
 
-      {!loading && overduePayments.length === 0 && pendingPayments.length === 0 && vacantFlatsCount === 0 && expiringAgreements.length === 0 && openTickets.length === 0 && (
+      {!loading && overduePayments.length === 0 && pendingPayments.length === 0 && pendingVerifications.length === 0 && vacantFlatsCount === 0 && expiringAgreements.length === 0 && openTickets.length === 0 && (
         <div className="bg-green-50 rounded-[14px] p-5 border border-green-100 text-center mb-4">
           <div className="text-2xl mb-1">✨</div>
           <div className="text-sm font-bold text-green-700">All rents collected · No alerts!</div>

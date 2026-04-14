@@ -34,6 +34,10 @@ export type LandlordRentPayment = {
   created_at: string;
   tenant_id?: string;
   flat_id?: string;
+  receipt_url?: string | null;
+  receipt_name?: string | null;
+  receipt_status?: string | null; // 'pending_verification' | 'accepted' | 'rejected'
+  paid_amount?: number | null;
   flat?: { flat_number: string; block: string | null; society?: { name: string; city: string } | null } | null;
   tenant?: { user?: { full_name: string; phone?: string } | null } | null;
 };
@@ -213,7 +217,7 @@ export async function getLandlordRentPayments(email: string): Promise<LandlordRe
   const currentMonth = new Date().toISOString().slice(0, 7);
   const { data, error } = await supabase
     .from("rent_payments")
-    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, tenant_id, flat_id,
+    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, tenant_id, flat_id, receipt_url, receipt_name, receipt_status, paid_amount,
       flat:flats(flat_number, block, society:societies(name, city))`)
     .in("tenant_id", tenantIds)
     .eq("month_year", currentMonth)
@@ -231,7 +235,7 @@ export async function getAllLandlordRentPayments(email: string): Promise<Landlor
 
   const { data, error } = await supabase
     .from("rent_payments")
-    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, tenant_id, flat_id,
+    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, tenant_id, flat_id, receipt_url, receipt_name, receipt_status, paid_amount,
       flat:flats(flat_number, block, society:societies(name, city))`)
     .in("tenant_id", tenantIds)
     .order("month_year", { ascending: false });

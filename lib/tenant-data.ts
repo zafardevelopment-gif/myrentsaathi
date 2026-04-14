@@ -33,6 +33,10 @@ export type TenantRentPayment = {
   payment_date: string | null;
   payment_method: string | null;
   created_at: string;
+  receipt_url?: string | null;
+  receipt_name?: string | null;
+  receipt_status?: string | null; // 'pending_verification' | 'accepted' | 'rejected'
+  paid_amount?: number | null;    // for partial payments
 };
 
 export type TenantTicket = {
@@ -140,7 +144,7 @@ export async function getTenantRentPayments(email: string): Promise<TenantRentPa
 
   const { data, error } = await supabase
     .from("rent_payments")
-    .select("id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at")
+    .select("id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, receipt_url, receipt_name, receipt_status, paid_amount")
     .eq("tenant_id", tenant.id)
     .order("month_year", { ascending: false });
   if (error) throw error;
