@@ -281,6 +281,30 @@ export default function TenantAgreementPage() {
         </div>
       </div>
 
+      {/* Custom Document from Landlord */}
+      {agreement.custom_doc_url && (
+        <div className="mb-3">
+          <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-2 px-1">Document from Landlord</div>
+          <div className="bg-purple-50 border border-purple-200 rounded-[14px] p-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-xl flex-shrink-0">📎</div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-ink truncate">{agreement.custom_doc_name ?? "Custom Agreement Document"}</div>
+                <div className="text-[10px] text-ink-muted mt-0.5">Attached by your landlord</div>
+              </div>
+            </div>
+            <a
+              href={agreement.custom_doc_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0 px-4 py-2 rounded-xl bg-purple-500 text-white text-xs font-bold cursor-pointer hover:bg-purple-600 transition-colors"
+            >
+              ⬇ Download
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Download CTA */}
       <button
         onClick={() => printAgreement(agreement)}

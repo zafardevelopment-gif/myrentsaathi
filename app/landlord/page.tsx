@@ -579,11 +579,15 @@ export default function LandlordOverview() {
         <CollapsibleSection title="🚫 Open Complaints" badge={openTickets.length} rightLink={{ label: "View all →", href: "/landlord/complaints" }}>
           {openTickets.slice(0, 3).map(tk => {
             const flat = tk.flat as { flat_number: string; block: string | null } | null;
+            const isTenantTicket = tk.source === "tenant";
             return (
-              <div key={tk.id} className="bg-white rounded-[14px] p-3.5 border border-border-default border-l-4 border-l-orange-400 mb-2 flex justify-between items-center gap-3">
+              <div key={tk.id} className={`bg-white rounded-[14px] p-3.5 border border-border-default border-l-4 ${isTenantTicket ? "border-l-blue-400" : "border-l-orange-400"} mb-2 flex justify-between items-center gap-3`}>
                 <div>
-                  <div className="text-xs font-bold text-ink">{tk.subject}</div>
-                  <div className="text-[11px] text-ink-muted mt-0.5">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    {isTenantTicket && <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">TENANT</span>}
+                    <div className="text-xs font-bold text-ink">{tk.subject}</div>
+                  </div>
+                  <div className="text-[11px] text-ink-muted">
                     {flat ? `Flat ${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : "—"} · {tk.priority.toUpperCase()} · {tk.status.replace("_", " ")}
                   </div>
                 </div>

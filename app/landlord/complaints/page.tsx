@@ -100,6 +100,9 @@ export default function LandlordComplaints() {
     return <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-warm-100 rounded-[14px] animate-pulse" />)}</div>;
   }
 
+  const tenantTickets = tickets.filter(t => t.source === "tenant");
+  const myTickets = tickets.filter(t => t.source !== "tenant");
+
   const counts = {
     open:        tickets.filter(t => t.status === "open").length,
     in_progress: tickets.filter(t => t.status === "in_progress").length,
@@ -132,9 +135,9 @@ export default function LandlordComplaints() {
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h2 className="text-[15px] font-extrabold text-ink">🚫 My Complaints</h2>
+          <h2 className="text-[15px] font-extrabold text-ink">🚫 Complaints</h2>
           <p className="text-[11px] text-ink-muted mt-0.5">
-            {tickets.length} complaint{tickets.length !== 1 ? "s" : ""} raised to society
+            {myTickets.length} yours · {tenantTickets.length} from tenants
           </p>
         </div>
         <button
@@ -273,20 +276,25 @@ export default function LandlordComplaints() {
       ) : (
         <div className="space-y-2">
           {paged.map(tk => (
-            <div key={tk.id} className="bg-white rounded-[14px] p-4 border border-border-default">
+            <div key={tk.id} className={`bg-white rounded-[14px] p-4 border border-border-default border-l-4 ${tk.source === "tenant" ? "border-l-blue-400" : "border-l-orange-400"}`}>
               <div className="flex justify-between items-start gap-2 mb-2">
                 <div className="flex gap-1.5 flex-wrap">
                   <span className={`inline-block px-2.5 py-[3px] rounded-full text-[10px] font-bold border ${PRIORITY_COLOR[tk.priority] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                     {tk.priority.toUpperCase()}
                   </span>
                   <StatusBadge status={tk.status} />
+                  {tk.source === "tenant" && (
+                    <span className="inline-block px-2.5 py-[3px] rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                      👤 Tenant
+                    </span>
+                  )}
                   {tk.category && (
                     <span className="inline-block px-2.5 py-[3px] rounded-full text-[10px] font-bold bg-warm-100 text-ink-muted border border-border-default capitalize">
                       {tk.category}
                     </span>
                   )}
                 </div>
-                {tk.status === "open" && (
+                {tk.source !== "tenant" && tk.status === "open" && (
                   <button
                     onClick={() => handleDelete(tk.id)}
                     className="px-2.5 py-1 rounded-lg border border-red-200 text-[11px] font-semibold text-red-400 cursor-pointer flex-shrink-0"
@@ -296,7 +304,13 @@ export default function LandlordComplaints() {
                 )}
               </div>
               <div className="text-sm font-bold text-ink mb-1">{tk.subject}</div>
-              <div className="text-[11px] text-ink-muted mb-3">
+              <div className="text-[11px] text-ink-muted mb-1">
+                {tk.source === "tenant" && tk.raiser && (
+                  <span className="font-semibold text-blue-600">
+                    {(tk.raiser as { full_name: string }).full_name} · {" "}
+                  </span>
+                )}
+                {tk.flat && `Flat ${(tk.flat as { flat_number: string; block: string | null }).flat_number}${(tk.flat as { flat_number: string; block: string | null }).block ? ` (${(tk.flat as { flat_number: string; block: string | null }).block})` : ""} · `}
                 📅 {new Date(tk.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
               </div>
               <div className="flex gap-2 flex-wrap">

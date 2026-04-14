@@ -49,6 +49,8 @@ export type LandlordAgreement = {
   start_date: string;
   end_date: string;
   created_at: string;
+  custom_doc_url?: string | null;
+  custom_doc_name?: string | null;
   flat?: { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
   society?: { name: string; city: string; address?: string | null } | null;
   tenant?: { user?: { full_name: string; phone?: string | null; email?: string | null } | null } | null;
@@ -248,6 +250,7 @@ export async function getLandlordAgreements(email: string): Promise<LandlordAgre
     .from("agreements")
     .select(`
       id, flat_id, tenant_id, tier, status, monthly_rent, security_deposit, start_date, end_date, created_at,
+      custom_doc_url, custom_doc_name,
       flat:flats(flat_number, block, floor_number, flat_type, area_sqft),
       society:societies(name, city, address)
     `)
@@ -343,24 +346,53 @@ export type LandlordTicket = {
   priority: string;
   status: string;
   created_at: string;
+  raised_by?: string | null;
+  source?: "landlord" | "tenant";
   flat?: { flat_number: string; block: string | null } | null;
+  raiser?: { full_name: string; role: string } | null;
 };
 
-/** Only complaints raised BY the landlord (landlord → society). */
+/**
+ * Returns complaints visible to this landlord:
+ * 1. Complaints raised BY the landlord (landlord → society)
+ * 2. Complaints raised by tenants in flats owned by this landlord
+ */
 export async function getLandlordTickets(email: string): Promise<LandlordTicket[]> {
   const userId = await getLandlordUserId(email);
   if (!userId) return [];
 
-  const { data, error } = await supabase
+  // Get all flat IDs owned by this landlord
+  const { data: flats } = await supabase
+    .from("flats")
+    .select("id")
+    .eq("owner_id", userId);
+
+  const flatIds = (flats ?? []).map((f) => f.id);
+
+  // Build OR filter: raised_by = landlord OR flat_id in owned flats
+  let query = supabase
     .from("tickets")
     .select(`
-      id, subject, category, priority, status, created_at,
-      flat:flats(flat_number, block)
+      id, subject, category, priority, status, created_at, raised_by, flat_id,
+      flat:flats(flat_number, block),
+      raiser:users!raised_by(full_name, role)
     `)
-    .eq("raised_by", userId)
     .order("created_at", { ascending: false });
+
+  if (flatIds.length > 0) {
+    query = query.or(`raised_by.eq.${userId},flat_id.in.(${flatIds.join(",")})`);
+  } else {
+    query = query.eq("raised_by", userId);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as unknown as LandlordTicket[];
+
+  // Tag each ticket with source
+  return (data ?? []).map((tk) => ({
+    ...tk,
+    source: tk.raised_by === userId ? "landlord" : "tenant",
+  })) as unknown as LandlordTicket[];
 }
 
 /** Get the society the landlord belongs to. */

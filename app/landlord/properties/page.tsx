@@ -86,6 +86,11 @@ export default function LandlordProperties() {
   const [deleteFlat, setDeleteFlat] = useState<LandlordFlat | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Quick rent change
+  const [rentFlat, setRentFlat] = useState<LandlordFlat | null>(null);
+  const [rentValue, setRentValue] = useState("");
+  const [rentSaving, setRentSaving] = useState(false);
+
   // Search / Filter
   const [filterName, setFilterName] = useState("");
   const [filterFlat, setFilterFlat] = useState("");
@@ -203,6 +208,20 @@ export default function LandlordProperties() {
     setDeleteFlat(null);
     setLoading(true);
     await loadData();
+  }
+
+  async function handleRentSave() {
+    if (!rentFlat || !rentValue.trim()) return;
+    const newRent = Number(rentValue);
+    if (isNaN(newRent) || newRent <= 0) { toast.error("Enter a valid rent amount."); return; }
+    setRentSaving(true);
+    const { error } = await supabase.from("flats").update({ monthly_rent: newRent }).eq("id", rentFlat.id);
+    setRentSaving(false);
+    if (error) { toast.error("Failed to update rent."); return; }
+    toast.success("Rent updated!");
+    setFlats(prev => prev.map(f => f.id === rentFlat.id ? { ...f, monthly_rent: newRent } : f));
+    setRentFlat(null);
+    setRentValue("");
   }
 
   if (loading) {
@@ -371,6 +390,10 @@ export default function LandlordProperties() {
                         <div className="text-right">
                           <div className="text-base font-extrabold text-ink">{formatCurrency(flat.monthly_rent ?? 0)}</div>
                           <div className="text-[10px] text-ink-muted">per month</div>
+                          <button
+                            onClick={() => { setRentFlat(flat); setRentValue(String(flat.monthly_rent ?? "")); }}
+                            className="text-[10px] text-brand-600 font-semibold underline cursor-pointer mt-0.5"
+                          >Edit Rent</button>
                         </div>
                       </div>
                     </div>
@@ -655,6 +678,40 @@ export default function LandlordProperties() {
             <div className="flex gap-2">
               <button onClick={() => setDeleteFlat(null)} className="flex-1 py-2.5 rounded-xl border border-border-default text-sm font-bold cursor-pointer">Cancel</button>
               <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold cursor-pointer disabled:opacity-60">{deleting ? "Deleting..." : "Delete"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Rent Change Modal */}
+      {rentFlat && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setRentFlat(null)}>
+          <div className="bg-white rounded-[18px] w-full max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center">
+              <div className="text-base font-extrabold text-ink">💰 Update Rent</div>
+              <button onClick={() => setRentFlat(null)} className="text-ink-muted text-lg cursor-pointer">✕</button>
+            </div>
+            <div className="text-xs text-ink-muted">
+              Flat <strong>{rentFlat.flat_number}{rentFlat.block ? ` (${rentFlat.block})` : ""}</strong>
+              {" · "}Current: <strong>{formatCurrency(rentFlat.monthly_rent ?? 0)}/mo</strong>
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-ink-muted block mb-1">New Monthly Rent (₹)</label>
+              <input
+                type="number"
+                className="w-full border border-border-default rounded-xl px-3 py-2.5 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500"
+                placeholder="e.g. 28000"
+                value={rentValue}
+                onChange={e => setRentValue(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleRentSave()}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setRentFlat(null)} className="flex-1 py-2.5 rounded-xl border border-border-default text-sm font-bold cursor-pointer">Cancel</button>
+              <button onClick={handleRentSave} disabled={rentSaving} className="flex-1 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-bold cursor-pointer disabled:opacity-60">
+                {rentSaving ? "Saving..." : "Save Rent"}
+              </button>
             </div>
           </div>
         </div>

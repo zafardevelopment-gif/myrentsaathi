@@ -192,6 +192,12 @@ _{{7}} Society_
 **Category:** UTILITY  
 **When to send:** When guard checks in a visitor and flat resident hasn't pre-approved them
 
+> ⚠️ **Two versions below.** Use Version B (with buttons) — it lets the resident tap ✅/❌ directly in WhatsApp and the system updates automatically via a webhook URL. Version A is the fallback if Meta rejects buttons.
+
+---
+
+### Version A — Text only (fallback, no buttons)
+
 ```
 🔔 *Visitor at Gate*
 
@@ -204,10 +210,10 @@ Someone is waiting at the gate for you.
 🎯 Purpose: *{{4}}*
 🕐 Time: {{5}}
 
-Open the app to Approve or Deny entry 👇
-🔗 {{6}}
+✅ To ALLOW entry, open: {{6}}
+❌ To DENY entry, open: {{7}}
 
-_Guard: {{7}} | {{8}} Society_
+_Guard: {{8}} | {{9}} Society_
 ```
 
 **Variables:**
@@ -218,9 +224,84 @@ _Guard: {{7}} | {{8}} Society_
 | `{{3}}` | Visitor phone | `+91 98765 43210` |
 | `{{4}}` | Visit purpose | `Delivery` |
 | `{{5}}` | Check-in time | `3:45 PM` |
-| `{{6}}` | Approval link | `https://myrentsaathi.com/tenant/visitors` |
+| `{{6}}` | Approve URL | `https://myrentsaathi.com/api/visitor-response?token=TOKEN&action=approve` |
+| `{{7}}` | Reject URL | `https://myrentsaathi.com/api/visitor-response?token=TOKEN&action=reject` |
+| `{{8}}` | Guard name | `Suresh` |
+| `{{9}}` | Society name | `Sunshine Heights` |
+
+> `TOKEN` = a short-lived signed token (see API route section below). One tap → system updates automatically, no login needed.
+
+---
+
+### Version B — Interactive with Quick Reply Buttons ✅ **Recommended**
+
+**Template Type:** `interactive` → `button`  
+**Meta template category:** UTILITY
+
+**Body text:**
+```
+🔔 *Visitor at Gate*
+
+Hi {{1}}! 
+
+Someone is waiting at the gate for *Flat {{2}}*.
+
+👤 *{{3}}*
+📞 {{4}}
+🎯 Purpose: {{5}}
+🕐 Time: {{6}}
+
+_Guard: {{7}} | {{8}} Society_
+```
+
+**Buttons (add in Meta template builder under "Buttons" → "Quick Reply"):**
+| Button | Text | Payload |
+|--------|------|---------|
+| Button 1 | `✅ Allow Entry` | `approve` |
+| Button 2 | `❌ Deny Entry` | `reject` |
+
+**Variables:**
+| # | Value | Example |
+|---|-------|---------|
+| `{{1}}` | Resident first name | `Sneha` |
+| `{{2}}` | Flat number | `B-204` |
+| `{{3}}` | Visitor name | `Ramesh Kumar` |
+| `{{4}}` | Visitor phone | `+91 98765 43210` |
+| `{{5}}` | Visit purpose | `Delivery` |
+| `{{6}}` | Check-in time | `3:45 PM` |
 | `{{7}}` | Guard name | `Suresh` |
 | `{{8}}` | Society name | `Sunshine Heights` |
+
+> When resident taps a button, WhatsApp sends a webhook to your server with the button payload (`approve` / `reject`) + the visitor token from the message context. Your `/api/whatsapp/webhook` route processes it and calls `respondToRequest()`.
+
+---
+
+**How to add buttons in Meta Business Manager:**
+1. Create template → Category: UTILITY → Language: English
+2. In the body, add the text above with variables
+3. Scroll down → click **"Add Button"**
+4. Button type: **Quick Reply**
+5. Add Button 1: text = `✅ Allow Entry`
+6. Add Button 2: text = `❌ Deny Entry`
+7. Submit for review
+
+---
+
+**Webhook flow (for Version B):**
+
+```
+Resident taps "✅ Allow Entry"
+  → WhatsApp sends POST to /api/whatsapp/webhook
+  → payload contains: button_reply.id = "approve", context.id = visit_id token
+  → route calls respondToRequest(requestId, visitId, residentId, role, true)
+  → Guard's screen auto-updates to "Approved" (via 5s polling)
+```
+
+```
+Resident taps "❌ Deny Entry"  
+  → Same flow with approve=false
+  → Visit status → "rejected"
+```
 
 **Trigger point in code:** `app/guard/page.tsx` → after visitor check-in form submit  
 **Recipients:** Tenant or landlord of the flat being visited
@@ -280,6 +361,8 @@ _{{8}} Society_
 **Category:** UTILITY  
 **When to send:** When admin adds a new user (tenant or landlord)
 
+> ⚠️ **Why password was removed:** Meta rejects any template containing words like "password", "OTP", "PIN", or credentials in the body. Send a secure setup link instead — user sets their own password via the link.
+
 ```
 🎉 *Welcome to {{1}}!*
 
@@ -291,10 +374,11 @@ Here's how to get started:
 
 🔑 Login at: {{3}}
 📧 Email: {{4}}
-🔐 Password: {{5}}
+
+👆 Use the link above to set your password and access the app.
 
 *What you can do on the app:*
-{{6}}
+{{5}}
 
 Need help? Chat with *Saathi AI* 🤖 — available 24/7 on the app!
 
@@ -308,13 +392,17 @@ _Team MyRentSaathi_ 🏠
 | `{{2}}` | User first name | `Pooja` |
 | `{{3}}` | Login URL | `https://myrentsaathi.com/login` |
 | `{{4}}` | Their email | `pooja@gmail.com` |
-| `{{5}}` | Temporary password | `Welcome@123` |
-| `{{6}}` | Role-based description | `✅ View & pay rent · 📋 Raise complaints · 📢 Read society notices · 🚗 Track your vehicle` |
+| `{{5}}` | Role-based description | `✅ View & pay rent · 📋 Raise complaints · 📢 Read society notices · 🚗 Track your vehicle` |
 
-**Role-based `{{6}}` values:**
+> **Note:** `{{5}}` was previously `{{6}}` — password variable removed, numbering shifted by one.
+
+**Role-based `{{5}}` values:**
 - **Tenant:** `✅ Pay rent online · 📋 Raise complaints · 📢 Read notices · 🚗 Parking details`
 - **Landlord:** `✅ Manage properties · 💰 Track rent · 🏢 Pay society dues · 📜 Digital agreements`
 - **Guard:** `🚪 Gate entry · ✅ Approve visitors · 🅿️ Verify vehicles`
+
+**How to handle password now:**
+After admin creates the user, admin tells the new user their temporary password separately (via phone call or SMS) OR implement a "Forgot Password" / "Set Password" flow at `/login` in the app. The WhatsApp message only carries the login link — not the credential.
 
 **Trigger point in code:** Admin → Staff/Landlords/Tenants page → after adding new user  
 **Recipients:** The newly added user
@@ -369,9 +457,9 @@ _{{7}} Society_
 | 2 | `mrs_payment_receipt` | Payment received | System (auto) | Payer (tenant/landlord) |
 | 3 | `mrs_maintenance_due` | Society maintenance generated | Admin | All flat owners/tenants |
 | 4 | `mrs_notice_alert` | New notice posted | Admin / Board | All / Tenants / Landlords |
-| 5 | `mrs_visitor_alert` | Visitor at gate | Guard (auto) | Flat resident |
+| 5 | `mrs_visitor_alert` | Visitor at gate | Guard (auto) | Flat resident — **has Accept/Reject buttons** |
 | 6 | `mrs_ticket_update` | Complaint status changed | Admin | Ticket raiser |
-| 7 | `mrs_welcome` | New user added | Admin | New user |
+| 7 | `mrs_welcome` | New user added | Admin | New user — **no password in message** |
 | 8 | `mrs_rent_hike_notice` | Rent hike scheduled | Landlord | Tenant |
 
 ---

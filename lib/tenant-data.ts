@@ -199,6 +199,8 @@ export type TenantAgreement = {
   end_date: string;
   monthly_rent: number;
   security_deposit: number | null;
+  custom_doc_url?: string | null;
+  custom_doc_name?: string | null;
   flat?: { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
   society?: { name: string; city: string; address?: string | null } | null;
   landlord?: { full_name?: string; phone?: string; email?: string } | null;
@@ -215,7 +217,7 @@ export async function getTenantAgreement(email: string): Promise<TenantAgreement
   const { data } = await supabase
     .from("agreements")
     .select(`
-      id, tier, status, start_date, end_date, monthly_rent, security_deposit, landlord_id,
+      id, tier, status, start_date, end_date, monthly_rent, security_deposit, landlord_id, custom_doc_url, custom_doc_name,
       flat:flats(flat_number, block, floor_number, flat_type, area_sqft),
       society:societies(name, city, address)
     `)

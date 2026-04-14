@@ -244,6 +244,11 @@ export default function LandlordAgreements() {
   const [viewAg, setViewAg] = useState<LandlordAgreement | null>(null);
   const [terminating, setTerminating] = useState(false);
 
+  // Custom document upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [docUploading, setDocUploading] = useState(false);
+  const [docRemoving, setDocRemoving] = useState(false);
+
   // Filters
   const [filterTenant, setFilterTenant] = useState("");
   const [filterFlat, setFilterFlat] = useState("");
@@ -330,6 +335,41 @@ export default function LandlordAgreements() {
     setViewAg(null);
     setLoading(true);
     await loadData();
+  }
+
+  async function handleDocUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!viewAg || !e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    if (file.size > 10 * 1024 * 1024) { toast.error("File must be under 10 MB."); return; }
+    setDocUploading(true);
+    const path = `agreements/${viewAg.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const { error: upErr } = await supabase.storage.from("agreements-docs").upload(path, file, { upsert: true });
+    if (upErr) { toast.error("Upload failed: " + upErr.message); setDocUploading(false); return; }
+    const { data: urlData } = supabase.storage.from("agreements-docs").getPublicUrl(path);
+    const publicUrl = urlData?.publicUrl ?? null;
+    const { error: dbErr } = await supabase.from("agreements")
+      .update({ custom_doc_url: publicUrl, custom_doc_name: file.name })
+      .eq("id", viewAg.id);
+    if (dbErr) { toast.error("Failed to save document link."); setDocUploading(false); return; }
+    const updated = { ...viewAg, custom_doc_url: publicUrl, custom_doc_name: file.name };
+    setViewAg(updated);
+    setAgreements(prev => prev.map(a => a.id === viewAg.id ? updated : a));
+    toast.success("Document uploaded!");
+    setDocUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleDocRemove() {
+    if (!viewAg?.custom_doc_url) return;
+    setDocRemoving(true);
+    await supabase.from("agreements")
+      .update({ custom_doc_url: null, custom_doc_name: null })
+      .eq("id", viewAg.id);
+    const updated = { ...viewAg, custom_doc_url: null, custom_doc_name: null };
+    setViewAg(updated);
+    setAgreements(prev => prev.map(a => a.id === viewAg.id ? updated : a));
+    toast.success("Document removed.");
+    setDocRemoving(false);
   }
 
   if (loading) {
@@ -714,6 +754,59 @@ export default function LandlordAgreements() {
                   <span className="px-3 py-1.5 rounded-xl bg-warm-100 border border-border-default text-[11px] font-semibold text-ink-muted">
                     Created: {fmtDate(viewAg.created_at)}
                   </span>
+                </div>
+
+                {/* ── Custom Document ── */}
+                <div>
+                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Custom Document</div>
+                  {viewAg.custom_doc_url ? (
+                    <div className="bg-purple-50 border border-purple-200 rounded-[14px] p-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-lg flex-shrink-0">📎</div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-ink truncate">{viewAg.custom_doc_name ?? "Custom Document"}</div>
+                          <div className="text-[10px] text-ink-muted mt-0.5">Visible to tenant</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <a
+                          href={viewAg.custom_doc_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-xl bg-purple-100 text-purple-700 text-[11px] font-bold cursor-pointer hover:bg-purple-200 transition-colors"
+                        >
+                          View
+                        </a>
+                        <button
+                          onClick={handleDocRemove}
+                          disabled={docRemoving}
+                          className="px-3 py-1.5 rounded-xl border border-red-200 text-red-500 text-[11px] font-bold cursor-pointer hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          {docRemoving ? "..." : "Remove"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-border-default rounded-[14px] p-4 text-center">
+                      <div className="text-2xl mb-1">📎</div>
+                      <div className="text-xs font-semibold text-ink mb-0.5">Attach your own agreement document</div>
+                      <div className="text-[10px] text-ink-muted mb-3">PDF, Word, or image · Max 10 MB · Tenant will be able to view &amp; download it</div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={handleDocUpload}
+                      />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={docUploading}
+                        className="px-4 py-2 rounded-xl bg-purple-500 text-white text-xs font-bold cursor-pointer hover:bg-purple-600 transition-colors disabled:opacity-50"
+                      >
+                        {docUploading ? "Uploading..." : "Upload Document"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
