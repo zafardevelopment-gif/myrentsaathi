@@ -215,9 +215,21 @@ export default function LandlordProperties() {
     const newRent = Number(rentValue);
     if (isNaN(newRent) || newRent <= 0) { toast.error("Enter a valid rent amount."); return; }
     setRentSaving(true);
+
+    // 1. Update flat's monthly_rent
     const { error } = await supabase.from("flats").update({ monthly_rent: newRent }).eq("id", rentFlat.id);
+    if (error) { toast.error("Failed to update rent."); setRentSaving(false); return; }
+
+    // 2. Update expected_amount on current month's pending/overdue rent_payment rows for this flat
+    const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+    await supabase
+      .from("rent_payments")
+      .update({ expected_amount: newRent })
+      .eq("flat_id", rentFlat.id)
+      .eq("month_year", currentMonth)
+      .in("status", ["pending", "overdue"]);
+
     setRentSaving(false);
-    if (error) { toast.error("Failed to update rent."); return; }
     toast.success("Rent updated!");
     setFlats(prev => prev.map(f => f.id === rentFlat.id ? { ...f, monthly_rent: newRent } : f));
     setRentFlat(null);

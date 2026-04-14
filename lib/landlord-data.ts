@@ -451,12 +451,20 @@ export async function getLandlordOverviewStats(email: string) {
 
   const tenantIds = await getTenantIdsForLandlord(userId);
   const rents = tenantIds.length > 0
-    ? (await supabase.from("rent_payments").select("amount, expected_amount, status").in("tenant_id", tenantIds).eq("month_year", currentMonth)).data ?? []
+    ? (await supabase.from("rent_payments").select("amount, expected_amount, status, flat_id").in("tenant_id", tenantIds).eq("month_year", currentMonth)).data ?? []
     : [];
 
   const totalFlats = flats.length;
   const occupiedFlats = flats.filter((f) => f.status === "occupied").length;
-  const expectedRent = rents.reduce((a, r) => a + (r.expected_amount || 0), 0);
+
+  // If rent_payment rows exist use their expected_amount (already updated on rent change).
+  // If no rows yet for this month, fall back to flats.monthly_rent so the number is never stale.
+  const rentedFlatIds = new Set(rents.map((r) => r.flat_id).filter(Boolean));
+  const missingFlatRent = flats
+    .filter((f) => f.status === "occupied" && !rentedFlatIds.has(f.id))
+    .reduce((a, f) => a + (f.monthly_rent || 0), 0);
+
+  const expectedRent = rents.reduce((a, r) => a + (r.expected_amount || 0), 0) + missingFlatRent;
   const collectedRent = rents.filter((r) => r.status === "paid").reduce((a, r) => a + (r.amount || 0), 0);
   const overdueRent = rents.filter((r) => r.status === "overdue").reduce((a, r) => a + (r.expected_amount || 0), 0);
 
