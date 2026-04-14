@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getLandlordRentPayments, getAllLandlordRentPayments, getLandlordUserId, type LandlordRentPayment } from "@/lib/landlord-data";
 import ReceiptModal from "@/components/tenant/ReceiptModal";
+import AddPastPaymentModal from "@/components/landlord/AddPastPaymentModal";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -36,6 +37,9 @@ export default function LandlordRent() {
 
   // Receipt verification
   const [verifying, setVerifying] = useState<string | null>(null);
+
+  // Past payment modal
+  const [showPastPayment, setShowPastPayment] = useState(false);
 
   async function loadData(all: boolean) {
     if (!user?.email) return;
@@ -150,13 +154,21 @@ export default function LandlordRent() {
   return (
     <div>
       <Toaster position="top-center" />
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 gap-2 flex-wrap">
         <h2 className="text-[15px] font-extrabold text-ink">
           💰 Rent Collection — {showAll ? "All Time" : currentMonthLabel}
         </h2>
-        <button onClick={toggleView} className="px-3 py-1.5 rounded-xl border border-border-default text-xs font-bold text-ink-muted cursor-pointer">
-          {showAll ? "This Month" : "All Months"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowPastPayment(true)}
+            className="px-3 py-1.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer flex items-center gap-1.5"
+          >
+            + Past Payment
+          </button>
+          <button onClick={toggleView} className="px-3 py-1.5 rounded-xl border border-border-default text-xs font-bold text-ink-muted cursor-pointer">
+            {showAll ? "This Month" : "All Months"}
+          </button>
+        </div>
       </div>
 
       {/* Summary */}
@@ -383,6 +395,15 @@ export default function LandlordRent() {
           />
         );
       })()}
+
+      {/* Past Payment Modal */}
+      {showPastPayment && user?.email && (
+        <AddPastPaymentModal
+          landlordEmail={user.email}
+          onClose={() => setShowPastPayment(false)}
+          onSuccess={() => { setShowPastPayment(false); loadData(true); setShowAll(true); }}
+        />
+      )}
     </div>
   );
 }
