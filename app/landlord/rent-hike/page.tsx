@@ -5,6 +5,7 @@ import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getLandlordFlats, getLandlordUserId, type LandlordFlat } from "@/lib/landlord-data";
 import { formatCurrency } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { sendRentHikeNotice } from "@/lib/whatsapp";
 import toast, { Toaster } from "react-hot-toast";
 
 type HikeHistory = {
@@ -101,6 +102,23 @@ export default function RentHikePage() {
         notice_type: "financial",
         target_audience: "tenants",
       });
+
+      // 4. WhatsApp notification to tenant (fire-and-forget)
+      const tenantPhone = selectedFlat.tenant?.user?.phone ?? "";
+      const tenantName = selectedFlat.tenant?.user?.full_name ?? "Tenant";
+      if (tenantPhone) {
+        const effectiveDateStr = new Date(effectiveDate).toLocaleDateString("en-IN", {
+          day: "numeric", month: "short", year: "numeric",
+        });
+        sendRentHikeNotice({
+          phone: tenantPhone,
+          fullName: tenantName,
+          flatNumber: `${selectedFlat.flat_number}${selectedFlat.block ? ` (${selectedFlat.block})` : ""}`,
+          currentRent,
+          newRent,
+          effectiveFrom: effectiveDateStr,
+        }).catch(() => {});
+      }
 
       toast.success("Rent updated and notice sent to tenant!");
       setHikeValue("");

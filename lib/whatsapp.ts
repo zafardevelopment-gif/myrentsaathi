@@ -44,13 +44,12 @@ async function sendTemplate(
 // ─── TEMPLATE SENDERS ────────────────────────────────────────
 
 /**
- * mrs_welcome — sent when a new tenant or landlord is created.
+ * mrs_welcome1 — sent when a new tenant or landlord is created.
  *
- * {{1}} Society name
- * {{2}} User first name
- * {{3}} Login URL
- * {{4}} Login email
- * {{5}} Role-based capability description
+ * {{1}} User first name
+ * {{2}} Society name
+ * {{3}} Login email
+ * {{4}} App / login URL
  */
 export async function sendWelcomeMessage(params: {
   phone: string;
@@ -60,17 +59,11 @@ export async function sendWelcomeMessage(params: {
   loginEmail: string;
   loginUrl?: string;
 }): Promise<void> {
-  const roleDesc: Record<string, string> = {
-    tenant:   "✅ Pay rent online · 📋 Raise complaints · 📢 Read notices · 🚗 Parking details",
-    landlord: "✅ Manage properties · 💰 Track rent · 🏢 Pay society dues · 📜 Digital agreements",
-    guard:    "🚪 Gate entry · ✅ Approve visitors · 🅿️ Verify vehicles",
-  };
-  await sendTemplate(params.phone, "mrs_welcome", [
-    params.societyName,
+  await sendTemplate(params.phone, "mrs_welcome1", [
     firstName(params.fullName),
-    params.loginUrl ?? "https://myrentsaathi.com/login",
+    params.societyName,
     params.loginEmail,
-    roleDesc[params.role] ?? roleDesc.tenant,
+    params.loginUrl ?? "https://myrentsaathi.com/login",
   ]);
 }
 
@@ -263,6 +256,34 @@ export async function sendRentDueReminder(params: {
 }
 
 /**
+ * mrs_rent_hike_notice — sent to tenant when landlord increases rent.
+ *
+ * {{1}} Tenant first name
+ * {{2}} Flat number
+ * {{3}} Current rent amount
+ * {{4}} New rent amount
+ * {{5}} Effective from date
+ * {{6}} App link
+ */
+export async function sendRentHikeNotice(params: {
+  phone: string;
+  fullName: string;
+  flatNumber: string;
+  currentRent: number;
+  newRent: number;
+  effectiveFrom: string; // e.g. "1 Jun 2026"
+}): Promise<void> {
+  await sendTemplate(params.phone, "mrs_rent_hike_notice", [
+    firstName(params.fullName),
+    params.flatNumber,
+    params.currentRent.toLocaleString("en-IN"),
+    params.newRent.toLocaleString("en-IN"),
+    params.effectiveFrom,
+    "https://myrentsaathi.com/tenant/payments",
+  ]);
+}
+
+/**
  * mrs_payment_confirmation — sent after successful subscription payment.
  *
  * {{1}} User first name
@@ -284,7 +305,7 @@ export async function sendPaymentConfirmation(params: {
   const dashboardLink = params.planType === "society"
     ? "https://myrentsaathi.com/admin"
     : "https://myrentsaathi.com/landlord";
-  await sendTemplate(params.phone, "mrs_payment_confirmation", [
+  await sendTemplate(params.phone, "mrs_payment_receipt", [
     firstName(params.fullName),
     params.planName,
     `₹${params.amount.toLocaleString("en-IN")}`,

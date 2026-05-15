@@ -11,32 +11,34 @@ Code mein 7 templates use ho rahe hain. Inhe Meta mein **APPROVED** status mein 
 
 ---
 
-### 1. `mrs_welcome`
+### 1. `mrs_welcome1`
 **Trigger:** Naya tenant / landlord / guard add karne par  
-**Variables:** 5
+**Variables:** 4
 
 | # | Variable | Example |
 |---|----------|---------|
-| {{1}} | Society name | Sunshine Apartments |
-| {{2}} | User first name | Rahul |
-| {{3}} | Login URL | https://myrentsaathi.com/login |
-| {{4}} | Login email | rahul@gmail.com |
-| {{5}} | Role description | ✅ Pay rent online · 📋 Raise complaints |
+| {{1}} | User first name | Rahul |
+| {{2}} | Society name | Sunshine Apartments |
+| {{3}} | Login email | rahul@gmail.com |
+| {{4}} | App / login URL | https://myrentsaathi.com/login |
 
 **Template body:**
 ```
-Welcome to {{1}}! 🏠
+Hi {{1}},
 
-Hi {{2}}, your MyRentSaathi account is ready.
+Welcome to {{2}} society on MyRentSaathi.
 
-🔗 Login: {{3}}
-📧 Email: {{4}}
+Your login email: {{3}}
 
-What you can do:
-{{5}}
+Get started using the app: {{4}}
 
-Need help? Reply to this message.
-— MyRentSaathi Team
+You can:
+✅ Pay & pay rent
+📋 Raise complaints
+📢 Read notices
+
+Need help? Chat with us anytime.
+— MyRentSaathi
 ```
 
 ---
@@ -212,36 +214,68 @@ Pay on time to maintain a good record.
 
 ---
 
-### 7. `mrs_payment_confirmation` ⚠️ MISSING — Create Karna Hai
-**Trigger:** Subscription payment successful hone par  
+### 7. `mrs_payment_receipt`
+**Trigger:** Subscription / rent payment successful hone par  
 **Variables:** 6
 
 | # | Variable | Example |
 |---|----------|---------|
 | {{1}} | User first name | Zafar |
-| {{2}} | Plan name | Pro |
-| {{3}} | Amount paid | ₹99 |
-| {{4}} | Valid till | 15 Jun 2026 |
+| {{2}} | Amount paid | ₹99 |
+| {{3}} | Plan / description | Pro Plan |
+| {{4}} | Due date / valid till | 15 Jun 2026 |
 | {{5}} | Payment ID | pay_ABC123xyz |
-| {{6}} | Dashboard link | https://myrentsaathi.com/landlord |
+| {{6}} | App link | https://myrentsaathi.com/landlord |
 
 **Template body:**
 ```
-✅ Payment Confirmed — MyRentSaathi
+✅ Payment Received!
 
 Hi {{1}},
 
-Your subscription payment was successful! 🎉
+Your payment has been successfully received.
 
-📦 Plan: {{2}}
-💰 Amount: {{3}}
-📅 Valid till: {{4}}
+💰 Amount: {{2}}
+📦 Plan: {{3}}
+📅 Due Date: {{4}}
 🧾 Payment ID: {{5}}
 
-Access your dashboard: {{6}}
+Thank you for paying on time! 🙏
 
-Thank you for choosing MyRentSaathi!
-— Team MyRentSaathi
+myrentsaathi — {{6}} Society
+```
+
+---
+
+### 8. `mrs_rent_hike_notice`
+**Trigger:** Landlord ne tenant ka rent badha diya  
+**Variables:** 6
+
+| # | Variable | Example |
+|---|----------|---------|
+| {{1}} | Tenant first name | Rohit |
+| {{2}} | Flat number | C-305 |
+| {{3}} | Current rent | 12,000 |
+| {{4}} | New rent | 13,500 |
+| {{5}} | Effective from date | 1 Jun 2026 |
+| {{6}} | App link | https://myrentsaathi.com/tenant/payments |
+
+**Template body:**
+```
+🏠 Rent Revision Notice
+
+Hi {{1}}!
+
+Your landlord has scheduled a rent revision for your flat.
+
+🏠 Flat: {{2}}
+💰 Current Rent: ₹{{3}}
+📈 New Rent: ₹{{4}}
+📅 Effective From: {{5}}
+
+Please plan accordingly. For any queries, contact your landlord or raise a complaint on the app.
+
+{{6}}
 ```
 
 ---
@@ -415,17 +449,13 @@ Pay rent, raise complaints, and more — all in one place.
 
 ## Status Summary
 
-| Template | Status | Priority |
-|----------|--------|----------|
-| `mrs_welcome` | ❓ Verify karo | High |
-| `mrs_visitor_alert` | ❓ Verify karo | High |
-| `mrs_ticket_update` | ❓ Verify karo | Medium |
-| `mrs_notice_alert` | ❓ Verify karo | Medium |
-| `mrs_maintenance_due` | ❓ Verify karo | High |
-| `mrs_rent_due` | ❓ Verify karo | High |
-| `mrs_payment_confirmation` | ❌ Missing | **Create karo** |
-| `mrs_rent_received` | ❌ Missing | **Create karo** |
-| `mrs_agreement_expiry` | ❌ Missing | **Create karo** |
-| `mrs_subscription_expiry` | ❌ Missing | **Create karo** |
-| `mrs_otp_verification` | ❌ Missing | Medium |
-| `mrs_tenant_moved_in` | ❌ Missing | Medium |
+| Template | Meta Status | Code Status |
+|----------|------------|-------------|
+| `mrs_welcome1` | ✅ Active | ✅ Implemented |
+| `mrs_visitor_alert` | ✅ Active | ✅ Implemented |
+| `mrs_ticket_update` | ✅ Active | ✅ Implemented |
+| `mrs_notice_alert` | ✅ Active | ✅ Implemented |
+| `mrs_maintenance_due` | ✅ Active | ✅ Implemented |
+| `mrs_payment_receipt` | ✅ Active | ✅ Implemented |
+| `mrs_rent_due` | ✅ Active | ✅ Implemented |
+| `mrs_rent_hike_notice` | ✅ Active | ✅ Implemented |

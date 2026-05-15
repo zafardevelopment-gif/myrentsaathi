@@ -397,8 +397,8 @@ export default function SuperAdminSettings() {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         to: testPhone.trim().startsWith("+") ? testPhone.trim() : `+${testPhone.trim()}`,
-                        template: "mrs_welcome",
-                        params: ["Test Society", "Admin", "https://myrentsaathi.com/login", "admin@test.com", "✅ WhatsApp connected successfully"],
+                        template: "mrs_welcome1",
+                        params: ["Admin", "Test Society", "admin@test.com", "https://myrentsaathi.com/login"],
                       }),
                     });
                     const data = await res.json() as { success?: boolean; error?: unknown; reason?: string };
