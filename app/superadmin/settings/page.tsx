@@ -161,6 +161,10 @@ export default function SuperAdminSettings() {
   const [freeTrialInput, setFreeTrialInput] = useState<string>("30");
   const [savingTrial, setSavingTrial] = useState(false);
 
+  // WhatsApp test
+  const [testPhone, setTestPhone] = useState("");
+  const [testingWa, setTestingWa] = useState(false);
+
   // Platform config (Razorpay + WhatsApp)
   const [config, setConfig] = useState<PlatformConfig>(EMPTY_CONFIG);
   const [razorpayDraft, setRazorpayDraft] = useState<PlatformConfig>(EMPTY_CONFIG);
@@ -356,7 +360,7 @@ export default function SuperAdminSettings() {
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 mb-3">
             <button
               disabled={savingConfig || !configLoaded}
               onClick={() => handleSaveConfig({
@@ -370,6 +374,55 @@ export default function SuperAdminSettings() {
             <button onClick={() => { setEditingItem(null); setWhatsappDraft(config); }} className="px-4 py-2 rounded-xl border border-border-default text-[11px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 transition-colors">
               Cancel
             </button>
+          </div>
+
+          {/* WhatsApp Test */}
+          <div className="border-t border-border-default pt-3">
+            <div className="text-[10px] font-bold text-ink-muted mb-2">Test WhatsApp Connection</div>
+            <div className="flex gap-2">
+              <input
+                type="tel"
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="919876543210 (with country code)"
+                className="flex-1 px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-white focus:outline-none focus:border-green-400 font-mono"
+              />
+              <button
+                disabled={testingWa || !testPhone.trim()}
+                onClick={async () => {
+                  setTestingWa(true);
+                  try {
+                    const res = await fetch("/api/whatsapp/send", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        to: testPhone.trim().startsWith("+") ? testPhone.trim() : `+${testPhone.trim()}`,
+                        template: "mrs_welcome",
+                        params: ["Test Society", "Admin", "https://myrentsaathi.com/login", "admin@test.com", "✅ WhatsApp connected successfully"],
+                      }),
+                    });
+                    const data = await res.json() as { success?: boolean; error?: unknown; reason?: string };
+                    if (data.success) {
+                      toast.success("✅ WhatsApp test message sent! Check your phone.");
+                    } else {
+                      const errMsg = data.reason ?? JSON.stringify(data.error ?? "Unknown error");
+                      toast.error(`WhatsApp error: ${errMsg}`);
+                      console.error("[WA Test]", data);
+                    }
+                  } catch (err) {
+                    toast.error(`Network error: ${String(err)}`);
+                  } finally {
+                    setTestingWa(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-green-600 text-white text-[11px] font-bold cursor-pointer hover:bg-green-700 transition-colors disabled:opacity-60"
+              >
+                {testingWa ? "Sending..." : "Send Test"}
+              </button>
+            </div>
+            <p className="text-[9px] text-ink-muted mt-1">
+              Save karne ke baad test karen. Phone number format: 919876543210 (country code + number, no +)
+            </p>
           </div>
         </div>
       );

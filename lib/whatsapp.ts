@@ -27,7 +27,11 @@ async function sendTemplate(
   const to = toE164(phone);
   if (!to || to.length < 10) return; // skip invalid phones silently
   try {
-    await fetch("/api/whatsapp/send", {
+    // Works from both client (relative URL) and server (absolute URL needed)
+    const url = typeof window !== "undefined"
+      ? "/api/whatsapp/send"
+      : `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/whatsapp/send`;
+    await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to, template, params }),
@@ -255,5 +259,37 @@ export async function sendRentDueReminder(params: {
     dueDate,
     params.flatNumber,
     "https://myrentsaathi.com/tenant/payments",
+  ]);
+}
+
+/**
+ * mrs_payment_confirmation — sent after successful subscription payment.
+ *
+ * {{1}} User first name
+ * {{2}} Plan name (e.g. "Pro")
+ * {{3}} Amount paid (e.g. "₹99")
+ * {{4}} Plan valid till date
+ * {{5}} Payment ID
+ * {{6}} Dashboard link
+ */
+export async function sendPaymentConfirmation(params: {
+  phone: string;
+  fullName: string;
+  planName: string;
+  amount: number;
+  validTill: string; // human readable e.g. "15 Jun 2026"
+  paymentId: string;
+  planType: "society" | "landlord";
+}): Promise<void> {
+  const dashboardLink = params.planType === "society"
+    ? "https://myrentsaathi.com/admin"
+    : "https://myrentsaathi.com/landlord";
+  await sendTemplate(params.phone, "mrs_payment_confirmation", [
+    firstName(params.fullName),
+    params.planName,
+    `₹${params.amount.toLocaleString("en-IN")}`,
+    params.validTill,
+    params.paymentId,
+    dashboardLink,
   ]);
 }

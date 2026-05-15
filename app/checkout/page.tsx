@@ -6,6 +6,7 @@ import { useAuth } from "@/components/providers/MockAuthProvider";
 import { activatePaidPlan } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase";
 import { validatePromo, applyPromo, type PromoResult } from "@/lib/promos-data";
+import { sendPaymentConfirmation } from "@/lib/whatsapp";
 import toast, { Toaster } from "react-hot-toast";
 
 // ── Duration options ──────────────────────────────────────────
@@ -146,6 +147,22 @@ function CheckoutContent() {
             });
 
             if (!result.success) throw new Error(result.error ?? "Plan activate nahi hua");
+
+            // WhatsApp payment confirmation (fire-and-forget)
+            const userPhone = (user as unknown as Record<string, string>).phone ?? "";
+            if (userPhone) {
+              const validTill = new Date(Date.now() + duration.months * 30 * 24 * 60 * 60 * 1000)
+                .toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+              sendPaymentConfirmation({
+                phone: userPhone,
+                fullName: (user as unknown as Record<string, string>).full_name ?? user.name ?? "",
+                planName,
+                amount: priceAfterPromo,
+                validTill,
+                paymentId: response.razorpay_payment_id,
+                planType,
+              }).catch(() => {});
+            }
 
             toast.success(`${planName} plan activate ho gaya!`);
             router.push(planType === "society" ? "/admin" : "/landlord");
