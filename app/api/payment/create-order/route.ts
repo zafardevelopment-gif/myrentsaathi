@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       flatId?: string;
       tenantId?: string;
       monthYear?: string;
-      type: "rent" | "maintenance";
+      type: "rent" | "maintenance" | "subscription";
       description?: string;
     };
 

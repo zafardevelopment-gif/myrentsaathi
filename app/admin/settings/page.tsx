@@ -6,6 +6,7 @@ import { getAdminSociety, updateSocietyDetails, type AdminSociety } from "@/lib/
 import toast from "react-hot-toast";
 import { Toaster } from "react-hot-toast";
 import SubscriptionSection from "@/components/settings/SubscriptionSection";
+import BankAccountForm from "@/components/settings/BankAccountForm";
 
 export default function AdminSettings() {
   const { user } = useAuth();
@@ -16,6 +17,7 @@ export default function AdminSettings() {
   const [savingSplit, setSavingSplit] = useState(false);
   const [form, setForm] = useState({ name: "", city: "", address: "", maintenance_amount: "", payment_due_day: "" });
   const [splitMode, setSplitMode] = useState<"total_flats" | "active_flats">("total_flats");
+  const [openPanel, setOpenPanel] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.email) return;
@@ -30,7 +32,7 @@ export default function AdminSettings() {
           maintenance_amount: s.maintenance_amount ? String(s.maintenance_amount) : "",
           payment_due_day: s.payment_due_day ? String(s.payment_due_day) : "",
         });
-        setSplitMode((s.expense_split_mode === "active_flats" ? "active_flats" : "total_flats"));
+        setSplitMode(s.expense_split_mode === "active_flats" ? "active_flats" : "total_flats");
       }
       setLoading(false);
     }
@@ -85,10 +87,19 @@ export default function AdminSettings() {
     );
   }
 
-  const STATIC_SETTINGS = [
-    { label: "Bank Account",        desc: "Bank details for maintenance collection",  icon: "🏦" },
-    { label: "Razorpay Integration",desc: "Payment gateway for online collection",     icon: "💳" },
-    { label: "WhatsApp API",        desc: "Meta Business API for notifications",       icon: "📱" },
+  const INTEGRATION_CARDS = [
+    {
+      key: "bank",
+      label: "Bank Account",
+      desc: "Rent & maintenance directly aapke account mein aayega",
+      icon: "🏦",
+    },
+    {
+      key: "whatsapp",
+      label: "WhatsApp Notifications",
+      desc: "Tenant alerts aapke number se jaayenge",
+      icon: "📱",
+    },
   ];
 
   return (
@@ -107,25 +118,13 @@ export default function AdminSettings() {
             </div>
           </div>
           {!editing ? (
-            <button
-              onClick={() => setEditing(true)}
-              className="px-3 py-1.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer"
-            >
+            <button onClick={() => setEditing(true)} className="px-3 py-1.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer">
               Edit
             </button>
           ) : (
             <div className="flex gap-1.5">
-              <button
-                onClick={() => setEditing(false)}
-                className="px-3 py-1.5 rounded-xl bg-warm-100 text-ink text-xs font-bold cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-3 py-1.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60"
-              >
+              <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-xl bg-warm-100 text-ink text-xs font-bold cursor-pointer">Cancel</button>
+              <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60">
                 {saving ? "Saving…" : "Save"}
               </button>
             </div>
@@ -134,92 +133,40 @@ export default function AdminSettings() {
 
         {editing ? (
           <div className="space-y-2.5 mt-2">
-            <div>
-              <label className="text-[11px] font-semibold text-ink-muted block mb-1">Society Name</label>
-              <input
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-ink-muted block mb-1">City</label>
-              <input
-                value={form.city}
-                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                className="w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-ink-muted block mb-1">Address</label>
-              <input
-                value={form.address}
-                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                className="w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-ink-muted block mb-1">Monthly Maintenance Amount (₹)</label>
-              <input
-                type="number"
-                value={form.maintenance_amount}
-                onChange={(e) => setForm((f) => ({ ...f, maintenance_amount: e.target.value }))}
-                className="w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-ink-muted block mb-1">Payment Due Day (1–28)</label>
-              <input
-                type="number"
-                min="1"
-                max="28"
-                placeholder="e.g. 10 = due on 10th of every month"
-                value={form.payment_due_day}
-                onChange={(e) => setForm((f) => ({ ...f, payment_due_day: e.target.value }))}
-                className="w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500"
-              />
-            </div>
+            {[
+              { label: "Society Name", key: "name", type: "text" },
+              { label: "City", key: "city", type: "text" },
+              { label: "Address", key: "address", type: "text" },
+              { label: "Monthly Maintenance Amount (₹)", key: "maintenance_amount", type: "number" },
+              { label: "Payment Due Day (1–28)", key: "payment_due_day", type: "number" },
+            ].map((field) => (
+              <div key={field.key}>
+                <label className="text-[11px] font-semibold text-ink-muted block mb-1">{field.label}</label>
+                <input
+                  type={field.type}
+                  value={form[field.key as keyof typeof form]}
+                  onChange={(e) => setForm((f) => ({ ...f, [field.key]: e.target.value }))}
+                  className="w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500"
+                />
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="space-y-1.5 mt-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-ink-muted text-xs">Name</span>
-              <span className="text-ink font-semibold text-xs">{society?.name ?? "—"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-muted text-xs">City</span>
-              <span className="text-ink font-semibold text-xs">{society?.city ?? "—"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-muted text-xs">Address</span>
-              <span className="text-ink font-semibold text-xs">{society?.address ?? "—"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-muted text-xs">Maintenance</span>
-              <span className="text-ink font-semibold text-xs">
-                {society?.maintenance_amount ? `₹${society.maintenance_amount}/mo` : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-muted text-xs">Payment Due Day</span>
-              <span className="text-ink font-semibold text-xs">
-                {society?.payment_due_day ? `${society.payment_due_day}th of every month` : "—"}
-              </span>
-            </div>
+          <div className="space-y-1.5 mt-2">
+            {[
+              { label: "Name", value: society?.name },
+              { label: "City", value: society?.city },
+              { label: "Address", value: society?.address },
+              { label: "Maintenance", value: society?.maintenance_amount ? `₹${society.maintenance_amount}/mo` : null },
+              { label: "Payment Due Day", value: society?.payment_due_day ? `${society.payment_due_day}th of every month` : null },
+            ].map((row) => (
+              <div key={row.label} className="flex justify-between">
+                <span className="text-ink-muted text-xs">{row.label}</span>
+                <span className="text-ink font-semibold text-xs">{row.value ?? "—"}</span>
+              </div>
+            ))}
           </div>
         )}
-      </div>
-
-      {/* Maintenance Settings */}
-      <div className="bg-white rounded-[14px] p-4 border border-border-default mb-2 flex items-center gap-3 cursor-pointer hover:bg-warm-50 transition-colors">
-        <span className="text-[22px]">💰</span>
-        <div className="flex-1">
-          <div className="text-sm font-bold text-ink">Maintenance Settings</div>
-          <div className="text-[11px] text-ink-muted">
-            {society?.maintenance_amount ? `₹${society.maintenance_amount}/month` : "Amount, frequency, due date, late fees"}
-          </div>
-        </div>
-        <span className="text-ink-muted">→</span>
       </div>
 
       {/* Expense Split Mode */}
@@ -232,34 +179,22 @@ export default function AdminSettings() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => handleSaveSplit("total_flats")}
-            disabled={savingSplit}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-60 ${
-              splitMode === "total_flats"
-                ? "bg-brand-500 text-white border-brand-500"
-                : "bg-warm-50 text-ink-muted border-border-default hover:border-brand-400"
-            }`}
-          >
-            🏢 Total Flats
-            <div className={`text-[10px] font-normal mt-0.5 ${splitMode === "total_flats" ? "text-white/80" : "text-ink-muted"}`}>
-              From society profile ({society?.total_flats ?? "—"} flats)
-            </div>
-          </button>
-          <button
-            onClick={() => handleSaveSplit("active_flats")}
-            disabled={savingSplit}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-60 ${
-              splitMode === "active_flats"
-                ? "bg-brand-500 text-white border-brand-500"
-                : "bg-warm-50 text-ink-muted border-border-default hover:border-brand-400"
-            }`}
-          >
-            ✅ Active Flats
-            <div className={`text-[10px] font-normal mt-0.5 ${splitMode === "active_flats" ? "text-white/80" : "text-ink-muted"}`}>
-              Only flats in system
-            </div>
-          </button>
+          {([
+            { mode: "total_flats", label: "🏢 Total Flats", sub: `From society profile (${society?.total_flats ?? "—"} flats)` },
+            { mode: "active_flats", label: "✅ Active Flats", sub: "Only flats in system" },
+          ] as const).map(({ mode, label, sub }) => (
+            <button
+              key={mode}
+              onClick={() => handleSaveSplit(mode)}
+              disabled={savingSplit}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-60 ${
+                splitMode === mode ? "bg-brand-500 text-white border-brand-500" : "bg-warm-50 text-ink-muted border-border-default hover:border-brand-400"
+              }`}
+            >
+              {label}
+              <div className={`text-[10px] font-normal mt-0.5 ${splitMode === mode ? "text-white/80" : "text-ink-muted"}`}>{sub}</div>
+            </button>
+          ))}
         </div>
         <div className="text-[10px] text-ink-muted mt-2">
           {splitMode === "total_flats"
@@ -268,14 +203,37 @@ export default function AdminSettings() {
         </div>
       </div>
 
-      {STATIC_SETTINGS.map((s) => (
-        <div key={s.label} className="bg-white rounded-[14px] p-4 border border-border-default mb-2 flex items-center gap-3 cursor-pointer hover:bg-warm-50 transition-colors">
-          <span className="text-[22px]">{s.icon}</span>
-          <div className="flex-1">
-            <div className="text-sm font-bold text-ink">{s.label}</div>
-            <div className="text-[11px] text-ink-muted">{s.desc}</div>
+      {/* Integration Cards */}
+      {INTEGRATION_CARDS.map((card) => (
+        <div key={card.key} className="bg-white rounded-[14px] border border-border-default mb-2 overflow-hidden">
+          <div
+            className="p-4 flex items-center gap-3 cursor-pointer hover:bg-warm-50 transition-colors"
+            onClick={() => setOpenPanel(openPanel === card.key ? null : card.key)}
+          >
+            <span className="text-[22px]">{card.icon}</span>
+            <div className="flex-1">
+              <div className="text-sm font-bold text-ink">{card.label}</div>
+              <div className="text-[11px] text-ink-muted">{card.desc}</div>
+            </div>
+            <span className="text-ink-muted text-sm">{openPanel === card.key ? "▲" : "▼"}</span>
           </div>
-          <span className="text-ink-muted">→</span>
+
+          {openPanel === card.key && (
+            <div className="px-4 pb-4 border-t border-border-light pt-3">
+              {card.key === "bank" && society?.id && user?.id && (
+                <BankAccountForm
+                  entityType="society"
+                  entityId={society.id}
+                  userId={user.id}
+                />
+              )}
+              {card.key === "whatsapp" && (
+                <div className="py-2 text-[11px] text-ink-muted">
+                  WhatsApp notifications platform-level configured hain. Super Admin se contact karen custom number ke liye.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ))}
 

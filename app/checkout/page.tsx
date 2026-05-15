@@ -72,6 +72,16 @@ function CheckoutContent() {
     if (!planName || !basePrice) router.push("/select-plan");
   }, [planName, basePrice, router]);
 
+  // Load Razorpay checkout script
+  useEffect(() => {
+    if (document.getElementById("razorpay-script")) return;
+    const script = document.createElement("script");
+    script.id = "razorpay-script";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
+
   // ── Price calculations ──────────────────────────────────────
   const priceAfterDuration  = Math.round(monthlyTotal * (1 - duration.discount / 100));
   const totalForPeriod      = priceAfterPriceCalc(priceAfterDuration, duration.months);
@@ -104,25 +114,88 @@ function CheckoutContent() {
     if (!user) { router.push("/"); return; }
     setPaying(true);
 
-    // Payment gateway not active yet — directly activate plan
-    const result = await activatePaidPlan({
-      userId: user.id,
-      societyId: societyId,
-      planType: planType,
-      planName: planName,
-      planPrice: priceAfterPromo,
-      durationDays: duration.months * 30,
-    });
+    try {
+      // Step 1: Create Razorpay order on server
+      const orderRes = await fetch("/api/payment/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: priceAfterPromo,
+          type: "subscription",
+          description: `${planName} plan - ${duration.months} month(s)`,
+        }),
+      });
 
-    setPaying(false);
+      const orderData = await orderRes.json() as {
+        orderId?: string; amount?: number; currency?: string; keyId?: string; error?: string;
+      };
 
-    if (!result.success) {
-      toast.error(result.error ?? "Plan activate nahi hua.");
-      return;
+      if (!orderRes.ok || !orderData.orderId) {
+        toast.error(orderData.error ?? "Payment initiate nahi ho saka.");
+        setPaying(false);
+        return;
+      }
+
+      // Step 2: Open Razorpay checkout modal
+      const rzp = new window.Razorpay({
+        key: orderData.keyId!,
+        amount: orderData.amount!,
+        currency: orderData.currency ?? "INR",
+        name: "MyRentSaathi",
+        description: `${planName} plan - ${duration.months} month(s)`,
+        order_id: orderData.orderId,
+        prefill: {
+          name: (user as unknown as Record<string, string>).full_name ?? user.name ?? "",
+          email: user.email ?? "",
+          contact: (user as unknown as Record<string, string>).phone ?? "",
+        },
+        theme: { color: "#e07b2e" },
+        handler: async (response) => {
+          // Step 3: Verify payment on server
+          try {
+            const verifyRes = await fetch("/api/payment/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                type: "subscription",
+              }),
+            });
+            const verifyData = await verifyRes.json() as { success?: boolean; error?: string };
+            if (!verifyData.success) throw new Error(verifyData.error ?? "Verification failed");
+
+            // Step 4: Activate plan
+            const result = await activatePaidPlan({
+              userId: user.id,
+              societyId: societyId,
+              planType: planType,
+              planName: planName,
+              planPrice: priceAfterPromo,
+              durationDays: duration.months * 30,
+            });
+
+            if (!result.success) throw new Error(result.error ?? "Plan activate nahi hua");
+
+            toast.success(`${planName} plan activate ho gaya!`);
+            router.push(planType === "society" ? "/admin" : "/landlord");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Payment verify nahi hua.");
+          } finally {
+            setPaying(false);
+          }
+        },
+        modal: {
+          ondismiss: () => setPaying(false),
+        },
+      });
+
+      rzp.open();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kuch gadbad ho gaya.");
+      setPaying(false);
     }
-
-    toast.success(`${planName} plan ${duration.months} month ke liye activate ho gaya!`);
-    router.push(planType === "society" ? "/admin" : "/landlord");
   }
 
   const unitLabel = planType === "society" ? "landlord" : "flat";
@@ -267,12 +340,10 @@ function CheckoutContent() {
           </div>
         </div>
 
-        {/* ── Payment Gateway Notice ── */}
-        <div className="bg-amber-900/20 border border-amber-700/30 rounded-2xl px-4 py-3 flex items-start gap-3">
-          <span className="text-amber-400 text-lg mt-0.5">🔧</span>
-          <div className="text-xs text-amber-300/80 leading-relaxed">
-            <strong className="text-amber-300">Payment gateway coming soon.</strong> Abhi "Pay Now" click karne se plan directly activate ho jaayega. Actual payment integration jald aayegi.
-          </div>
+        {/* ── Security badge ── */}
+        <div className="flex items-center justify-center gap-2 text-gray-500 text-xs">
+          <span>🔒</span>
+          <span>Secured by Razorpay · 256-bit SSL encryption</span>
         </div>
 
         {/* ── Pay Now Button ── */}
@@ -282,7 +353,7 @@ function CheckoutContent() {
           className="w-full py-4 rounded-2xl bg-[#e07b2e] text-white font-extrabold text-base cursor-pointer hover:bg-[#c96d24] transition-colors disabled:opacity-60 shadow-[0_4px_20px_rgba(224,123,46,0.4)]"
         >
           {paying
-            ? "Activating..."
+            ? "Processing..."
             : `Pay ₹${priceAfterPromo.toLocaleString("en-IN")} & Activate Plan →`}
         </button>
 
