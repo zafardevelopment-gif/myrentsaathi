@@ -2,36 +2,172 @@
 
 import { useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
+import toast, { Toaster } from "react-hot-toast";
 
-const PROMO_CODES = [
-  { code: "LAUNCH50",    type: "percentage", value: 50,   maxUses: 500,  used: 234, minPlan: "any",          validTill: "2026-04-30", status: "active",  savings: 356000, createdBy: "System",            revenue: 0 },
-  { code: "SOCIETY20",   type: "percentage", value: 20,   maxUses: 200,  used: 89,  minPlan: "professional", validTill: "2026-06-30", status: "active",  savings: 120000, createdBy: "Admin",             revenue: 0 },
-  { code: "FLAT1000",    type: "fixed",      value: 1000, maxUses: 1000, used: 445, minPlan: "any",          validTill: "2026-12-31", status: "active",  savings: 445000, createdBy: "System",            revenue: 0 },
-  { code: "AGENTRAHUL",  type: "percentage", value: 10,   maxUses: 100,  used: 45,  minPlan: "any",          validTill: "2026-12-31", status: "active",  savings: 45000,  createdBy: "Agent: Rahul Verma",revenue: 185000 },
-  { code: "AGENTSNEHA",  type: "percentage", value: 10,   maxUses: 100,  used: 28,  minPlan: "any",          validTill: "2026-12-31", status: "active",  savings: 28000,  createdBy: "Agent: Sneha Kulkarni", revenue: 100000 },
-  { code: "NRI30",       type: "percentage", value: 30,   maxUses: 100,  used: 28,  minPlan: "nri",          validTill: "2026-09-30", status: "active",  savings: 42000,  createdBy: "Admin",             revenue: 0 },
-  { code: "DIWALI25",    type: "percentage", value: 25,   maxUses: 300,  used: 300, minPlan: "any",          validTill: "2025-11-30", status: "expired", savings: 225000, createdBy: "System",            revenue: 0 },
-  { code: "SUMMER10",    type: "percentage", value: 10,   maxUses: 400,  used: 145, minPlan: "any",          validTill: "2026-08-31", status: "active",  savings: 65000,  createdBy: "Admin",             revenue: 0 },
+// ── Types ─────────────────────────────────────────────────────
+
+type PromoStatus = "active" | "expired" | "disabled";
+
+type Promo = {
+  code: string;
+  type: "percentage" | "fixed";
+  value: number;
+  maxUses: number;
+  used: number;
+  minPlan: string;
+  validTill: string;
+  status: PromoStatus;
+  savings: number;
+  createdBy: string;
+  revenue: number;
+};
+
+// ── Seed data (replace with DB fetch when ready) ──────────────
+
+const SEED_PROMOS: Promo[] = [
+  { code: "LAUNCH50",   type: "percentage", value: 50,   maxUses: 500,  used: 234, minPlan: "any",          validTill: "2026-04-30", status: "active",   savings: 356000, createdBy: "System",              revenue: 0 },
+  { code: "SOCIETY20",  type: "percentage", value: 20,   maxUses: 200,  used: 89,  minPlan: "professional", validTill: "2026-06-30", status: "active",   savings: 120000, createdBy: "Admin",               revenue: 0 },
+  { code: "FLAT1000",   type: "fixed",      value: 1000, maxUses: 1000, used: 445, minPlan: "any",          validTill: "2026-12-31", status: "active",   savings: 445000, createdBy: "System",              revenue: 0 },
+  { code: "AGENTRAHUL", type: "percentage", value: 10,   maxUses: 100,  used: 45,  minPlan: "any",          validTill: "2026-12-31", status: "active",   savings: 45000,  createdBy: "Agent: Rahul Verma",  revenue: 185000 },
+  { code: "AGENTSNEHA", type: "percentage", value: 10,   maxUses: 100,  used: 28,  minPlan: "any",          validTill: "2026-12-31", status: "active",   savings: 28000,  createdBy: "Agent: Sneha Kulkarni", revenue: 100000 },
+  { code: "NRI30",      type: "percentage", value: 30,   maxUses: 100,  used: 28,  minPlan: "nri",          validTill: "2026-09-30", status: "active",   savings: 42000,  createdBy: "Admin",               revenue: 0 },
+  { code: "DIWALI25",   type: "percentage", value: 25,   maxUses: 300,  used: 300, minPlan: "any",          validTill: "2025-11-30", status: "expired",  savings: 225000, createdBy: "System",              revenue: 0 },
+  { code: "SUMMER10",   type: "percentage", value: 10,   maxUses: 400,  used: 145, minPlan: "any",          validTill: "2026-08-31", status: "active",   savings: 65000,  createdBy: "Admin",               revenue: 0 },
 ];
 
-export default function SuperAdminPromos() {
-  const [showForm, setShowForm] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("all");
+const EMPTY_FORM = {
+  code: "", type: "percentage" as "percentage" | "fixed",
+  value: "", maxUses: "", minPlan: "any", validTill: "", linkedAgent: "",
+};
 
-  const filtered = PROMO_CODES.filter((p) =>
+// ── Main Page ─────────────────────────────────────────────────
+
+export default function SuperAdminPromos() {
+  const [promos, setPromos] = useState<Promo[]>(SEED_PROMOS);
+  const [filterStatus, setFilterStatus] = useState<"all" | PromoStatus>("all");
+  const [showForm, setShowForm] = useState(false);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+
+  const filtered = promos.filter((p) =>
     filterStatus === "all" ? true : p.status === filterStatus
   );
 
-  const activeCount = PROMO_CODES.filter((p) => p.status === "active").length;
-  const totalSavings = PROMO_CODES.reduce((a, p) => a + p.savings, 0);
-  const totalUsed = PROMO_CODES.reduce((a, p) => a + p.used, 0);
-  const agentRevenue = PROMO_CODES.filter((p) => p.createdBy.startsWith("Agent")).reduce((a, p) => a + p.revenue, 0);
+  const activeCount  = promos.filter((p) => p.status === "active").length;
+  const totalSavings = promos.reduce((a, p) => a + p.savings, 0);
+  const totalUsed    = promos.reduce((a, p) => a + p.used, 0);
+  const agentRevenue = promos.filter((p) => p.createdBy.startsWith("Agent")).reduce((a, p) => a + p.revenue, 0);
+
+  function openCreate() {
+    setEditingCode(null);
+    setForm(EMPTY_FORM);
+    setShowForm(true);
+    setTimeout(() => document.getElementById("promo-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
+  function openEdit(p: Promo) {
+    setEditingCode(p.code);
+    setForm({
+      code: p.code,
+      type: p.type,
+      value: String(p.value),
+      maxUses: String(p.maxUses),
+      minPlan: p.minPlan,
+      validTill: p.validTill,
+      linkedAgent: p.createdBy.startsWith("Agent") ? p.createdBy.replace("Agent: ", "") : "",
+    });
+    setShowForm(true);
+    setTimeout(() => document.getElementById("promo-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
+  function cancelForm() {
+    setShowForm(false);
+    setEditingCode(null);
+    setForm(EMPTY_FORM);
+  }
+
+  function validate() {
+    if (!form.code.trim()) { toast.error("Promo code required"); return false; }
+    if (!/^[A-Z0-9]+$/.test(form.code.toUpperCase())) { toast.error("Code mein sirf letters aur numbers hone chahiye"); return false; }
+    if (!form.value || isNaN(Number(form.value)) || Number(form.value) <= 0) { toast.error("Valid discount value required"); return false; }
+    if (form.type === "percentage" && Number(form.value) > 100) { toast.error("Percentage 100 se zyada nahi ho sakta"); return false; }
+    if (!form.maxUses || isNaN(Number(form.maxUses)) || Number(form.maxUses) <= 0) { toast.error("Valid max uses required"); return false; }
+    if (!form.validTill) { toast.error("Valid till date required"); return false; }
+    if (new Date(form.validTill) < new Date() && !editingCode) { toast.error("Valid till date past mein nahi ho sakti"); return false; }
+    return true;
+  }
+
+  async function handleSave() {
+    if (!validate()) return;
+    setSaving(true);
+
+    // Simulate async save (replace with actual API call when DB ready)
+    await new Promise((r) => setTimeout(r, 600));
+
+    const code = form.code.trim().toUpperCase();
+
+    if (editingCode) {
+      // Update existing
+      setPromos((prev) => prev.map((p) =>
+        p.code === editingCode
+          ? {
+              ...p,
+              type: form.type,
+              value: Number(form.value),
+              maxUses: Number(form.maxUses),
+              minPlan: form.minPlan,
+              validTill: form.validTill,
+              createdBy: form.linkedAgent ? `Agent: ${form.linkedAgent}` : p.createdBy,
+            }
+          : p
+      ));
+      toast.success(`Promo code ${editingCode} updated!`);
+    } else {
+      // Check duplicate
+      if (promos.some((p) => p.code === code)) {
+        toast.error(`Code "${code}" already exists`);
+        setSaving(false);
+        return;
+      }
+      const newPromo: Promo = {
+        code,
+        type: form.type,
+        value: Number(form.value),
+        maxUses: Number(form.maxUses),
+        used: 0,
+        minPlan: form.minPlan,
+        validTill: form.validTill,
+        status: "active",
+        savings: 0,
+        createdBy: form.linkedAgent ? `Agent: ${form.linkedAgent}` : "Admin",
+        revenue: 0,
+      };
+      setPromos((prev) => [newPromo, ...prev]);
+      toast.success(`Promo code ${code} created!`);
+    }
+
+    setSaving(false);
+    cancelForm();
+  }
+
+  function handleDisable(code: string) {
+    setPromos((prev) => prev.map((p) => p.code === code ? { ...p, status: "disabled" as PromoStatus } : p));
+    toast.success(`${code} disabled`);
+  }
+
+  function handleEnable(code: string) {
+    setPromos((prev) => prev.map((p) => p.code === code ? { ...p, status: "active" as PromoStatus } : p));
+    toast.success(`${code} enabled`);
+  }
 
   return (
     <div>
+      <Toaster position="top-center" />
+
       {/* Stats */}
       <div className="flex gap-2.5 flex-wrap mb-4">
-        <StatCard icon="🏷️" label="Active Promo Codes" value={String(activeCount)} sub={`${PROMO_CODES.length} total`} accent="text-green-600" />
+        <StatCard icon="🏷️" label="Active Promo Codes" value={String(activeCount)} sub={`${promos.length} total`} accent="text-green-600" />
         <StatCard icon="📊" label="Total Uses" value={String(totalUsed)} sub="Across all codes" accent="text-amber-600" />
         <StatCard icon="💸" label="Discounts Given" value={`₹${(totalSavings / 100000).toFixed(2)}L`} sub="Total savings offered" accent="text-red-500" />
         <StatCard icon="💰" label="Revenue via Agent Codes" value={`₹${(agentRevenue / 1000).toFixed(0)}K`} sub="Agent-linked promos" accent="text-purple-600" />
@@ -40,7 +176,7 @@ export default function SuperAdminPromos() {
       {/* Toolbar */}
       <div className="flex flex-wrap gap-2.5 justify-between items-center mb-4">
         <div className="flex gap-2">
-          {(["all", "active", "expired"] as const).map((s) => (
+          {(["all", "active", "expired", "disabled"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
@@ -55,42 +191,121 @@ export default function SuperAdminPromos() {
           ))}
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={openCreate}
           className="px-4 py-2 rounded-xl bg-amber-500 text-white text-[12px] font-bold cursor-pointer hover:bg-amber-600 transition-colors"
         >
           + Create Promo Code
         </button>
       </div>
 
-      {/* Create Form */}
+      {/* Create / Edit Form */}
       {showForm && (
-        <div className="bg-white rounded-[14px] p-4 border-2 border-amber-300 mb-4">
-          <div className="text-[13px] font-extrabold text-amber-600 mb-3">Create New Promo Code</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-3">
-            {[
-              { l: "Code",            p: "e.g., SUMMER30" },
-              { l: "Type",            p: "percentage / fixed" },
-              { l: "Discount Value",  p: "30 (%) or 1000 (₹)" },
-              { l: "Max Uses",        p: "e.g., 500" },
-              { l: "Min Plan",        p: "any / professional / nri" },
-              { l: "Valid Till",      p: "2026-12-31" },
-              { l: "Linked Agent",    p: "Select agent (optional)" },
-            ].map((f) => (
-              <div key={f.l}>
-                <div className="text-[10px] font-bold text-ink-muted mb-1">{f.l}</div>
-                <input
-                  placeholder={f.p}
-                  className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-warm-50 focus:outline-none focus:border-amber-400"
-                />
-              </div>
-            ))}
+        <div id="promo-form" className="bg-white rounded-[14px] p-4 border-2 border-amber-300 mb-4">
+          <div className="text-[13px] font-extrabold text-amber-600 mb-3">
+            {editingCode ? `Edit: ${editingCode}` : "Create New Promo Code"}
           </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+            {/* Code */}
+            <div>
+              <div className="text-[10px] font-bold text-ink-muted mb-1">Code <span className="text-red-400">*</span></div>
+              <input
+                value={form.code}
+                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") }))}
+                placeholder="e.g., SUMMER30"
+                disabled={!!editingCode}
+                className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-warm-50 focus:outline-none focus:border-amber-400 font-mono uppercase disabled:opacity-60"
+              />
+            </div>
+
+            {/* Type */}
+            <div>
+              <div className="text-[10px] font-bold text-ink-muted mb-1">Type <span className="text-red-400">*</span></div>
+              <select
+                value={form.type}
+                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "percentage" | "fixed" }))}
+                className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-warm-50 focus:outline-none focus:border-amber-400"
+              >
+                <option value="percentage">Percentage (%)</option>
+                <option value="fixed">Fixed (₹)</option>
+              </select>
+            </div>
+
+            {/* Value */}
+            <div>
+              <div className="text-[10px] font-bold text-ink-muted mb-1">
+                Discount Value <span className="text-red-400">*</span>
+                <span className="font-normal ml-1">{form.type === "percentage" ? "(%)" : "(₹)"}</span>
+              </div>
+              <input
+                type="number"
+                value={form.value}
+                onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
+                placeholder={form.type === "percentage" ? "e.g., 30" : "e.g., 1000"}
+                className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-warm-50 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            {/* Max Uses */}
+            <div>
+              <div className="text-[10px] font-bold text-ink-muted mb-1">Max Uses <span className="text-red-400">*</span></div>
+              <input
+                type="number"
+                value={form.maxUses}
+                onChange={(e) => setForm((f) => ({ ...f, maxUses: e.target.value }))}
+                placeholder="e.g., 500"
+                className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-warm-50 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            {/* Min Plan */}
+            <div>
+              <div className="text-[10px] font-bold text-ink-muted mb-1">Min Plan</div>
+              <select
+                value={form.minPlan}
+                onChange={(e) => setForm((f) => ({ ...f, minPlan: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-warm-50 focus:outline-none focus:border-amber-400"
+              >
+                <option value="any">Any Plan</option>
+                <option value="starter">Starter+</option>
+                <option value="professional">Professional+</option>
+                <option value="enterprise">Enterprise</option>
+                <option value="nri">NRI</option>
+              </select>
+            </div>
+
+            {/* Valid Till */}
+            <div>
+              <div className="text-[10px] font-bold text-ink-muted mb-1">Valid Till <span className="text-red-400">*</span></div>
+              <input
+                type="date"
+                value={form.validTill}
+                onChange={(e) => setForm((f) => ({ ...f, validTill: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-warm-50 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            {/* Linked Agent */}
+            <div className="col-span-2 sm:col-span-3">
+              <div className="text-[10px] font-bold text-ink-muted mb-1">Linked Agent <span className="font-normal">(optional)</span></div>
+              <input
+                value={form.linkedAgent}
+                onChange={(e) => setForm((f) => ({ ...f, linkedAgent: e.target.value }))}
+                placeholder="Agent name (optional)"
+                className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-warm-50 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+          </div>
+
           <div className="flex gap-2">
-            <button className="px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold cursor-pointer hover:bg-amber-600 transition-colors">
-              Create Code
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold cursor-pointer hover:bg-amber-600 transition-colors disabled:opacity-60"
+            >
+              {saving ? "Saving..." : editingCode ? "Save Changes" : "Create Code"}
             </button>
             <button
-              onClick={() => setShowForm(false)}
+              onClick={cancelForm}
               className="px-4 py-2 rounded-xl border border-border-default text-[11px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 transition-colors"
             >
               Cancel
@@ -104,10 +319,20 @@ export default function SuperAdminPromos() {
         {filtered.map((p) => {
           const usedPct = Math.round((p.used / p.maxUses) * 100);
           const isNearMax = usedPct >= 90;
+          const isDisabled = p.status === "disabled";
           return (
-            <div key={p.code} className={`bg-white rounded-[14px] p-4 border ${p.status === "expired" ? "border-border-light opacity-60" : "border-border-default"}`}>
+            <div
+              key={p.code}
+              className={`bg-white rounded-[14px] p-4 border ${
+                p.status === "expired" || isDisabled
+                  ? "border-border-light opacity-60"
+                  : editingCode === p.code
+                  ? "border-amber-400 ring-1 ring-amber-300"
+                  : "border-border-default"
+              }`}
+            >
               <div className="flex flex-wrap justify-between gap-3">
-                {/* Left: Code + badges */}
+                {/* Left */}
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="px-3 py-2 bg-amber-50 border border-dashed border-amber-300 rounded-xl font-mono font-extrabold text-amber-600 text-[14px] tracking-widest flex-shrink-0">
                     {p.code}
@@ -117,7 +342,11 @@ export default function SuperAdminPromos() {
                       <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-green-100 text-green-700">
                         {p.type === "percentage" ? `${p.value}% OFF` : `₹${p.value} OFF`}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${p.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                        p.status === "active" ? "bg-green-100 text-green-700"
+                        : p.status === "disabled" ? "bg-orange-100 text-orange-600"
+                        : "bg-gray-100 text-gray-500"
+                      }`}>
                         {p.status}
                       </span>
                       {p.minPlan !== "any" && (
@@ -134,12 +363,11 @@ export default function SuperAdminPromos() {
                     <div className="text-[10px] text-ink-muted">
                       Uses: {p.used}/{p.maxUses} • Valid till: {p.validTill} • By: {p.createdBy}
                     </div>
-                    {/* Progress */}
                     <div className="mt-1.5 flex items-center gap-2">
                       <div className="flex-1 h-1.5 bg-warm-100 rounded-full overflow-hidden max-w-[120px]">
                         <div
                           className={`h-full rounded-full ${isNearMax ? "bg-red-500" : "bg-amber-400"}`}
-                          style={{ width: `${usedPct}%` }}
+                          style={{ width: `${Math.min(usedPct, 100)}%` }}
                         />
                       </div>
                       <span className="text-[9px] text-ink-muted">{usedPct}% used</span>
@@ -147,20 +375,35 @@ export default function SuperAdminPromos() {
                   </div>
                 </div>
 
-                {/* Right: Stats */}
+                {/* Right */}
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
                   <div className="text-[13px] font-bold text-red-500">−₹{(p.savings / 1000).toFixed(0)}K saved</div>
                   {p.revenue > 0 && (
                     <div className="text-[12px] font-bold text-green-600">₹{(p.revenue / 1000).toFixed(0)}K revenue</div>
                   )}
-                  {p.status === "active" && (
+                  {p.status !== "expired" && (
                     <div className="flex gap-1.5 mt-1">
-                      <button className="px-2.5 py-1 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted hover:bg-warm-50 cursor-pointer transition-colors">
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="px-2.5 py-1 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted hover:bg-warm-50 cursor-pointer transition-colors"
+                      >
                         Edit
                       </button>
-                      <button className="px-2.5 py-1 rounded-lg border border-red-200 text-[10px] font-semibold text-red-500 hover:bg-red-50 cursor-pointer transition-colors">
-                        Disable
-                      </button>
+                      {p.status === "active" ? (
+                        <button
+                          onClick={() => handleDisable(p.code)}
+                          className="px-2.5 py-1 rounded-lg border border-red-200 text-[10px] font-semibold text-red-500 hover:bg-red-50 cursor-pointer transition-colors"
+                        >
+                          Disable
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleEnable(p.code)}
+                          className="px-2.5 py-1 rounded-lg border border-green-200 text-[10px] font-semibold text-green-600 hover:bg-green-50 cursor-pointer transition-colors"
+                        >
+                          Enable
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
