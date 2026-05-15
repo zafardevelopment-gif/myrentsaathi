@@ -350,6 +350,7 @@ export type LandlordTicket = {
   priority: string;
   status: string;
   created_at: string;
+  ticket_number?: string | null;
   raised_by?: string | null;
   source?: "landlord" | "tenant";
   flat?: { flat_number: string; block: string | null } | null;
