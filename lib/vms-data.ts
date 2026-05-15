@@ -237,7 +237,7 @@ export async function createApprovalRequest(
 export async function getResidentsOfFlat(
   societyId: string,
   flatNumber: string
-): Promise<{ id: string; full_name: string; role: string }[]> {
+): Promise<{ id: string; full_name: string; role: string; phone?: string | null }[]> {
   // Get flat by flat_number + society
   const { data: flat } = await supabase
     .from("flats")
@@ -253,7 +253,7 @@ export async function getResidentsOfFlat(
 
   const { data: users } = await supabase
     .from("users")
-    .select("id, full_name, role")
+    .select("id, full_name, role, phone")
     .in("id", ids)
     .eq("is_active", true);
 

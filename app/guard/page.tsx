@@ -18,6 +18,8 @@ import {
   type VMSVisitor,
   type FlatResidentInfo,
 } from "@/lib/vms-data";
+import { sendVisitorAlert } from "@/lib/whatsapp";
+import { supabase } from "@/lib/supabase";
 
 // ─── FLAT RESIDENT CARD ───────────────────────────────────────
 
@@ -109,6 +111,7 @@ export default function GuardGatePage() {
   const { user } = useAuth();
 
   const [guardInfo, setGuardInfo] = useState<{ id: string; full_name: string; society_id: string } | null>(null);
+  const [societyName, setSocietyName] = useState("MyRentSaathi Society");
   const [pendingVisits, setPendingVisits] = useState<VMSVisit[]>([]);
 
   // Search state
@@ -140,10 +143,13 @@ export default function GuardGatePage() {
   // Load guard info + pending visits
   useEffect(() => {
     if (!user?.email) return;
-    getGuardUser(user.email).then((g) => {
+    getGuardUser(user.email).then(async (g) => {
       if (g) {
         setGuardInfo(g);
         refreshPending(g.society_id);
+        // Fetch society name for WhatsApp alerts
+        const { data: soc } = await supabase.from("societies").select("name").eq("id", g.society_id).single();
+        if (soc?.name) setSocietyName(soc.name);
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -273,6 +279,19 @@ export default function GuardGatePage() {
     const residents = await getResidentsOfFlat(guardInfo.society_id, flat);
     for (const r of residents) {
       await createApprovalRequest(visit.id, r.id);
+      // Send WhatsApp visitor alert (fire-and-forget)
+      if (r.phone) {
+        sendVisitorAlert({
+          residentPhone: r.phone,
+          residentName: r.full_name,
+          flatNumber: flat + (block ? ` (${block})` : ""),
+          visitorName: visitor.name,
+          visitorPhone: visitor.mobile ?? "—",
+          purpose: purpose || "Visit",
+          guardName: guardInfo.full_name,
+          societyName,
+        }).catch(() => {});
+      }
     }
 
     setLastVisit({ ...visit, visitor });

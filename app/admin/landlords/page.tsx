@@ -6,6 +6,7 @@ import { getAdminSocietyId, getSocietyFlats, getSocietyLandlordStats, type Admin
 import { addLandlordBySocietyAdmin } from "@/lib/auth-db";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
+import { sendWelcomeMessage } from "@/lib/whatsapp";
 
 const inputClass = "w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500";
 const labelClass = "text-[10px] font-semibold text-ink-muted block mb-1";
@@ -34,6 +35,7 @@ type Credentials = {
 export default function AdminLandlords() {
   const { user } = useAuth();
   const [societyId, setSocietyId] = useState<string | null>(null);
+  const [societyName, setSocietyName] = useState<string>("MyRentSaathi");
   const [landlords, setLandlords] = useState<LandlordRow[]>([]);
   const [vacantFlats, setVacantFlats] = useState<AdminFlat[]>([]);
   const [landlordStats, setLandlordStats] = useState<{ count: number; limit: number } | null>(null);
@@ -100,7 +102,12 @@ export default function AdminLandlords() {
     async function init() {
       const sid = await getAdminSocietyId(user!.email);
       setSocietyId(sid);
-      if (sid) await loadData(sid);
+      if (sid) {
+        await loadData(sid);
+        // Fetch society name for WhatsApp welcome message
+        const { data: soc } = await supabase.from("societies").select("name").eq("id", sid).single();
+        if (soc?.name) setSocietyName(soc.name);
+      }
       setLoading(false);
     }
     init().catch(() => setLoading(false));
@@ -141,6 +148,17 @@ export default function AdminLandlords() {
     if (!result.success) {
       toast.error(result.error ?? "Failed to add landlord.");
       return;
+    }
+
+    // Send WhatsApp welcome message (fire-and-forget)
+    if (form.phone) {
+      sendWelcomeMessage({
+        phone: form.phone,
+        fullName: form.full_name,
+        role: "landlord",
+        societyName,
+        loginEmail: result.loginEmail ?? form.email,
+      }).catch(() => {});
     }
 
     const selectedFlat = vacantFlats.find((f) => f.id === form.flat_id);

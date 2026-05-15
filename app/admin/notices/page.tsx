@@ -9,6 +9,8 @@ import {
   createNotice,
   type AdminNotice,
 } from "@/lib/admin-data";
+import { supabase } from "@/lib/supabase";
+import { sendNoticeAlert } from "@/lib/whatsapp";
 
 const TYPE_COLORS: Record<string, string> = {
   urgent: "border-l-red-500",
@@ -21,6 +23,7 @@ export default function AdminNotices() {
   const { user } = useAuth();
   const [notices, setNotices] = useState<AdminNotice[]>([]);
   const [societyId, setSocietyId] = useState<string | null>(null);
+  const [societyName, setSocietyName] = useState("MyRentSaathi Society");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -34,8 +37,12 @@ export default function AdminNotices() {
         const sid = await getAdminSocietyId(user!.email);
         setSocietyId(sid);
         if (sid) {
-          const n = await getSocietyNotices(sid);
+          const [n, socData] = await Promise.all([
+            getSocietyNotices(sid),
+            supabase.from("societies").select("name").eq("id", sid).single(),
+          ]);
           setNotices(n);
+          if (socData.data?.name) setSocietyName(socData.data.name);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load");
@@ -70,9 +77,41 @@ export default function AdminNotices() {
       await createNotice(societyId, userData.id, form);
       toast.success("Notice published!");
       setShowForm(false);
+      const savedTitle = form.title;
+      const savedContent = form.content;
+      const savedAudience = form.audience;
       setForm({ title: "", content: "", notice_type: "general", audience: "all" });
       const n = await getSocietyNotices(societyId);
       setNotices(n);
+
+      // Send WhatsApp alerts to residents (fire-and-forget)
+      const targetRoles = savedAudience === "tenants" ? ["tenant"]
+        : savedAudience === "landlords" ? ["landlord"]
+        : ["tenant", "landlord"];
+      supabase
+        .from("society_members")
+        .select("user_id, role")
+        .eq("society_id", societyId)
+        .in("role", targetRoles)
+        .then(({ data: members }) => {
+          if (!members || members.length === 0) return;
+          const userIds = members.map(m => m.user_id);
+          supabase.from("users").select("full_name, phone, role").in("id", userIds).eq("is_active", true)
+            .then(({ data: users }) => {
+              (users ?? []).forEach(u => {
+                if (u.phone) {
+                  sendNoticeAlert({
+                    residentPhone: u.phone,
+                    residentName: u.full_name,
+                    societyName,
+                    noticeTitle: savedTitle,
+                    noticeContent: savedContent,
+                    role: u.role === "landlord" ? "landlord" : "tenant",
+                  }).catch(() => {});
+                }
+              });
+            });
+        });
     } catch (err) {
       console.error("Notice creation error:", err);
       toast.error((err as Error).message ?? "Failed — check RLS policies");

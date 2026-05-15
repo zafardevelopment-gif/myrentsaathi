@@ -18,6 +18,7 @@ import {
   type AdminExpense,
   type AdminFlat,
 } from "@/lib/admin-data";
+import { sendMaintenanceDue } from "@/lib/whatsapp";
 
 const CATEGORY_ICON: Record<string, string> = {
   electricity: "⚡",
@@ -49,6 +50,7 @@ type CalcMode = "total" | "per_flat" | "per_sqft";
 export default function AdminExpenses() {
   const { user } = useAuth();
   const [societyId, setSocietyId] = useState<string | null>(null);
+  const [societyName, setSocietyName] = useState("MyRentSaathi Society");
   const [expenses, setExpenses] = useState<AdminExpense[]>([]);
   const [flats, setFlats] = useState<AdminFlat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,9 +128,14 @@ export default function AdminExpenses() {
     const sid = await getAdminSocietyId(email);
     if (sid) {
       setSocietyId(sid);
-      const [e, f] = await Promise.all([getSocietyExpenses(sid), getSocietyFlats(sid)]);
+      const [e, f, socData] = await Promise.all([
+        getSocietyExpenses(sid),
+        getSocietyFlats(sid),
+        supabase.from("societies").select("name").eq("id", sid).single(),
+      ]);
       setExpenses(e);
       setFlats(f);
+      if (socData.data?.name) setSocietyName(socData.data.name);
       await loadPaymentStats(e, f);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -504,6 +511,38 @@ export default function AdminExpenses() {
       await approveExpense(id);
       setExpenses((prev) => prev.map((e) => e.id === id ? { ...e, approval_status: "approved" } : e));
       toast.success("Expense approved");
+
+      // Send WhatsApp maintenance due alert to all active flat owners (fire-and-forget)
+      const expense = expenses.find(e => e.id === id);
+      if (expense && societyId) {
+        const activeFlatList = flats.filter(f => f.status !== "inactive");
+        const perFlatShare = Math.round(expense.amount / (activeFlatList.length || 1));
+        // Fetch owner user IDs for all active flats
+        const flatIds = activeFlatList.map(f => f.id);
+        supabase.from("flats").select("flat_number, block, owner_id").in("id", flatIds)
+          .then(({ data: flatRows }) => {
+            if (!flatRows || flatRows.length === 0) return;
+            const ownerIds = flatRows.map(f => f.owner_id).filter(Boolean);
+            supabase.from("users").select("id, full_name, phone").in("id", ownerIds).eq("is_active", true)
+              .then(({ data: owners }) => {
+                (owners ?? []).forEach(owner => {
+                  if (!owner.phone) return;
+                  const flat = flatRows.find(f => f.owner_id === owner.id);
+                  const flatLabel = flat
+                    ? `${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}`
+                    : "—";
+                  sendMaintenanceDue({
+                    residentPhone: owner.phone,
+                    residentName: owner.full_name,
+                    flatNumber: flatLabel,
+                    shareAmount: perFlatShare,
+                    description: expense.description,
+                    societyName,
+                  }).catch(() => {});
+                });
+              });
+          });
+      }
     } catch {
       toast.error("Failed — check RLS policies");
     } finally {

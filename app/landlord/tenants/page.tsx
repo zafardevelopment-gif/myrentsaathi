@@ -9,6 +9,7 @@ import { addTenant } from "@/lib/auth-db";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
 import ReceiptModal from "@/components/tenant/ReceiptModal";
+import { sendWelcomeMessage } from "@/lib/whatsapp";
 
 type TenantDetail = {
   id: string;
@@ -473,6 +474,19 @@ export default function LandlordTenants() {
     });
     setSaving(false);
     if (!result.success) { toast.error(result.error ?? "Failed to add tenant."); return; }
+
+    // Send WhatsApp welcome message (fire-and-forget — never blocks UI)
+    if (form.phone) {
+      const flat = flats.find(f => f.id === form.flat_id);
+      const societyName = (flat?.society as { name?: string } | null)?.name ?? "MyRentSaathi";
+      sendWelcomeMessage({
+        phone: form.phone,
+        fullName: form.full_name,
+        role: "tenant",
+        societyName,
+        loginEmail: result.loginEmail ?? form.email,
+      }).catch(() => {});
+    }
 
     // Show credentials if auto-generated
     if (result.generatedUserId && result.generatedPassword) {

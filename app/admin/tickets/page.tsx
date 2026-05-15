@@ -10,6 +10,8 @@ import {
   resolveTicket,
   type AdminTicket,
 } from "@/lib/admin-data";
+import { supabase } from "@/lib/supabase";
+import { sendTicketUpdate } from "@/lib/whatsapp";
 
 export default function AdminTickets() {
   const { user } = useAuth();
@@ -17,6 +19,7 @@ export default function AdminTickets() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [societyName, setSocietyName] = useState("MyRentSaathi Society");
 
   useEffect(() => {
     if (!user?.email) return;
@@ -26,6 +29,8 @@ export default function AdminTickets() {
         if (societyId) {
           const t = await getSocietyTickets(societyId);
           setTickets(t);
+          const { data: soc } = await supabase.from("societies").select("name").eq("id", societyId).single();
+          if (soc?.name) setSocietyName(soc.name);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load");
@@ -42,6 +47,22 @@ export default function AdminTickets() {
       await resolveTicket(id, "");
       setTickets((prev) => prev.map((t) => t.id === id ? { ...t, status: "resolved" } : t));
       toast.success("Ticket resolved");
+      // Send WhatsApp notification to ticket raiser (fire-and-forget)
+      const tk = tickets.find(t => t.id === id);
+      if (tk?.raised_by) {
+        supabase.from("users").select("full_name, phone").eq("id", tk.raised_by).single().then(({ data: raiser }) => {
+          if (raiser?.phone) {
+            sendTicketUpdate({
+              raiserPhone: raiser.phone,
+              raiserName: raiser.full_name,
+              ticketNumber: tk.ticket_number ?? id.slice(0, 8),
+              subject: tk.subject,
+              newStatus: "resolved",
+              societyName,
+            }).catch(() => {});
+          }
+        });
+      }
     } catch {
       toast.error("Failed — check RLS policies");
     } finally {

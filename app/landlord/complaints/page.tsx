@@ -9,6 +9,7 @@ import {
 } from "@/lib/landlord-data";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
+import { sendTicketUpdate } from "@/lib/whatsapp";
 
 const PRIORITY_COLOR: Record<string, string> = {
   urgent: "bg-red-100 text-red-700 border-red-200",
@@ -23,6 +24,7 @@ export default function LandlordComplaints() {
   const { user } = useAuth();
   const [tickets, setTickets] = useState<LandlordTicket[]>([]);
   const [societyId, setSocietyId] = useState<string | null>(null);
+  const [societyName, setSocietyName] = useState("MyRentSaathi Society");
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,6 +55,10 @@ export default function LandlordComplaints() {
         loadTickets(),
       ]);
       setSocietyId(sid);
+      if (sid) {
+        const { data: soc } = await supabase.from("societies").select("name").eq("id", sid).single();
+        if (soc?.name) setSocietyName(soc.name);
+      }
       setLoading(false);
     }
     init().catch(() => setLoading(false));
@@ -83,6 +89,23 @@ export default function LandlordComplaints() {
     if (error) { toast.error("Failed to update status"); return; }
     toast.success(`Marked as ${status.replace("_", " ")}`);
     setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+    // Send WhatsApp notification to ticket raiser (fire-and-forget)
+    const tk = tickets.find(t => t.id === id);
+    if (tk?.raised_by) {
+      supabase.from("users").select("full_name, phone").eq("id", tk.raised_by).single().then(({ data: raiser }) => {
+        if (raiser?.phone) {
+          sendTicketUpdate({
+            raiserPhone: raiser.phone,
+            raiserName: raiser.full_name,
+            ticketNumber: tk.ticket_number ?? id.slice(0, 8),
+            subject: tk.subject,
+            newStatus: status,
+            societyName,
+            role: tk.source === "tenant" ? "tenant" : "landlord",
+          }).catch(() => {});
+        }
+      });
+    }
   }
 
   async function handleDelete(id: string) {
