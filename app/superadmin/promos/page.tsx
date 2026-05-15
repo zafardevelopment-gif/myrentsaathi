@@ -3,37 +3,7 @@
 import { useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
 import toast, { Toaster } from "react-hot-toast";
-
-// ── Types ─────────────────────────────────────────────────────
-
-type PromoStatus = "active" | "expired" | "disabled";
-
-type Promo = {
-  code: string;
-  type: "percentage" | "fixed";
-  value: number;
-  maxUses: number;
-  used: number;
-  minPlan: string;
-  validTill: string;
-  status: PromoStatus;
-  savings: number;
-  createdBy: string;
-  revenue: number;
-};
-
-// ── Seed data (replace with DB fetch when ready) ──────────────
-
-const SEED_PROMOS: Promo[] = [
-  { code: "LAUNCH50",   type: "percentage", value: 50,   maxUses: 500,  used: 234, minPlan: "any",          validTill: "2026-04-30", status: "active",   savings: 356000, createdBy: "System",              revenue: 0 },
-  { code: "SOCIETY20",  type: "percentage", value: 20,   maxUses: 200,  used: 89,  minPlan: "professional", validTill: "2026-06-30", status: "active",   savings: 120000, createdBy: "Admin",               revenue: 0 },
-  { code: "FLAT1000",   type: "fixed",      value: 1000, maxUses: 1000, used: 445, minPlan: "any",          validTill: "2026-12-31", status: "active",   savings: 445000, createdBy: "System",              revenue: 0 },
-  { code: "AGENTRAHUL", type: "percentage", value: 10,   maxUses: 100,  used: 45,  minPlan: "any",          validTill: "2026-12-31", status: "active",   savings: 45000,  createdBy: "Agent: Rahul Verma",  revenue: 185000 },
-  { code: "AGENTSNEHA", type: "percentage", value: 10,   maxUses: 100,  used: 28,  minPlan: "any",          validTill: "2026-12-31", status: "active",   savings: 28000,  createdBy: "Agent: Sneha Kulkarni", revenue: 100000 },
-  { code: "NRI30",      type: "percentage", value: 30,   maxUses: 100,  used: 28,  minPlan: "nri",          validTill: "2026-09-30", status: "active",   savings: 42000,  createdBy: "Admin",               revenue: 0 },
-  { code: "DIWALI25",   type: "percentage", value: 25,   maxUses: 300,  used: 300, minPlan: "any",          validTill: "2025-11-30", status: "expired",  savings: 225000, createdBy: "System",              revenue: 0 },
-  { code: "SUMMER10",   type: "percentage", value: 10,   maxUses: 400,  used: 145, minPlan: "any",          validTill: "2026-08-31", status: "active",   savings: 65000,  createdBy: "Admin",               revenue: 0 },
-];
+import { PROMO_LIST, type Promo, type PromoStatus } from "@/lib/promos-data";
 
 const EMPTY_FORM = {
   code: "", type: "percentage" as "percentage" | "fixed",
@@ -43,7 +13,7 @@ const EMPTY_FORM = {
 // ── Main Page ─────────────────────────────────────────────────
 
 export default function SuperAdminPromos() {
-  const [promos, setPromos] = useState<Promo[]>(SEED_PROMOS);
+  const [promos, setPromos] = useState<Promo[]>(PROMO_LIST);
   const [filterStatus, setFilterStatus] = useState<"all" | PromoStatus>("all");
   const [showForm, setShowForm] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);

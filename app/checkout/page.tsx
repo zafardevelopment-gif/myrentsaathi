@@ -5,47 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { activatePaidPlan } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase";
+import { validatePromo, applyPromo, type PromoResult } from "@/lib/promos-data";
 import toast, { Toaster } from "react-hot-toast";
 
 // ── Duration options ──────────────────────────────────────────
 const DURATIONS = [
-  { months: 1,  label: "Monthly",     sublabel: "Billed every month",      discount: 0   },
-  { months: 3,  label: "3 Months",    sublabel: "Save 5% vs monthly",       discount: 5   },
-  { months: 6,  label: "6 Months",    sublabel: "Save 10% vs monthly",      discount: 10  },
-  { months: 12, label: "12 Months",   sublabel: "Save 20% vs monthly",      discount: 20  },
+  { months: 1,  label: "Monthly",   sublabel: "Billed every month",  discount: 0  },
+  { months: 3,  label: "3 Months",  sublabel: "Save 5% vs monthly",  discount: 5  },
+  { months: 6,  label: "6 Months",  sublabel: "Save 10% vs monthly", discount: 10 },
+  { months: 12, label: "12 Months", sublabel: "Save 20% vs monthly", discount: 20 },
 ];
-
-// ── Promo code list — mirrors superadmin/promos page ─────────
-// When DB promo table is added, replace this with a fetch call
-const ALL_PROMOS = [
-  { code: "LAUNCH50",   type: "percentage", value: 50,   maxUses: 500,  used: 234, validTill: "2026-04-30", status: "active"  },
-  { code: "SOCIETY20",  type: "percentage", value: 20,   maxUses: 200,  used: 89,  validTill: "2026-06-30", status: "active"  },
-  { code: "FLAT1000",   type: "fixed",      value: 1000, maxUses: 1000, used: 445, validTill: "2026-12-31", status: "active"  },
-  { code: "AGENTRAHUL", type: "percentage", value: 10,   maxUses: 100,  used: 45,  validTill: "2026-12-31", status: "active"  },
-  { code: "AGENTSNEHA", type: "percentage", value: 10,   maxUses: 100,  used: 28,  validTill: "2026-12-31", status: "active"  },
-  { code: "NRI30",      type: "percentage", value: 30,   maxUses: 100,  used: 28,  validTill: "2026-09-30", status: "active"  },
-  { code: "DIWALI25",   type: "percentage", value: 25,   maxUses: 300,  used: 300, validTill: "2025-11-30", status: "expired" },
-  { code: "SUMMER10",   type: "percentage", value: 10,   maxUses: 400,  used: 145, validTill: "2026-08-31", status: "active"  },
-];
-
-type PromoResult = { type: "percent" | "flat"; value: number; label: string };
-
-function validatePromo(code: string): { valid: true; promo: PromoResult } | { valid: false; error: string } {
-  const found = ALL_PROMOS.find((p) => p.code === code.trim().toUpperCase());
-  if (!found) return { valid: false, error: "Invalid promo code." };
-  if (found.status === "expired") return { valid: false, error: "Yeh promo code expire ho chuka hai." };
-  if (new Date() > new Date(found.validTill)) return { valid: false, error: "Yeh promo code expire ho chuka hai." };
-  if (found.used >= found.maxUses) return { valid: false, error: "Yeh promo code ki limit khatam ho gayi hai." };
-  const type: "percent" | "flat" = found.type === "percentage" ? "percent" : "flat";
-  const label = type === "percent" ? `${found.value}% off` : `₹${found.value} flat discount`;
-  return { valid: true, promo: { type, value: found.value, label } };
-}
-
-function applyPromo(price: number, promo: PromoResult | null): number {
-  if (!promo) return price;
-  if (promo.type === "percent") return Math.round(price * (1 - promo.value / 100));
-  return Math.max(0, price - promo.value);
-}
 
 function CheckoutContent() {
   const router = useRouter();
