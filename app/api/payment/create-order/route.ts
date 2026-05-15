@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import Razorpay from "razorpay";
+import { getRazorpayKeys } from "@/lib/platform-config";
 
 export const runtime = "nodejs";
-
-function getRazorpay() {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  if (!keyId || !keySecret) {
-    throw new Error("Razorpay keys not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env.local");
-  }
-  return new Razorpay({ key_id: keyId, key_secret: keySecret });
-}
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
-      amount: number;          // in INR (will be converted to paise)
+      amount: number;
       flatId?: string;
       tenantId?: string;
-      monthYear?: string;      // "YYYY-MM"
+      monthYear?: string;
       type: "rent" | "maintenance";
       description?: string;
     };
@@ -32,10 +24,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Payment type is required" }, { status: 400 });
     }
 
-    const razorpay = getRazorpay();
+    const { keyId, keySecret } = await getRazorpayKeys();
+    if (!keyId || !keySecret) {
+      return NextResponse.json(
+        { error: "Razorpay keys not configured. Super Admin settings mein configure karen." },
+        { status: 500 }
+      );
+    }
+
+    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
 
     const order = await razorpay.orders.create({
-      amount: Math.round(amount * 100), // convert INR to paise
+      amount: Math.round(amount * 100),
       currency: "INR",
       receipt: `${type}_${flatId ?? tenantId ?? "unknown"}_${monthYear ?? Date.now()}`.slice(0, 40),
       notes: {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      keyId,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

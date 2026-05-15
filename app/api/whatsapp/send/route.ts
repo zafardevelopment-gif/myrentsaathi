@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-
-/**
- * POST /api/whatsapp/send
- * Sends a WhatsApp template message via Meta Cloud API.
- *
- * Body:
- *   to       — phone in E.164 format, e.g. "+919876543210"
- *   template — Meta template name, e.g. "mrs_welcome"
- *   params   — ordered array of variable values for {{1}}, {{2}}, ...
- *   language — optional, defaults to "en"
- */
-
-const WHATSAPP_API_URL = `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+import { getWhatsappCreds } from "@/lib/platform-config";
 
 export async function POST(req: NextRequest) {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const { accessToken, phoneNumberId } = await getWhatsappCreds();
 
-  if (!token || !phoneNumberId) {
-    // Not configured — silently succeed so app still works without WhatsApp
+  if (!accessToken || !phoneNumberId) {
     return NextResponse.json({ success: false, reason: "WhatsApp not configured" }, { status: 200 });
   }
 
@@ -34,7 +20,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing 'to' or 'template'" }, { status: 400 });
   }
 
-  // Build components from params array
   const components = params.length > 0 ? [
     {
       type: "body",
@@ -54,11 +39,11 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const res = await fetch(WHATSAPP_API_URL, {
+    const res = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(payload),
     });
@@ -67,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       console.error("[WhatsApp] API error:", data);
-      return NextResponse.json({ success: false, error: data }, { status: 200 }); // 200 so caller doesn't throw
+      return NextResponse.json({ success: false, error: data }, { status: 200 });
     }
 
     return NextResponse.json({ success: true, data });

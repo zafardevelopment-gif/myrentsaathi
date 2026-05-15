@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { getRazorpayKeys } from "@/lib/platform-config";
 
 export const runtime = "nodejs";
 
@@ -10,11 +11,11 @@ function getSupabaseAdmin() {
   return createClient(url, key);
 }
 
-function verifySignature(orderId: string, paymentId: string, signature: string): boolean {
-  const secret = process.env.RAZORPAY_KEY_SECRET;
-  if (!secret) throw new Error("RAZORPAY_KEY_SECRET not configured");
+async function verifySignature(orderId: string, paymentId: string, signature: string): Promise<boolean> {
+  const { keySecret } = await getRazorpayKeys();
+  if (!keySecret) throw new Error("Razorpay Key Secret not configured");
   const body = `${orderId}|${paymentId}`;
-  const expectedSig = crypto.createHmac("sha256", secret).update(body).digest("hex");
+  const expectedSig = crypto.createHmac("sha256", keySecret).update(body).digest("hex");
   return expectedSig === signature;
 }
 
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify HMAC signature — critical security step
-    const isValid = verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    const isValid = await verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
     if (!isValid) {
       console.error("[payment/verify] Signature mismatch — possible fraud attempt");
       return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
