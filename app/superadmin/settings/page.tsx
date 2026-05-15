@@ -397,8 +397,9 @@ export default function SuperAdminSettings() {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         to: testPhone.trim().startsWith("+") ? testPhone.trim() : `+${testPhone.trim()}`,
-                        template: "mrs_welcome1",
-                        params: ["Admin", "Test Society", "admin@test.com", "https://myrentsaathi.com/login"],
+                        template: "hello_world",
+                        params: [],
+                        language: "en_US",
                       }),
                     });
                     const data = await res.json() as { success?: boolean; error?: unknown; reason?: string };
