@@ -6,6 +6,7 @@ import { getLandlordFlats, getLandlordUserId, type LandlordFlat } from "@/lib/la
 import { formatCurrency } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { sendRentHikeNotice } from "@/lib/whatsapp";
+import { emailRentHikeNotice } from "@/lib/email";
 import toast, { Toaster } from "react-hot-toast";
 
 type HikeHistory = {
@@ -103,17 +104,29 @@ export default function RentHikePage() {
         target_audience: "tenants",
       });
 
-      // 4. WhatsApp notification to tenant (fire-and-forget)
+      // 4. WhatsApp + Email notification to tenant (fire-and-forget)
       const tenantPhone = selectedFlat.tenant?.user?.phone ?? "";
+      const tenantEmail = selectedFlat.tenant?.user?.email ?? "";
       const tenantName = selectedFlat.tenant?.user?.full_name ?? "Tenant";
+      const flatLabel2 = `${selectedFlat.flat_number}${selectedFlat.block ? ` (${selectedFlat.block})` : ""}`;
+      const effectiveDateStr = new Date(effectiveDate).toLocaleDateString("en-IN", {
+        day: "numeric", month: "short", year: "numeric",
+      });
       if (tenantPhone) {
-        const effectiveDateStr = new Date(effectiveDate).toLocaleDateString("en-IN", {
-          day: "numeric", month: "short", year: "numeric",
-        });
         sendRentHikeNotice({
           phone: tenantPhone,
           fullName: tenantName,
-          flatNumber: `${selectedFlat.flat_number}${selectedFlat.block ? ` (${selectedFlat.block})` : ""}`,
+          flatNumber: flatLabel2,
+          currentRent,
+          newRent,
+          effectiveFrom: effectiveDateStr,
+        }).catch(() => {});
+      }
+      if (tenantEmail) {
+        emailRentHikeNotice({
+          to: tenantEmail,
+          tenantName,
+          flatNumber: flatLabel2,
           currentRent,
           newRent,
           effectiveFrom: effectiveDateStr,

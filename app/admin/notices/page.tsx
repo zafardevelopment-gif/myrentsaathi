@@ -11,6 +11,7 @@ import {
 } from "@/lib/admin-data";
 import { supabase } from "@/lib/supabase";
 import { sendNoticeAlert } from "@/lib/whatsapp";
+import { emailNoticeAlert } from "@/lib/email";
 
 const TYPE_COLORS: Record<string, string> = {
   urgent: "border-l-red-500",
@@ -96,7 +97,7 @@ export default function AdminNotices() {
         .then(({ data: members }) => {
           if (!members || members.length === 0) return;
           const userIds = members.map(m => m.user_id);
-          supabase.from("users").select("full_name, phone, role").in("id", userIds).eq("is_active", true)
+          supabase.from("users").select("full_name, phone, email, role").in("id", userIds).eq("is_active", true)
             .then(({ data: users }) => {
               (users ?? []).forEach(u => {
                 if (u.phone) {
@@ -107,6 +108,15 @@ export default function AdminNotices() {
                     noticeTitle: savedTitle,
                     noticeContent: savedContent,
                     role: u.role === "landlord" ? "landlord" : "tenant",
+                  }).catch(() => {});
+                }
+                if (u.email) {
+                  emailNoticeAlert({
+                    to: u.email,
+                    residentName: u.full_name,
+                    societyName,
+                    noticeTitle: savedTitle,
+                    noticeContent: savedContent,
                   }).catch(() => {});
                 }
               });

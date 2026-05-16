@@ -167,7 +167,7 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
   try {
     const { data } = await supabase
       .from("blog_posts")
-      .select("*")
+      .select("*, schema_type, updated_at")
       .eq("slug", slug)
       .eq("is_published", true)
       .single();
@@ -175,6 +175,8 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
   } catch { /* use static */ }
 
   if (!post) notFound();
+
+  const wordCount = post.content ? post.content.trim().split(/\s+/).length : 0;
 
   const articleJsonLd = {
     "@context": "https://schema.org",
@@ -184,10 +186,31 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
     author: { "@type": "Organization", name: post.author },
     publisher: { "@type": "Organization", name: "MyRentSaathi", url: BASE_URL },
     datePublished: post.published_at,
+    dateModified: (post as unknown as Record<string, string>).updated_at ?? post.published_at,
+    wordCount,
     url: `${BASE_URL}/blog/${slug}`,
     mainEntityOfPage: { "@type": "WebPage", "@id": `${BASE_URL}/blog/${slug}` },
     keywords: post.tags?.join(", "),
   };
+
+  // HowTo schema — only for process-type posts (schema_type = 'howto')
+  const howToJsonLd = (post as unknown as Record<string, string>).schema_type === "howto" ? (() => {
+    const stepHeadings = post.content
+      .split("\n")
+      .filter((line: string) => /^##\s+Step\s+\d+/i.test(line))
+      .map((line: string, i: number) => ({
+        "@type": "HowToStep",
+        position: i + 1,
+        name: line.replace(/^#+\s+/, ""),
+      }));
+    return {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      name: post.title,
+      description: post.excerpt,
+      step: stepHeadings.length > 0 ? stepHeadings : undefined,
+    };
+  })() : null;
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -227,6 +250,12 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(aggregateRatingJsonLd).replace(/</g, "\\u003c") }}
       />
+      {howToJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(howToJsonLd).replace(/</g, "\\u003c") }}
+        />
+      )}
       <HomePageClient />
 
       <main className="pt-24 pb-20 max-w-[760px] mx-auto px-6">

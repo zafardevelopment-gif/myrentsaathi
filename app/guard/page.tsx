@@ -19,6 +19,7 @@ import {
   type FlatResidentInfo,
 } from "@/lib/vms-data";
 import { sendVisitorAlert } from "@/lib/whatsapp";
+import { emailVisitorAlert } from "@/lib/email";
 import { supabase } from "@/lib/supabase";
 
 // ─── FLAT RESIDENT CARD ───────────────────────────────────────
@@ -279,18 +280,21 @@ export default function GuardGatePage() {
     const residents = await getResidentsOfFlat(guardInfo.society_id, flat);
     for (const r of residents) {
       await createApprovalRequest(visit.id, r.id);
-      // Send WhatsApp visitor alert (fire-and-forget)
+      const flatLabel = flat + (block ? ` (${block})` : "");
+      const alertParams = {
+        residentName: r.full_name,
+        flatNumber: flatLabel,
+        visitorName: visitor.name,
+        visitorPhone: visitor.mobile ?? "—",
+        purpose: purpose || "Visit",
+        guardName: guardInfo.full_name,
+        societyName,
+      };
       if (r.phone) {
-        sendVisitorAlert({
-          residentPhone: r.phone,
-          residentName: r.full_name,
-          flatNumber: flat + (block ? ` (${block})` : ""),
-          visitorName: visitor.name,
-          visitorPhone: visitor.mobile ?? "—",
-          purpose: purpose || "Visit",
-          guardName: guardInfo.full_name,
-          societyName,
-        }).catch(() => {});
+        sendVisitorAlert({ residentPhone: r.phone, ...alertParams }).catch(() => {});
+      }
+      if (r.email) {
+        emailVisitorAlert({ to: r.email, ...alertParams }).catch(() => {});
       }
     }
 

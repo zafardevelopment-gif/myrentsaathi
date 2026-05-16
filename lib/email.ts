@@ -1,0 +1,270 @@
+/**
+ * Generic email sender — fire-and-forget, never throws.
+ * Calls /api/email/send internally via fetch.
+ */
+
+type EmailPayload = {
+  to: string;
+  subject: string;
+  html: string;
+};
+
+async function sendEmail(payload: EmailPayload): Promise<void> {
+  try {
+    const url = typeof window !== "undefined"
+      ? "/api/email/send"
+      : `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/email/send`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // Never throw — email failure must not break the main flow
+  }
+}
+
+const BASE = "https://www.myrentsaathi.com";
+
+const wrap = (content: string) => `
+  <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#fff;border-radius:12px">
+    <div style="background:#1a1a2e;border-radius:10px;padding:16px 24px;margin-bottom:24px">
+      <h1 style="color:#fff;font-size:18px;margin:0">MyRentSaathi</h1>
+      <p style="color:#aaa;font-size:11px;margin:4px 0 0">Society Management Platform</p>
+    </div>
+    ${content}
+    <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
+    <p style="color:#bbb;font-size:11px;text-align:center">
+      MyRentSaathi &middot; <a href="${BASE}" style="color:#bbb">${BASE}</a>
+    </p>
+  </div>`;
+
+// ─── TYPED SENDERS ───────────────────────────────────────────
+
+export async function emailRentHikeNotice(params: {
+  to: string;
+  tenantName: string;
+  flatNumber: string;
+  currentRent: number;
+  newRent: number;
+  effectiveFrom: string;
+}): Promise<void> {
+  const { to, tenantName, flatNumber, currentRent, newRent, effectiveFrom } = params;
+  await sendEmail({
+    to,
+    subject: `Rent Hike Notice — Flat ${flatNumber}`,
+    html: wrap(`
+      <p style="color:#333;font-size:15px">Namaste <strong>${tenantName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        Aapke flat <strong>${flatNumber}</strong> ka monthly rent badha diya gaya hai.
+      </p>
+      <div style="background:#f8f8f8;border:1px solid #e5e5e5;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee">
+          <span style="color:#888">Current Rent</span>
+          <span style="color:#333;font-weight:600">₹${currentRent.toLocaleString("en-IN")}/month</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee">
+          <span style="color:#888">New Rent</span>
+          <span style="color:#e05;font-weight:700">₹${newRent.toLocaleString("en-IN")}/month</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0">
+          <span style="color:#888">Effective From</span>
+          <span style="color:#333;font-weight:600">${effectiveFrom}</span>
+        </div>
+      </div>
+      <p style="color:#555;font-size:12px">Koi sawaal ho to apne landlord ya MyRentSaathi support se sampark karen.</p>
+    `),
+  });
+}
+
+export async function emailNoticeAlert(params: {
+  to: string;
+  residentName: string;
+  societyName: string;
+  noticeTitle: string;
+  noticeContent: string;
+}): Promise<void> {
+  const { to, residentName, societyName, noticeTitle, noticeContent } = params;
+  await sendEmail({
+    to,
+    subject: `Society Notice: ${noticeTitle}`,
+    html: wrap(`
+      <p style="color:#333;font-size:15px">Namaste <strong>${residentName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        <strong>${societyName}</strong> ki taraf se ek naya notice publish kiya gaya hai:
+      </p>
+      <div style="background:#fffbf0;border:1px solid #f59e0b;border-radius:10px;padding:16px;margin:16px 0">
+        <div style="font-weight:700;font-size:14px;color:#1a1a2e;margin-bottom:8px">${noticeTitle}</div>
+        <div style="font-size:13px;color:#555;line-height:1.6">${noticeContent}</div>
+      </div>
+      <a href="${BASE}/tenant/notices" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px">
+        Notice Dekhen →
+      </a>
+    `),
+  });
+}
+
+export async function emailMaintenanceDue(params: {
+  to: string;
+  ownerName: string;
+  flatNumber: string;
+  shareAmount: number;
+  description: string;
+  societyName: string;
+}): Promise<void> {
+  const { to, ownerName, flatNumber, shareAmount, description, societyName } = params;
+  await sendEmail({
+    to,
+    subject: `Maintenance Due — Flat ${flatNumber} | ${societyName}`,
+    html: wrap(`
+      <p style="color:#333;font-size:15px">Namaste <strong>${ownerName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        <strong>${societyName}</strong> mein ek naya maintenance expense approve hua hai.
+        Flat <strong>${flatNumber}</strong> ka share neeche diya gaya hai:
+      </p>
+      <div style="background:#f8f8f8;border:1px solid #e5e5e5;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee">
+          <span style="color:#888">Description</span>
+          <span style="color:#333;font-weight:600">${description}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0">
+          <span style="color:#888">Your Share</span>
+          <span style="color:#e05;font-weight:700">₹${shareAmount.toLocaleString("en-IN")}</span>
+        </div>
+      </div>
+      <a href="${BASE}/landlord/society-dues" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px">
+        Payment Karen →
+      </a>
+    `),
+  });
+}
+
+export async function emailTicketUpdate(params: {
+  to: string;
+  raiserName: string;
+  ticketNumber: string;
+  subject: string;
+  newStatus: string;
+  societyName: string;
+  note?: string;
+}): Promise<void> {
+  const { to, raiserName, ticketNumber, subject, newStatus, societyName, note } = params;
+  const statusLabel: Record<string, string> = {
+    open: "Open",
+    in_progress: "In Progress",
+    resolved: "Resolved",
+    closed: "Closed",
+  };
+  await sendEmail({
+    to,
+    subject: `Ticket #${ticketNumber} Update — ${statusLabel[newStatus] ?? newStatus}`,
+    html: wrap(`
+      <p style="color:#333;font-size:15px">Namaste <strong>${raiserName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        Aapki complaint <strong>${societyName}</strong> mein update hui hai:
+      </p>
+      <div style="background:#f8f8f8;border:1px solid #e5e5e5;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee">
+          <span style="color:#888">Ticket #</span>
+          <span style="color:#333;font-weight:600">${ticketNumber}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee">
+          <span style="color:#888">Subject</span>
+          <span style="color:#333;font-weight:600">${subject}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0${note ? ";border-bottom:1px solid #eee" : ""}">
+          <span style="color:#888">New Status</span>
+          <span style="color:#16a34a;font-weight:700">${statusLabel[newStatus] ?? newStatus}</span>
+        </div>
+        ${note ? `<div style="padding:6px 0"><span style="color:#888">Note: </span><span style="color:#333">${note}</span></div>` : ""}
+      </div>
+      <a href="${BASE}/landlord/complaints" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px">
+        Ticket Dekhen →
+      </a>
+    `),
+  });
+}
+
+export async function emailVisitorAlert(params: {
+  to: string;
+  residentName: string;
+  flatNumber: string;
+  visitorName: string;
+  visitorPhone: string;
+  purpose: string;
+  guardName: string;
+  societyName: string;
+}): Promise<void> {
+  const { to, residentName, flatNumber, visitorName, visitorPhone, purpose, guardName, societyName } = params;
+  await sendEmail({
+    to,
+    subject: `Visitor Alert — Flat ${flatNumber} | ${societyName}`,
+    html: wrap(`
+      <p style="color:#333;font-size:15px">Namaste <strong>${residentName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        Flat <strong>${flatNumber}</strong> ke liye ek visitor aaya hai:
+      </p>
+      <div style="background:#f8f8f8;border:1px solid #e5e5e5;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee">
+          <span style="color:#888">Visitor Name</span>
+          <span style="color:#333;font-weight:600">${visitorName}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee">
+          <span style="color:#888">Mobile</span>
+          <span style="color:#333;font-weight:600">${visitorPhone}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee">
+          <span style="color:#888">Purpose</span>
+          <span style="color:#333;font-weight:600">${purpose || "—"}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0">
+          <span style="color:#888">Guard</span>
+          <span style="color:#333;font-weight:600">${guardName}</span>
+        </div>
+      </div>
+    `),
+  });
+}
+
+export async function emailPaymentConfirmation(params: {
+  to: string;
+  fullName: string;
+  planName: string;
+  amount: number;
+  validTill: string;
+  paymentId: string;
+  planType: string;
+}): Promise<void> {
+  const { to, fullName, planName, amount, validTill, paymentId, planType } = params;
+  await sendEmail({
+    to,
+    subject: `Payment Confirmed — ${planName} Plan | MyRentSaathi`,
+    html: wrap(`
+      <p style="color:#333;font-size:15px">Namaste <strong>${fullName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        Aapka payment successfully receive ho gaya hai. Aapka <strong>${planName}</strong> plan activate ho gaya!
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Plan</span>
+          <span style="color:#333;font-weight:600">${planName} (${planType})</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Amount Paid</span>
+          <span style="color:#16a34a;font-weight:700">₹${amount.toLocaleString("en-IN")}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Valid Till</span>
+          <span style="color:#333;font-weight:600">${validTill}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0">
+          <span style="color:#888">Transaction ID</span>
+          <span style="color:#333;font-family:monospace;font-size:11px">${paymentId}</span>
+        </div>
+      </div>
+      <a href="${BASE}/${planType === "society" ? "admin" : "landlord"}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px">
+        Dashboard Khulen →
+      </a>
+    `),
+  });
+}

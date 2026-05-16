@@ -19,6 +19,7 @@ import {
   type AdminFlat,
 } from "@/lib/admin-data";
 import { sendMaintenanceDue } from "@/lib/whatsapp";
+import { emailMaintenanceDue } from "@/lib/email";
 
 const CATEGORY_ICON: Record<string, string> = {
   electricity: "⚡",
@@ -523,22 +524,33 @@ export default function AdminExpenses() {
           .then(({ data: flatRows }) => {
             if (!flatRows || flatRows.length === 0) return;
             const ownerIds = flatRows.map(f => f.owner_id).filter(Boolean);
-            supabase.from("users").select("id, full_name, phone").in("id", ownerIds).eq("is_active", true)
+            supabase.from("users").select("id, full_name, phone, email").in("id", ownerIds).eq("is_active", true)
               .then(({ data: owners }) => {
                 (owners ?? []).forEach(owner => {
-                  if (!owner.phone) return;
                   const flat = flatRows.find(f => f.owner_id === owner.id);
                   const flatLabel = flat
                     ? `${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}`
                     : "—";
-                  sendMaintenanceDue({
-                    residentPhone: owner.phone,
-                    residentName: owner.full_name,
-                    flatNumber: flatLabel,
-                    shareAmount: perFlatShare,
-                    description: expense.description,
-                    societyName,
-                  }).catch(() => {});
+                  if (owner.phone) {
+                    sendMaintenanceDue({
+                      residentPhone: owner.phone,
+                      residentName: owner.full_name,
+                      flatNumber: flatLabel,
+                      shareAmount: perFlatShare,
+                      description: expense.description,
+                      societyName,
+                    }).catch(() => {});
+                  }
+                  if (owner.email) {
+                    emailMaintenanceDue({
+                      to: owner.email,
+                      ownerName: owner.full_name,
+                      flatNumber: flatLabel,
+                      shareAmount: perFlatShare,
+                      description: expense.description,
+                      societyName,
+                    }).catch(() => {});
+                  }
                 });
               });
           });

@@ -12,6 +12,7 @@ import {
 } from "@/lib/admin-data";
 import { supabase } from "@/lib/supabase";
 import { sendTicketUpdate } from "@/lib/whatsapp";
+import { emailTicketUpdate } from "@/lib/email";
 
 export default function AdminTickets() {
   const { user } = useAuth();
@@ -50,12 +51,23 @@ export default function AdminTickets() {
       // Send WhatsApp notification to ticket raiser (fire-and-forget)
       const tk = tickets.find(t => t.id === id);
       if (tk?.raised_by) {
-        supabase.from("users").select("full_name, phone").eq("id", tk.raised_by).single().then(({ data: raiser }) => {
+        supabase.from("users").select("full_name, phone, email").eq("id", tk.raised_by).single().then(({ data: raiser }) => {
+          const ticketNum = tk.ticket_number ?? id.slice(0, 8);
           if (raiser?.phone) {
             sendTicketUpdate({
               raiserPhone: raiser.phone,
               raiserName: raiser.full_name,
-              ticketNumber: tk.ticket_number ?? id.slice(0, 8),
+              ticketNumber: ticketNum,
+              subject: tk.subject,
+              newStatus: "resolved",
+              societyName,
+            }).catch(() => {});
+          }
+          if (raiser?.email) {
+            emailTicketUpdate({
+              to: raiser.email,
+              raiserName: raiser.full_name,
+              ticketNumber: ticketNum,
               subject: tk.subject,
               newStatus: "resolved",
               societyName,

@@ -10,6 +10,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
 import { sendTicketUpdate } from "@/lib/whatsapp";
+import { emailTicketUpdate } from "@/lib/email";
 
 const PRIORITY_COLOR: Record<string, string> = {
   urgent: "bg-red-100 text-red-700 border-red-200",
@@ -92,16 +93,27 @@ export default function LandlordComplaints() {
     // Send WhatsApp notification to ticket raiser (fire-and-forget)
     const tk = tickets.find(t => t.id === id);
     if (tk?.raised_by) {
-      supabase.from("users").select("full_name, phone").eq("id", tk.raised_by).single().then(({ data: raiser }) => {
+      supabase.from("users").select("full_name, phone, email").eq("id", tk.raised_by).single().then(({ data: raiser }) => {
+        const ticketNum = tk.ticket_number ?? id.slice(0, 8);
         if (raiser?.phone) {
           sendTicketUpdate({
             raiserPhone: raiser.phone,
             raiserName: raiser.full_name,
-            ticketNumber: tk.ticket_number ?? id.slice(0, 8),
+            ticketNumber: ticketNum,
             subject: tk.subject,
             newStatus: status,
             societyName,
             role: tk.source === "tenant" ? "tenant" : "landlord",
+          }).catch(() => {});
+        }
+        if (raiser?.email) {
+          emailTicketUpdate({
+            to: raiser.email,
+            raiserName: raiser.full_name,
+            ticketNumber: ticketNum,
+            subject: tk.subject,
+            newStatus: status,
+            societyName,
           }).catch(() => {});
         }
       });
