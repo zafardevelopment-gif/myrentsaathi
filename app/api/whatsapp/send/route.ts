@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { to, template, params = [], language = "en" } = body;
+  const { to, template, params = [], language = "en_US" } = body;
   if (!to || !template) {
     return NextResponse.json({ error: "Missing 'to' or 'template'" }, { status: 400 });
   }

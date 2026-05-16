@@ -240,9 +240,9 @@ export async function emailPaymentConfirmation(params: {
     to,
     subject: `Payment Confirmed — ${planName} Plan | MyRentSaathi`,
     html: wrap(`
-      <p style="color:#333;font-size:15px">Namaste <strong>${fullName}</strong>,</p>
+      <p style="color:#333;font-size:15px">Hello <strong>${fullName}</strong>,</p>
       <p style="color:#555;font-size:13px;line-height:1.6">
-        Aapka payment successfully receive ho gaya hai. Aapka <strong>${planName}</strong> plan activate ho gaya!
+        Your payment has been successfully received. Your <strong>${planName}</strong> plan is now active!
       </p>
       <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
         <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
@@ -263,7 +263,7 @@ export async function emailPaymentConfirmation(params: {
         </div>
       </div>
       <a href="${BASE}/${planType === "society" ? "admin" : "landlord"}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px">
-        Dashboard Khulen →
+        Open Dashboard →
       </a>
     `),
   });
