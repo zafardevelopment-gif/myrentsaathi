@@ -75,7 +75,7 @@ const FAQS = [
   { q: "Can MyRentSaathi replace MyGate completely?", a: "For most societies, yes. Only exception: guard app with physical intercom/vehicle barrier integration. For rent + society management, MyRentSaathi is significantly more capable." },
 ];
 
-export default function VsMygатePage() {
+export default function VsMygatePage() {
   return (
     <div className="bg-background text-ink overflow-x-hidden">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c") }} />
