@@ -8,6 +8,12 @@ const ALLOWED_KEYS = [
   "razorpay_webhook_secret",
   "whatsapp_access_token",
   "whatsapp_phone_number_id",
+  "smtp_host",
+  "smtp_port",
+  "smtp_user",
+  "smtp_password",
+  "smtp_from_email",
+  "smtp_from_name",
 ];
 
 // Keys that are sensitive — mask them in GET responses
@@ -15,6 +21,7 @@ const SENSITIVE_KEYS = [
   "razorpay_key_secret",
   "razorpay_webhook_secret",
   "whatsapp_access_token",
+  "smtp_password",
 ];
 
 function mask(value: string): string {

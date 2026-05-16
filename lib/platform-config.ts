@@ -5,7 +5,13 @@ type ConfigKey =
   | "razorpay_key_secret"
   | "razorpay_webhook_secret"
   | "whatsapp_access_token"
-  | "whatsapp_phone_number_id";
+  | "whatsapp_phone_number_id"
+  | "smtp_host"
+  | "smtp_port"
+  | "smtp_user"
+  | "smtp_password"
+  | "smtp_from_email"
+  | "smtp_from_name";
 
 // Simple in-process cache — cleared after 60 seconds so changes take effect quickly
 const cache: Partial<Record<ConfigKey, string>> = {};
@@ -47,4 +53,16 @@ export async function getWhatsappCreds() {
     get("whatsapp_phone_number_id"),
   ]);
   return { accessToken, phoneNumberId };
+}
+
+export async function getSmtpConfig() {
+  const [host, port, user, password, fromEmail, fromName] = await Promise.all([
+    get("smtp_host"),
+    get("smtp_port"),
+    get("smtp_user"),
+    get("smtp_password"),
+    get("smtp_from_email"),
+    get("smtp_from_name"),
+  ]);
+  return { host, port: port ? Number(port) : 587, user, password, fromEmail, fromName };
 }

@@ -418,6 +418,21 @@ export default function AdminFlats() {
             flatLabel,
           });
           setLandlordStats(prev => prev ? { ...prev, count: prev.count + 1 } : prev);
+          // Send credential email + WhatsApp notification
+          const lEmail = lResult.loginEmail!;
+          const lPass = lResult.generatedPassword!;
+          fetch("/api/email/send-credentials", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ to: lEmail, name: form.owner_name, email: lEmail, password: lPass, role: "Landlord", societyName: society?.name }),
+          }).catch(() => {});
+          if (form.owner_phone) {
+            fetch("/api/whatsapp/notify-credentials", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ phone: form.owner_phone, name: form.owner_name, email: lEmail }),
+            }).catch(() => {});
+          }
         } else {
           toast.error(lResult.error ?? "Failed to create landlord user.");
         }
@@ -456,6 +471,21 @@ export default function AdminFlats() {
               loginEmail: tResult.loginEmail!,
               flatLabel,
             });
+            // Send credential email + WhatsApp notification
+            const tEmail = tResult.loginEmail!;
+            const tPass = tResult.generatedPassword!;
+            fetch("/api/email/send-credentials", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ to: tEmail, name: form.tenant_name, email: tEmail, password: tPass, role: "Tenant", societyName: society?.name }),
+            }).catch(() => {});
+            if (form.tenant_phone) {
+              fetch("/api/whatsapp/notify-credentials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone: form.tenant_phone, name: form.tenant_name, email: tEmail }),
+              }).catch(() => {});
+            }
           } else if (!tResult.success) {
             toast.error(tResult.error ?? "Failed to create tenant user.");
           }

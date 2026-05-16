@@ -476,16 +476,45 @@ export default function LandlordTenants() {
     if (!result.success) { toast.error(result.error ?? "Failed to add tenant."); return; }
 
     // Send WhatsApp welcome message (fire-and-forget — never blocks UI)
+    const tenantSocietyName = (flats.find(f => f.id === form.flat_id)?.society as { name?: string } | null)?.name ?? "MyRentSaathi";
     if (form.phone) {
-      const flat = flats.find(f => f.id === form.flat_id);
-      const societyName = (flat?.society as { name?: string } | null)?.name ?? "MyRentSaathi";
       sendWelcomeMessage({
         phone: form.phone,
         fullName: form.full_name,
         role: "tenant",
-        societyName,
+        societyName: tenantSocietyName,
         loginEmail: result.loginEmail ?? form.email,
       }).catch(() => {});
+    }
+
+    // Send credential email + WhatsApp notification (fire-and-forget)
+    const credEmail = result.loginEmail ?? form.email;
+    const credPassword = result.generatedPassword;
+    if (credEmail && credPassword) {
+      fetch("/api/email/send-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: credEmail,
+          name: form.full_name,
+          email: credEmail,
+          password: credPassword,
+          role: "Tenant",
+          societyName: tenantSocietyName,
+        }),
+      }).catch(() => {});
+
+      if (form.phone) {
+        fetch("/api/whatsapp/notify-credentials", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: form.phone,
+            name: form.full_name,
+            email: credEmail,
+          }),
+        }).catch(() => {});
+      }
     }
 
     // Show credentials if auto-generated

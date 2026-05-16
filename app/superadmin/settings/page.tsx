@@ -12,6 +12,12 @@ type PlatformConfig = {
   razorpay_webhook_secret: string;
   whatsapp_access_token: string;
   whatsapp_phone_number_id: string;
+  smtp_host: string;
+  smtp_port: string;
+  smtp_user: string;
+  smtp_password: string;
+  smtp_from_email: string;
+  smtp_from_name: string;
 };
 
 const EMPTY_CONFIG: PlatformConfig = {
@@ -20,6 +26,12 @@ const EMPTY_CONFIG: PlatformConfig = {
   razorpay_webhook_secret: "",
   whatsapp_access_token: "",
   whatsapp_phone_number_id: "",
+  smtp_host: "",
+  smtp_port: "587",
+  smtp_user: "",
+  smtp_password: "",
+  smtp_from_email: "",
+  smtp_from_name: "MyRentSaathi",
 };
 
 // ─── Settings definition ──────────────────────────────────────
@@ -59,7 +71,7 @@ const SETTING_GROUPS = [
     icon: "📱",
     items: [
       { icon: "📱", title: "WhatsApp Business API",     desc: "Meta Cloud API credentials, webhook URLs, template mgmt",    tag: "Connected", editable: true, editType: "whatsapp" },
-      { icon: "📧", title: "Email Configuration",       desc: "SMTP settings, templates (welcome, receipt, notification)",  tag: null,        editable: true,  editType: "generic" },
+      { icon: "📧", title: "Email Configuration",       desc: "SMTP settings, test email, credential delivery",            tag: null,        editable: true,  editType: "smtp" },
       { icon: "🔔", title: "Super Admin Alerts",        desc: "Alert on: new signup, payment failure, support ticket, agent payout", tag: "Editable", editable: true, editType: "generic" },
     ],
   },
@@ -165,10 +177,15 @@ export default function SuperAdminSettings() {
   const [testPhone, setTestPhone] = useState("");
   const [testingWa, setTestingWa] = useState(false);
 
-  // Platform config (Razorpay + WhatsApp)
+  // SMTP test
+  const [testEmail, setTestEmail] = useState("");
+  const [testingEmail, setTestingEmail] = useState(false);
+
+  // Platform config (Razorpay + WhatsApp + SMTP)
   const [config, setConfig] = useState<PlatformConfig>(EMPTY_CONFIG);
   const [razorpayDraft, setRazorpayDraft] = useState<PlatformConfig>(EMPTY_CONFIG);
   const [whatsappDraft, setWhatsappDraft] = useState<PlatformConfig>(EMPTY_CONFIG);
+  const [smtpDraft, setSmtpDraft] = useState<PlatformConfig>(EMPTY_CONFIG);
   const [savingConfig, setSavingConfig] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
 
@@ -186,6 +203,7 @@ export default function SuperAdminSettings() {
           setConfig(c);
           setRazorpayDraft(c);
           setWhatsappDraft(c);
+          setSmtpDraft(c);
           setConfigLoaded(true);
         }
       })
@@ -224,6 +242,7 @@ export default function SuperAdminSettings() {
         setConfig(c);
         setRazorpayDraft(c);
         setWhatsappDraft(c);
+        setSmtpDraft(c);
       }
       toast.success("Configuration saved successfully!");
       setEditingItem(null);
@@ -511,6 +530,138 @@ export default function SuperAdminSettings() {
           <div className="flex gap-2">
             <button className="px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold cursor-pointer hover:bg-amber-600 transition-colors">Save Changes</button>
             <button onClick={() => setEditingItem(null)} className="px-4 py-2 rounded-xl border border-border-default text-[11px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 transition-colors">Cancel</button>
+          </div>
+        </div>
+      );
+    }
+
+    // ── SMTP ──
+    if (item.editType === "smtp") {
+      return (
+        <div className="mx-4 mb-3 p-4 bg-warm-50 rounded-xl border border-border-default">
+          <div className="text-[12px] font-bold text-ink mb-1">Edit: Email Configuration (SMTP)</div>
+          <p className="text-[10px] text-ink-muted mb-3">
+            Gmail ke liye: App Password use karen (2FA on hone par). Port 587 (TLS) ya 465 (SSL).
+          </p>
+          {!configLoaded ? (
+            <div className="text-[11px] text-ink-muted py-4 text-center">Loading...</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 mb-3">
+              <PlainField
+                label="SMTP Host"
+                name="smtp_host"
+                value={smtpDraft.smtp_host}
+                onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_host: v }))}
+                placeholder="smtp.gmail.com"
+                hint="Gmail: smtp.gmail.com · Outlook: smtp.office365.com · Custom: aapka SMTP server"
+              />
+              <PlainField
+                label="SMTP Port"
+                name="smtp_port"
+                value={smtpDraft.smtp_port}
+                onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_port: v }))}
+                placeholder="587"
+                hint="587 (TLS/STARTTLS) ya 465 (SSL) — recommended: 587"
+              />
+              <PlainField
+                label="SMTP Username / Email"
+                name="smtp_user"
+                value={smtpDraft.smtp_user}
+                onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_user: v }))}
+                placeholder="noreply@myrentsaathi.com"
+                hint="Woh email address jo login karta hai SMTP server par"
+              />
+              <SecretField
+                label="SMTP Password / App Password"
+                name="smtp_password"
+                value={smtpDraft.smtp_password}
+                onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_password: v }))}
+                placeholder="Gmail App Password ya SMTP password"
+                hint="Gmail: Google Account → Security → App Passwords se generate karen"
+              />
+              <PlainField
+                label="From Email (optional)"
+                name="smtp_from_email"
+                value={smtpDraft.smtp_from_email}
+                onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_from_email: v }))}
+                placeholder="noreply@myrentsaathi.com"
+                hint="Agar blank hai to SMTP username use hoga"
+              />
+              <PlainField
+                label="From Name"
+                name="smtp_from_name"
+                value={smtpDraft.smtp_from_name}
+                onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_from_name: v }))}
+                placeholder="MyRentSaathi"
+                hint="Email mein sender ka naam dikhai dega"
+              />
+            </div>
+          )}
+
+          <div className="flex gap-2 mb-4">
+            <button
+              disabled={savingConfig || !configLoaded}
+              onClick={() => handleSaveConfig({
+                smtp_host: smtpDraft.smtp_host,
+                smtp_port: smtpDraft.smtp_port,
+                smtp_user: smtpDraft.smtp_user,
+                smtp_password: smtpDraft.smtp_password,
+                smtp_from_email: smtpDraft.smtp_from_email,
+                smtp_from_name: smtpDraft.smtp_from_name,
+              })}
+              className="px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold cursor-pointer hover:bg-amber-600 transition-colors disabled:opacity-60"
+            >
+              {savingConfig ? "Saving..." : "Save Changes"}
+            </button>
+            <button
+              onClick={() => { setEditingItem(null); setSmtpDraft(config); }}
+              className="px-4 py-2 rounded-xl border border-border-default text-[11px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {/* Test Email */}
+          <div className="border-t border-border-default pt-3">
+            <div className="text-[10px] font-bold text-ink-muted mb-2">Test Email Connection</div>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="test@example.com"
+                className="flex-1 px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-white focus:outline-none focus:border-amber-400"
+              />
+              <button
+                disabled={testingEmail || !testEmail.trim()}
+                onClick={async () => {
+                  setTestingEmail(true);
+                  try {
+                    const res = await fetch("/api/email/test", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ to: testEmail.trim() }),
+                    });
+                    const data = await res.json() as { success?: boolean; error?: string };
+                    if (data.success) {
+                      toast.success("✅ Test email sent! Inbox check karen.");
+                    } else {
+                      toast.error(`Email error: ${data.error ?? "Unknown"}`);
+                    }
+                  } catch (err) {
+                    toast.error(`Network error: ${String(err)}`);
+                  } finally {
+                    setTestingEmail(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-bold cursor-pointer hover:bg-blue-700 transition-colors disabled:opacity-60"
+              >
+                {testingEmail ? "Sending..." : "Send Test"}
+              </button>
+            </div>
+            <p className="text-[9px] text-ink-muted mt-1">
+              Pehle Save karo, phir test karen. Gmail App Password required hai agar 2FA on hai.
+            </p>
           </div>
         </div>
       );

@@ -161,6 +161,36 @@ export default function AdminLandlords() {
       }).catch(() => {});
     }
 
+    // Send credential email + WhatsApp notification (fire-and-forget)
+    const credEmail = result.loginEmail ?? form.email;
+    const credPassword = result.generatedPassword;
+    if (credEmail && credPassword) {
+      fetch("/api/email/send-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: credEmail,
+          name: form.full_name,
+          email: credEmail,
+          password: credPassword,
+          role: "Landlord",
+          societyName,
+        }),
+      }).catch(() => {});
+
+      if (form.phone) {
+        fetch("/api/whatsapp/notify-credentials", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: form.phone,
+            name: form.full_name,
+            email: credEmail,
+          }),
+        }).catch(() => {});
+      }
+    }
+
     const selectedFlat = vacantFlats.find((f) => f.id === form.flat_id);
     const flatLabel = selectedFlat
       ? `${selectedFlat.flat_number}${selectedFlat.block ? ` (${selectedFlat.block})` : ""}`
