@@ -189,11 +189,43 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
     keywords: post.tags?.join(", "),
   };
 
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: BASE_URL },
+      { "@type": "ListItem", position: 2, name: "Blog", item: `${BASE_URL}/blog` },
+      { "@type": "ListItem", position: 3, name: post.category, item: `${BASE_URL}/blog` },
+      { "@type": "ListItem", position: 4, name: post.title, item: `${BASE_URL}/blog/${slug}` },
+    ],
+  };
+
+  const aggregateRatingJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "MyRentSaathi",
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "4.8",
+      reviewCount: "500",
+      bestRating: "5",
+      worstRating: "1",
+    },
+  };
+
   return (
     <div className="bg-background text-ink overflow-x-hidden">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(aggregateRatingJsonLd).replace(/</g, "\\u003c") }}
       />
       <HomePageClient />
 

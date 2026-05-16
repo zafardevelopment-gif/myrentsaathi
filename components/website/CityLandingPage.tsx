@@ -115,6 +115,85 @@ export default function CityLandingPage({ city, state, slug, neighborhoods, faqs
         </section>
       )}
 
+      {/* Local Laws & Stamp Duty */}
+      <section className="py-14 px-6 max-w-[900px] mx-auto">
+        <h2 className="font-serif text-[26px] font-extrabold text-ink text-center mb-8">
+          Rental Laws & Registration Costs in {city}
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
+          {((): { title: string; content: string }[] => {
+            const stateRules: Record<string, { title: string; content: string }[]> = {
+              Maharashtra: [
+                { title: "Stamp Duty", content: "Leave & Licence: 0.25% of total rent for ≤5 years. For longer tenures, higher slabs apply." },
+                { title: "Registration", content: "Mandatory registration for agreements >11 months. Done at Sub-Registrar office or online via iGR Maharashtra." },
+                { title: "CHS Rules", content: "Co-operative Housing Society members must follow Maharashtra Co-operative Societies Act 1960." },
+                { title: "Notice Period", content: "Typically 1 month for residential. Leave & Licence gives stronger landlord protection than lease." },
+              ],
+              Delhi: [
+                { title: "Stamp Duty", content: "2% of annual rent + security deposit for agreements up to 5 years. Higher for longer tenure." },
+                { title: "Registration", content: "Compulsory registration for agreements >11 months. File at Sub-Registrar office, Delhi." },
+                { title: "DDA Rules", content: "DDA flats have transfer restrictions. Check DDA bye-laws before subletting." },
+                { title: "Rent Control", content: "Delhi Rent Control Act applies to pre-1958 properties. Newer properties follow Transfer of Property Act." },
+              ],
+              Karnataka: [
+                { title: "Stamp Duty", content: "0.5% of average annual rent for residential agreements up to 10 years." },
+                { title: "Registration", content: "Mandatory for tenures >11 months. Online registration available via Karnataka Kaveri portal." },
+                { title: "Model Tenancy Act", content: "Karnataka adopted the Model Tenancy Act — landlords have stronger dispute resolution rights." },
+                { title: "RWA Rules", content: "BBMP and BDA layouts have specific maintenance and parking norms under Karnataka apartment laws." },
+              ],
+              Telangana: [
+                { title: "Stamp Duty", content: "0.5% of total rent amount for residential agreements up to 10 years." },
+                { title: "Registration", content: "Can register online via IGRS Telangana portal. 11-month agreements widely used to avoid registration." },
+                { title: "HMDA Rules", content: "HMDA (Hyderabad Metropolitan Development Authority) governs layouts in Hyderabad suburbs." },
+                { title: "Notice Period", content: "Minimum 1 month notice on both sides unless otherwise agreed in the tenancy agreement." },
+              ],
+            };
+            const defaultRules = [
+              { title: "11-Month Agreements", content: "Most landlords use 11-month agreements to avoid mandatory registration, which kicks in at 12+ months." },
+              { title: "Stamp Duty", content: "Stamp duty varies by state — typically 0.25%–2% of total annual rent. Always use proper stamp paper." },
+              { title: "Registration", content: `Agreements exceeding 11 months must be registered at the local Sub-Registrar office in ${city}.` },
+              { title: "Security Deposit", content: "2–3 months rent is standard in most Indian cities. More in Bangalore (6–10 months) and Mumbai." },
+            ];
+            return stateRules[state] ?? defaultRules;
+          })().map((rule) => (
+            <div key={rule.title} className="bg-white rounded-[14px] border border-border-default p-5">
+              <h3 className="font-bold text-ink text-[14px] mb-2">📋 {rule.title}</h3>
+              <p className="text-[12px] text-ink/65 leading-relaxed">{rule.content}</p>
+            </div>
+          ))}
+        </div>
+        {/* Stamp duty table */}
+        <div className="bg-warm-50 rounded-[14px] border border-border-default p-5">
+          <div className="text-[13px] font-bold text-ink mb-3">Agreement Registration Fees — Quick Reference</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px] text-ink/70">
+              <thead>
+                <tr className="border-b border-border-default">
+                  <th className="text-left pb-2 font-semibold">Agreement Type</th>
+                  <th className="text-left pb-2 font-semibold">Stamp Duty</th>
+                  <th className="text-left pb-2 font-semibold">Registration</th>
+                  <th className="text-left pb-2 font-semibold">Mandatory?</th>
+                </tr>
+              </thead>
+              <tbody className="space-y-1">
+                {[
+                  { type: "≤11 months", stamp: "₹100–₹500", reg: "Not required", mandatory: "No" },
+                  { type: "12–36 months", stamp: "0.25%–2% of rent", reg: "Sub-Registrar office", mandatory: "Yes" },
+                  { type: "3–5 years", stamp: "Higher slab", reg: "Sub-Registrar + notary", mandatory: "Yes" },
+                ].map((row) => (
+                  <tr key={row.type} className="border-b border-border-light last:border-0">
+                    <td className="py-2 font-semibold">{row.type}</td>
+                    <td className="py-2">{row.stamp}</td>
+                    <td className="py-2">{row.reg}</td>
+                    <td className="py-2">{row.mandatory}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing CTA */}
       <section className="py-14 px-6 max-w-[700px] mx-auto text-center">
         <h2 className="font-serif text-[28px] font-extrabold text-ink mb-4">

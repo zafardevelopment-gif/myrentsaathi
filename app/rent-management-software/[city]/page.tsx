@@ -102,6 +102,14 @@ function getCityFaqs(city: City): { q: string; a: string }[] {
       q: `Can NRI landlords manage ${city.city_name} properties remotely?`,
       a: `Yes. The NRI plan (₹1,999/month) is built for remote management — WhatsApp-only operation, NRI tax reports, Power of Attorney support, and a multi-city dashboard for all your ${city.city_name} properties.`,
     },
+    {
+      q: `What is the stamp duty for a rent agreement in ${city.city_name}?`,
+      a: `For 11-month agreements in ${city.city_name}, stamp paper of ₹100–₹500 is typically used — no registration required. For agreements exceeding 11 months, stamp duty of 0.25%–2% of total rent applies depending on ${city.state} rules, and registration at the Sub-Registrar office is mandatory. MyRentSaathi's AI agreement generator includes city-specific stamp duty guidance.`,
+    },
+    {
+      q: `How does MyRentSaathi handle society maintenance collection in ${city.city_name}?`,
+      a: `Society admins in ${city.city_name} can auto-generate monthly maintenance bills, send them via WhatsApp to flat owners, collect UPI payments, and track defaulters — all from one dashboard. Expense splitting across flats is automatic. No manual calculations needed.`,
+    },
   ];
 }
 
@@ -127,14 +135,30 @@ export default async function CityPage({
   const neighborhoods = CITY_NEIGHBORHOODS[slug] ?? [];
   const faqs = getCityFaqs(city);
 
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: BASE_URL },
+      { "@type": "ListItem", position: 2, name: "Rent Management Software", item: `${BASE_URL}/rent-management-software` },
+      { "@type": "ListItem", position: 3, name: city.city_name, item: `${BASE_URL}/rent-management-software/${slug}` },
+    ],
+  };
+
   return (
-    <CityLandingPage
-      city={city.city_name}
-      state={city.state}
-      slug={slug}
-      neighborhoods={neighborhoods}
-      faqs={faqs}
-      otherCities={otherCities}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c") }}
+      />
+      <CityLandingPage
+        city={city.city_name}
+        state={city.state}
+        slug={slug}
+        neighborhoods={neighborhoods}
+        faqs={faqs}
+        otherCities={otherCities}
+      />
+    </>
   );
 }

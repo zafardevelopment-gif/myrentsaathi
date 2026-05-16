@@ -109,6 +109,29 @@ const orgJsonLd = {
   ],
 };
 
+// ── LocalBusiness JSON-LD ─────────────────────────────────────
+const localBusinessJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  name: "MyRentSaathi",
+  url: BASE_URL,
+  logo: `${BASE_URL}/logo.png`,
+  description: "India's smartest rent & society management platform. WhatsApp-native, AI-powered agreements, UPI rent collection.",
+  priceRange: "₹499–₹9,999/month",
+  serviceType: ["Society Management Software", "Rent Collection App", "Tenant Management Software", "Property Management India"],
+  areaServed: [
+    "Delhi", "Mumbai", "Bangalore", "Hyderabad", "Pune", "Chennai", "Kolkata",
+    "Ahmedabad", "Noida", "Gurgaon", "Surat", "Jaipur", "Lucknow", "Indore",
+    "Bhopal", "Kochi", "Coimbatore", "Nagpur", "Visakhapatnam", "Bhubaneswar",
+    "Chandigarh", "Vadodara", "Thane", "Navi Mumbai", "Faridabad",
+  ].map((name) => ({ "@type": "City", name })),
+  contactPoint: {
+    "@type": "ContactPoint",
+    contactType: "customer support",
+    availableLanguage: ["English", "Hindi"],
+  },
+};
+
 // ── SaaS Product JSON-LD ─────────────────────────────────────
 const productJsonLd = {
   "@context": "https://schema.org",
@@ -141,7 +164,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="en-IN"
       className={`${outfit.variable} ${playfair.variable} h-full antialiased`}
       suppressHydrationWarning
     >
@@ -156,6 +179,12 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c"),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(localBusinessJsonLd).replace(/</g, "\\u003c"),
           }}
         />
       </head>

@@ -10,10 +10,25 @@ import TopCities from "@/components/website/TopCities";
 import FAQ from "@/components/website/FAQ";
 import CTA from "@/components/website/CTA";
 import Footer from "@/components/website/Footer";
+import { WEBSITE_FAQS } from "@/lib/mockData";
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: WEBSITE_FAQS.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
 
 export default function HomePage() {
   return (
     <div className="bg-background text-ink overflow-x-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c") }}
+      />
       {/* Fire-and-forget analytics — renders nothing */}
       <PageTracker page="/" />
       {/* Client shell: Navbar + LoginModal (needs useState) */}

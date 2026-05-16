@@ -18,7 +18,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/for-landlords`,    lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     { url: `${BASE_URL}/for-societies`,    lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     { url: `${BASE_URL}/for-tenants`,      lastModified: now, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${BASE_URL}/blog`,             lastModified: now, changeFrequency: "weekly",  priority: 0.7 },
+    { url: `${BASE_URL}/blog`,                            lastModified: now, changeFrequency: "weekly",  priority: 0.7 },
+    { url: `${BASE_URL}/rental-agreement-generator`,      lastModified: now, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${BASE_URL}/vs-mygate`,                       lastModified: now, changeFrequency: "monthly", priority: 0.85 },
+    { url: `${BASE_URL}/nri-property-management`,         lastModified: now, changeFrequency: "monthly", priority: 0.85 },
+    { url: `${BASE_URL}/visitor-management`,              lastModified: now, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${BASE_URL}/for-rwa-committees`,              lastModified: now, changeFrequency: "monthly", priority: 0.75 },
+    { url: `${BASE_URL}/whatsapp-rent-collection`,        lastModified: now, changeFrequency: "monthly", priority: 0.8 },
   ];
 
   // ── Dynamic city pages ────────────────────────────────────
