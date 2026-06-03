@@ -10,11 +10,14 @@ type Payload = {
   role: string;
   societyName?: string;
   loginUrl?: string;
+  createdByType?: "landlord" | "society";
+  createdByName?: string;
+  createdByPhone?: string;
 };
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as Payload;
-  const { to, name, email, password, role, societyName, loginUrl } = body;
+  const { to, name, email, password, role, societyName, loginUrl, createdByType, createdByName, createdByPhone } = body;
 
   if (!to || !name || !email || !password) {
     return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
@@ -26,6 +29,46 @@ export async function POST(req: NextRequest) {
   }
 
   const appUrl = loginUrl ?? "https://myrentsaathi.com/login";
+
+  // Who created this account (landlord / society) + their details.
+  const roleLower = (role ?? "").toLowerCase();
+  const creatorType: "landlord" | "society" | null =
+    createdByType ?? (roleLower === "tenant" ? "landlord" : roleLower === "landlord" ? "society" : null);
+  const creatorName = createdByName ?? (creatorType === "society" ? societyName : undefined);
+  const creatorLine = creatorName
+    ? `your ${creatorType === "society" ? "society" : "landlord"} <strong>${creatorName}</strong>${createdByPhone ? ` (${createdByPhone})` : ""} has created your MyRentSaathi account.`
+    : `your MyRentSaathi account has been created${societyName ? ` for <strong>${societyName}</strong>` : ""}.`;
+
+  // What the user can do, based on their role.
+  const capsByRole: Record<string, string[]> = {
+    tenant: [
+      "Pay your rent online (UPI / card / netbanking)",
+      "View &amp; download rent invoices and receipts",
+      "View your rental agreement anytime",
+      "Raise complaints and track their status",
+      "Read society notices and vote in polls",
+      "Pre-approve visitors and manage your documents",
+    ],
+    landlord: [
+      "Manage your properties, tenants and agreements",
+      "Collect rent online and track every payment",
+      "Generate rent / maintenance / electricity invoices (with GST)",
+      "Send automatic payment reminders on email &amp; WhatsApp",
+      "Handle complaints, notices and documents in one place",
+    ],
+  };
+  const caps = capsByRole[roleLower] ?? [
+    "Access your dashboard",
+    "Manage payments and documents",
+    "Stay updated with notices and alerts",
+  ];
+  const capabilitiesHtml = `
+    <div style="background:#f0f7ff;border:1px solid #d7e7fb;border-radius:10px;padding:16px 18px;margin:20px 0">
+      <div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:8px">✨ What you can do on MyRentSaathi</div>
+      <ul style="margin:0;padding-left:18px;color:#555;font-size:12.5px;line-height:1.7">
+        ${caps.map((c) => `<li>${c}</li>`).join("")}
+      </ul>
+    </div>`;
 
   try {
     const transporter = nodemailer.createTransport({
@@ -46,10 +89,8 @@ export async function POST(req: NextRequest) {
             <p style="color:#aaa;font-size:12px;margin:4px 0 0">Society Management Platform</p>
           </div>
 
-          <p style="color:#333;font-size:15px">Hello <strong>${name}</strong>,</p>
-          <p style="color:#555;font-size:13px;line-height:1.6">
-            Your <strong>MyRentSaathi</strong> account has been created${societyName ? ` for <strong>${societyName}</strong>` : ""}.
-            Here are your login credentials:
+          <p style="color:#555;font-size:14px;line-height:1.6;margin-top:0">
+            <strong style="color:#1a1a2e">${name}</strong>, ${creatorLine} Below are your login credentials:
           </p>
 
           <div style="background:#f8f8f8;border:1px solid #e5e5e5;border-radius:10px;padding:20px;margin:20px 0">
@@ -69,9 +110,11 @@ export async function POST(req: NextRequest) {
             </table>
           </div>
 
-          <a href="${appUrl}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:20px">
+          <a href="${appUrl}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:8px">
             Log In →
           </a>
+
+          ${capabilitiesHtml}
 
           <p style="color:#e05;font-size:12px;background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px;margin-top:16px">
             ⚠️ <strong>Security tip:</strong> Please change your password after your first login.

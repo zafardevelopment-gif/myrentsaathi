@@ -477,7 +477,7 @@ export default function AdminFlats() {
             fetch("/api/email/send-credentials", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ to: tEmail, name: form.tenant_name, email: tEmail, password: tPass, role: "Tenant", societyName: society?.name }),
+              body: JSON.stringify({ to: tEmail, name: form.tenant_name, email: tEmail, password: tPass, role: "Tenant", societyName: society?.name, createdByType: "society", createdByName: society?.name }),
             }).catch(() => {});
             if (form.tenant_phone) {
               fetch("/api/whatsapp/notify-credentials", {

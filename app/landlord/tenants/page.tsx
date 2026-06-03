@@ -501,6 +501,8 @@ export default function LandlordTenants() {
           password: credPassword,
           role: "Tenant",
           societyName: tenantSocietyName,
+          createdByType: "landlord",
+          createdByName: user?.name,
         }),
       }).catch(() => {});
 

@@ -11,6 +11,7 @@ export type TenantProfile = {
   id: string;
   society_id: string | null;
   flat_id: string | null;
+  gst_number: string | null;
   user: { id: string; full_name: string; email: string; phone: string } | null;
   flat?: {
     flat_number: string;
@@ -72,7 +73,7 @@ export async function getTenantProfile(email: string): Promise<TenantProfile | n
 
   const { data, error } = await supabase
     .from("tenants")
-    .select("id, society_id, flat_id, user_id")
+    .select("id, society_id, flat_id, user_id, gst_number")
     .eq("user_id", user.id)
     .maybeSingle();
   if (error) { console.error("getTenantProfile error:", error); return null; }
@@ -119,10 +120,18 @@ export async function getTenantProfile(email: string): Promise<TenantProfile | n
     id: data.id,
     society_id: data.society_id,
     flat_id: data.flat_id,
+    gst_number: data.gst_number ?? null,
     user: userInfo ?? { id: user.id, full_name: email, email, phone: "" },
     flat,
     society,
   } as unknown as TenantProfile;
+}
+
+/** Save the tenant's GST number (optional — for B2B / GST invoices). */
+export async function updateTenantGst(tenantId: string, gst: string): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase.from("tenants").update({ gst_number: gst.trim() || null }).eq("id", tenantId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
 }
 
 // ─── RENT PAYMENTS ───────────────────────────────────────────

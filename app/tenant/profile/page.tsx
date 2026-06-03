@@ -3,20 +3,33 @@
 import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
-import { getTenantProfile, type TenantProfile } from "@/lib/tenant-data";
+import { getTenantProfile, updateTenantGst, type TenantProfile } from "@/lib/tenant-data";
 
 export default function TenantProfile() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<TenantProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gstValue, setGstValue] = useState("");
+  const [gstSaving, setGstSaving] = useState(false);
+  const [gstMsg, setGstMsg] = useState("");
 
   useEffect(() => {
     if (!user?.email) return;
     getTenantProfile(user.email)
-      .then(setProfile)
+      .then((p) => { setProfile(p); setGstValue(p?.gst_number ?? ""); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user]);
+
+  async function saveGst() {
+    if (!profile) return;
+    setGstSaving(true); setGstMsg("");
+    const res = await updateTenantGst(profile.id, gstValue);
+    setGstSaving(false);
+    if (!res.success) { setGstMsg("Could not save. " + (res.error ?? "")); return; }
+    setGstMsg("Saved ✓");
+    setProfile({ ...profile, gst_number: gstValue.trim() || null });
+  }
 
   if (loading) {
     return (
@@ -80,6 +93,26 @@ export default function TenantProfile() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* GST Number (optional — for GST invoices) */}
+      <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
+        <div className="text-sm font-extrabold text-ink">GST Number <span className="text-[10px] font-normal text-ink-muted">(optional)</span></div>
+        <div className="text-[11px] text-ink-muted mt-0.5 mb-3">Add your GSTIN only if you need GST invoices for your rent.</div>
+        <div className="flex gap-2 items-center flex-wrap">
+          <input
+            className="flex-1 min-w-[180px] border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500 uppercase"
+            placeholder="e.g. 27ABCDE1234F1Z5"
+            value={gstValue}
+            maxLength={15}
+            onChange={(e) => setGstValue(e.target.value.toUpperCase())}
+          />
+          <button onClick={saveGst} disabled={gstSaving}
+            className="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60">
+            {gstSaving ? "Saving..." : "Save GST"}
+          </button>
+        </div>
+        {gstMsg && <div className="text-[11px] mt-2 font-semibold text-green-600">{gstMsg}</div>}
       </div>
 
       {/* Actions */}
