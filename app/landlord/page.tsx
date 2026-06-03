@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { supabase } from "@/lib/supabase";
+import SetupProgressCard from "@/components/billing/SetupProgressCard";
 import {
   getLandlordOverviewStats, getLandlordRentPayments, getLandlordTickets,
   getLandlordAgreements, getLandlordFlats, getLandlordUserId,
@@ -373,6 +374,9 @@ export default function LandlordOverview() {
 
   return (
     <div>
+      {/* Guided setup progress (auto-hides once 100%) */}
+      <div className="mb-4"><SetupProgressCard /></div>
+
       {/* Welcome card */}
       <div className="bg-gradient-to-br from-green-900 to-green-700 text-white rounded-[18px] p-6 mb-4 relative overflow-hidden">
         <div className="absolute top-[-40px] right-[-40px] w-36 h-36 rounded-full bg-white/5" />

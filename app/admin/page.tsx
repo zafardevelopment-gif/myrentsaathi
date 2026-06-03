@@ -6,6 +6,7 @@ import StatusBadge from "@/components/dashboard/StatusBadge";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { supabase } from "@/lib/supabase";
+import SetupProgressCard from "@/components/billing/SetupProgressCard";
 import {
   getAdminSociety,
   getAdminSocietyId,
@@ -118,6 +119,9 @@ export default function AdminOverview() {
 
   return (
     <div>
+      {/* Guided setup progress (auto-hides once 100%) */}
+      <div className="mb-4"><SetupProgressCard /></div>
+
       {/* Society Card */}
       <div className="bg-gradient-to-br from-brand-900 to-[#3a2a1a] text-white rounded-[14px] p-5 mb-4">
         <div className="flex justify-between items-center flex-wrap gap-3">
