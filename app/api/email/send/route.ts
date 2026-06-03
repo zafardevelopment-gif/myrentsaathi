@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { getSmtpConfig } from "@/lib/platform-config";
 
+type Attachment = { filename: string; content?: string; encoding?: string; path?: string; href?: string; contentType?: string };
 type Payload = {
   to: string;
   subject: string;
   html: string;
+  attachments?: Attachment[]; // e.g. PDF invoice (base64 content or a URL via href)
 };
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as Payload;
-  const { to, subject, html } = body;
+  const { to, subject, html, attachments } = body;
 
   if (!to || !subject || !html) {
     return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
@@ -34,6 +36,7 @@ export async function POST(req: NextRequest) {
       to,
       subject,
       html,
+      ...(attachments && attachments.length ? { attachments } : {}),
     });
 
     return NextResponse.json({ success: true });

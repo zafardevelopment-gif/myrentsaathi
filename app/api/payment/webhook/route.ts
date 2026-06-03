@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
             notes: Record<string, string>;
           };
         };
+        payment_link?: { entity: { id: string; notes: Record<string, string> } };
       };
     };
 
@@ -54,6 +55,24 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getSupabaseAdmin();
+
+    // ── NEW billing model (§27): confirm an invoice payment from link/order notes ──
+    const invoiceId = payment.notes?.invoice_id || payload.payment_link?.entity?.notes?.invoice_id;
+    if ((eventType === "payment.captured" || eventType === "payment_link.paid") && invoiceId) {
+      const linkId = payload.payment_link?.entity?.id ?? null;
+      const { data: dupe } = await supabase
+        .from("invoice_payments").select("id").eq("reference", payment.id).maybeSingle();
+      if (!dupe) {
+        await supabase.from("invoice_payments").insert({
+          invoice_id: invoiceId, amount: payment.amount / 100,
+          method: linkId ? "payment_link" : "razorpay", reference: payment.id,
+          razorpay_order_id: payment.order_id ?? null, payment_link_id: linkId, status: "confirmed",
+        });
+        // DB trigger recomputes invoice amount_paid + status.
+      }
+      if (linkId) await supabase.from("invoices").update({ payment_link_status: "paid" }).eq("id", invoiceId);
+      return NextResponse.json({ received: true });
+    }
 
     if (eventType === "payment.captured") {
       // Payment succeeded — log it (main update happens in /verify route after client confirms)

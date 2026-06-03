@@ -1,0 +1,10 @@
+{
+  "crons": [
+    { "path": "/api/cron/generate-rent", "schedule": "0 2 1 * *" },
+    { "path": "/api/cron/generate-maintenance", "schedule": "0 2 1 * *" },
+    { "path": "/api/cron/generate-electricity", "schedule": "0 2 5 * *" },
+    { "path": "/api/cron/apply-late-fees", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/mark-overdue", "schedule": "30 0 * * *" },
+    { "path": "/api/cron/process-reminders", "schedule": "0 3 * * *" }
+  ]
+}
