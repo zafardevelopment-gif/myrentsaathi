@@ -443,6 +443,32 @@ export async function getAllSocieties(): Promise<SocietyOption[]> {
   return (data ?? []) as SocietyOption[];
 }
 
+/**
+ * Resolve a society by typed name: if one already exists (case-insensitive),
+ * return its id; otherwise create a new society and return its id.
+ * Blank name → null (independent property).
+ */
+export async function findOrCreateSociety(name: string): Promise<{ id: string | null; created: boolean; error?: string }> {
+  const trimmed = name.trim();
+  if (!trimmed) return { id: null, created: false };
+
+  const { data: existing } = await supabase
+    .from("societies")
+    .select("id")
+    .ilike("name", trimmed)
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) return { id: existing.id, created: false };
+
+  const { data: created, error } = await supabase
+    .from("societies")
+    .insert({ name: trimmed, is_active: true })
+    .select("id")
+    .single();
+  if (error || !created) return { id: null, created: false, error: error?.message ?? "Failed to create society." };
+  return { id: created.id, created: true };
+}
+
 // ─── OVERVIEW STATS ───────────────────────────────────────────
 
 export async function getLandlordOverviewStats(email: string) {

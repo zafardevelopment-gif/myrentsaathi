@@ -20,6 +20,7 @@ import { getTenantTickets, type TenantTicket } from "@/lib/tenant-data";
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import SetupProgressCard from "@/components/billing/SetupProgressCard";
 
 export default function TenantHome() {
   const { user } = useAuth();
@@ -119,6 +120,8 @@ export default function TenantHome() {
   return (
     <div>
       <Toaster position="top-center" />
+      {/* Guided setup progress (auto-hides once complete) */}
+      <div className="mb-4"><SetupProgressCard /></div>
       <div className="bg-gradient-to-br from-indigo-900 to-indigo-700 text-white rounded-[14px] p-5 mb-4">
         <div className="flex justify-between items-start gap-3 flex-wrap">
           <div>

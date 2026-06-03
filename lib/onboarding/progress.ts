@@ -18,7 +18,7 @@ export type SetupStep = {
   hint?: string;
 };
 export type SetupProgress = {
-  user_type: "landlord" | "society" | null;
+  user_type: "landlord" | "society" | "tenant" | null;
   percent: number;
   completed: boolean;
   nextStepHref: string | null;
@@ -115,9 +115,43 @@ async function societySteps(societyId: string): Promise<SetupStep[]> {
   ];
 }
 
+// ─── TENANT ───────────────────────────────────────────────────
+
+async function tenantSteps(userId: string): Promise<SetupStep[]> {
+  const { data: user } = await supabaseAdmin
+    .from("users").select("full_name, phone, email").eq("id", userId).maybeSingle();
+  const profileDone = !!(user?.full_name && user?.phone && user?.email);
+
+  const { count: docCount } = await supabaseAdmin
+    .from("documents").select("id", { count: "exact", head: true }).eq("uploaded_by", userId);
+
+  const { data: tenantRow } = await supabaseAdmin
+    .from("tenants").select("gst_number").eq("user_id", userId).limit(1).maybeSingle();
+  const gstDone = !!tenantRow?.gst_number;
+
+  return [
+    { key: "profile", title: "Complete Your Profile", required: true, href: "/tenant/profile",
+      status: profileDone ? "completed" : "in_progress", hint: "Name, phone, email" },
+    { key: "documents", title: "Upload Documents", required: true, href: "/tenant/documents",
+      status: (docCount ?? 0) > 0 ? "completed" : "not_started", hint: "ID proof, agreement copy, etc." },
+    { key: "gst", title: "Add GST Number", required: false, href: "/tenant/profile",
+      status: gstDone ? "completed" : "not_started", hint: "Only if you need GST invoices" },
+  ];
+}
+
 // ─── PUBLIC ───────────────────────────────────────────────────
 
 export async function getSetupProgress(user: ScopeUser): Promise<SetupProgress> {
+  // Tenants have their own (non-biller) setup flow.
+  if (user.role === "tenant") {
+    const steps = await tenantSteps(user.id);
+    const required = steps.filter((s) => s.required);
+    const done = required.filter((s) => s.status === "completed").length;
+    const percent = required.length === 0 ? 100 : Math.round((done / required.length) * 100);
+    const next = steps.find((s) => s.status !== "completed");
+    return { user_type: "tenant", percent, completed: percent === 100, nextStepHref: next?.href ?? null, steps };
+  }
+
   const scope = await resolveBillerScope(user);
   if (!scope) return { user_type: null, percent: 0, completed: false, nextStepHref: null, steps: [] };
 

@@ -6,8 +6,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import {
   getLandlordFlats, getLandlordUserId, addLandlordFlat, updateLandlordFlat,
-  deleteLandlordFlat, getAllSocieties,
-  type LandlordFlat, type SocietyOption,
+  deleteLandlordFlat, findOrCreateSociety,
+  type LandlordFlat,
 } from "@/lib/landlord-data";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
@@ -56,7 +56,6 @@ type Complaint = { id: string; subject: string; category: string; priority: stri
 export default function LandlordProperties() {
   const { user } = useAuth();
   const [flats, setFlats] = useState<LandlordFlat[]>([]);
-  const [societies, setSocieties] = useState<SocietyOption[]>([]);
   const [landlordId, setLandlordId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -103,14 +102,12 @@ export default function LandlordProperties() {
 
   async function loadData() {
     if (!user?.email) return;
-    const [f, lid, socs] = await Promise.all([
+    const [f, lid] = await Promise.all([
       getLandlordFlats(user.email).catch(() => [] as LandlordFlat[]),
       getLandlordUserId(user.email),
-      getAllSocieties().catch(() => [] as SocietyOption[]),
     ]);
     setFlats(f);
     setLandlordId(lid);
-    setSocieties(socs);
     setLoading(false);
   }
 
@@ -157,9 +154,18 @@ export default function LandlordProperties() {
     e.preventDefault();
     if (!landlordId) return;
     setSaving(true);
+
+    // Resolve society from the typed name: link existing, else create new (blank = independent).
+    let societyId: string | undefined = undefined;
+    if (addForm.society_name_custom.trim()) {
+      const soc = await findOrCreateSociety(addForm.society_name_custom);
+      if (!soc.id) { setSaving(false); toast.error(soc.error ?? "Could not resolve society."); return; }
+      societyId = soc.id;
+    }
+
     const result = await addLandlordFlat({
       owner_id: landlordId,
-      society_id: addForm.society_id || undefined,
+      society_id: societyId,
       flat_number: addForm.flat_number,
       block: addForm.block || undefined,
       flat_type: addForm.flat_type || undefined,
@@ -274,19 +280,14 @@ export default function LandlordProperties() {
         <form onSubmit={handleAddFlat} className="bg-white rounded-[14px] p-4 border border-brand-200 mb-4 space-y-3">
           <div className="text-sm font-bold text-ink mb-1">Add New Property</div>
           <div>
-            <label className={labelClass}>Society (optional)</label>
-            <select className={inputClass} value={addForm.society_id} onChange={e => setAddForm(f => ({ ...f, society_id: e.target.value }))}>
-              <option value="">— None / Independent Property —</option>
-              {societies.map(s => <option key={s.id} value={s.id}>{s.name} · {s.city}</option>)}
-            </select>
-            {!addForm.society_id && (
-              <input
-                className={`${inputClass} mt-1`}
-                placeholder="Or type society / area name (optional)"
-                value={addForm.society_name_custom}
-                onChange={e => setAddForm(f => ({ ...f, society_name_custom: e.target.value }))}
-              />
-            )}
+            <label className={labelClass}>Society / Area (optional)</label>
+            <input
+              className={inputClass}
+              placeholder="Type your society / area name (leave blank for independent)"
+              value={addForm.society_name_custom}
+              onChange={e => setAddForm(f => ({ ...f, society_name_custom: e.target.value }))}
+            />
+            <p className="text-[9px] text-ink-muted mt-1">If this society already exists we&apos;ll link to it; otherwise a new one is created.</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div><label className={labelClass}>Flat Number *</label><input required className={inputClass} placeholder="101" value={addForm.flat_number} onChange={e => setAddForm(f => ({ ...f, flat_number: e.target.value }))} /></div>

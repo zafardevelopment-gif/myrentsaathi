@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     await transporter.sendMail({
       from: `"${smtp.fromName || "MyRentSaathi"}" <${smtp.fromEmail || smtp.user}>`,
       to,
-      subject: `🔑 Aapke MyRentSaathi Login Credentials`,
+      subject: `🔑 Your MyRentSaathi Login Credentials`,
       html: `
         <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#fff;border-radius:12px">
           <div style="background:#1a1a2e;border-radius:10px;padding:20px 24px;margin-bottom:24px">
@@ -46,10 +46,10 @@ export async function POST(req: NextRequest) {
             <p style="color:#aaa;font-size:12px;margin:4px 0 0">Society Management Platform</p>
           </div>
 
-          <p style="color:#333;font-size:15px">Namaste <strong>${name}</strong>,</p>
+          <p style="color:#333;font-size:15px">Hello <strong>${name}</strong>,</p>
           <p style="color:#555;font-size:13px;line-height:1.6">
-            Aapka account <strong>MyRentSaathi</strong> par create kar diya gaya hai${societyName ? ` (<strong>${societyName}</strong>)` : ""}.
-            Neeche aapke login credentials hain:
+            Your <strong>MyRentSaathi</strong> account has been created${societyName ? ` for <strong>${societyName}</strong>` : ""}.
+            Here are your login credentials:
           </p>
 
           <div style="background:#f8f8f8;border:1px solid #e5e5e5;border-radius:10px;padding:20px;margin:20px 0">
@@ -70,17 +70,17 @@ export async function POST(req: NextRequest) {
           </div>
 
           <a href="${appUrl}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;margin-bottom:20px">
-            Login Karen →
+            Log In →
           </a>
 
           <p style="color:#e05;font-size:12px;background:#fff5f5;border:1px solid #fcc;border-radius:8px;padding:12px;margin-top:16px">
-            ⚠️ <strong>Security tip:</strong> Please pehli login ke baad apna password zaroor badlen.
-            Yeh credentials kisi ke saath share mat karen.
+            ⚠️ <strong>Security tip:</strong> Please change your password after your first login.
+            Do not share these credentials with anyone.
           </p>
 
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
           <p style="color:#bbb;font-size:11px;text-align:center">
-            MyRentSaathi · Agar koi problem ho to support@myrentsaathi.com par email karen
+            MyRentSaathi · If you have any issues, email support@myrentsaathi.com
           </p>
         </div>
       `,
