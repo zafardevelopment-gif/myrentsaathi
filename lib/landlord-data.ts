@@ -12,6 +12,7 @@ export type LandlordFlat = {
   flat_number: string;
   block: string | null;
   flat_type: string | null;
+  rental_type: string | null;
   floor_number: number | null;
   area_sqft: number | null;
   status: string;
@@ -81,7 +82,7 @@ export async function getLandlordFlats(email: string): Promise<LandlordFlat[]> {
   const { data, error } = await supabase
     .from("flats")
     .select(`
-      id, flat_number, block, flat_type, floor_number, area_sqft, status,
+      id, flat_number, block, flat_type, rental_type, floor_number, area_sqft, status,
       monthly_rent, security_deposit, society_id, current_tenant_id,
       society:societies(name, city)
     `)
@@ -120,6 +121,7 @@ export async function addLandlordFlat(params: {
   flat_number: string;
   block?: string;
   flat_type?: string;
+  rental_type?: string;
   floor_number?: number;
   area_sqft?: number;
   monthly_rent?: number;
@@ -133,6 +135,7 @@ export async function addLandlordFlat(params: {
       flat_number: params.flat_number.trim(),
       block: params.block?.trim() || null,
       flat_type: params.flat_type?.trim() || null,
+      rental_type: params.rental_type?.trim() || null,
       floor_number: params.floor_number ?? null,
       area_sqft: params.area_sqft ?? null,
       monthly_rent: params.monthly_rent ?? null,
@@ -149,6 +152,7 @@ export async function updateLandlordFlat(flatId: string, params: {
   flat_number?: string;
   block?: string | null;
   flat_type?: string | null;
+  rental_type?: string | null;
   floor_number?: number | null;
   area_sqft?: number | null;
   monthly_rent?: number | null;

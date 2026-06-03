@@ -15,6 +15,15 @@ import toast, { Toaster } from "react-hot-toast";
 import ReceiptModal from "@/components/tenant/ReceiptModal";
 
 const FLAT_TYPES = ["1BHK", "2BHK", "3BHK", "4BHK", "Studio", "Penthouse", "Commercial"];
+const RENTAL_TYPES: { v: string; l: string }[] = [
+  { v: "residential", l: "Residential" },
+  { v: "flat", l: "Flat" },
+  { v: "commercial", l: "Commercial" },
+  { v: "office", l: "Office" },
+  { v: "shop", l: "Shop" },
+  { v: "cabin", l: "Cabin" },
+  { v: "coworking", l: "Co-working" },
+];
 
 function TenantProfileTab({ tenantFlat }: { tenantFlat: LandlordFlat }) {
   const tu = (tenantFlat.tenant as { id: string; user?: { full_name: string; phone: string; email: string } | null } | null)?.user;
@@ -45,7 +54,7 @@ function TenantProfileTab({ tenantFlat }: { tenantFlat: LandlordFlat }) {
   );
 }
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
-const emptyForm = { flat_number: "", block: "", flat_type: "", floor_number: "", area_sqft: "", monthly_rent: "", security_deposit: "", society_id: "", society_name_custom: "" };
+const emptyForm = { flat_number: "", block: "", flat_type: "", rental_type: "", floor_number: "", area_sqft: "", monthly_rent: "", security_deposit: "", society_id: "", society_name_custom: "" };
 
 type TenantModalTab = "profile" | "payments" | "agreement" | "documents" | "complaints";
 
@@ -171,6 +180,7 @@ export default function LandlordProperties() {
       flat_number: addForm.flat_number,
       block: addForm.block || undefined,
       flat_type: addForm.flat_type || undefined,
+      rental_type: addForm.rental_type || undefined,
       floor_number: addForm.floor_number ? Number(addForm.floor_number) : undefined,
       area_sqft: addForm.area_sqft ? Number(addForm.area_sqft) : undefined,
       monthly_rent: addForm.monthly_rent ? Number(addForm.monthly_rent) : undefined,
@@ -193,6 +203,7 @@ export default function LandlordProperties() {
       flat_number: editForm.flat_number,
       block: editForm.block || null,
       flat_type: editForm.flat_type || null,
+      rental_type: editForm.rental_type || null,
       floor_number: editForm.floor_number ? Number(editForm.floor_number) : null,
       area_sqft: editForm.area_sqft ? Number(editForm.area_sqft) : null,
       monthly_rent: editForm.monthly_rent ? Number(editForm.monthly_rent) : null,
@@ -304,6 +315,13 @@ export default function LandlordProperties() {
             </div>
             <div><label className={labelClass}>Floor</label><input type="number" className={inputClass} placeholder="1" value={addForm.floor_number} onChange={e => setAddForm(f => ({ ...f, floor_number: e.target.value }))} /></div>
           </div>
+          <div>
+            <label className={labelClass}>Rental Type</label>
+            <select className={inputClass} value={addForm.rental_type} onChange={e => setAddForm(f => ({ ...f, rental_type: e.target.value }))}>
+              <option value="">— Select —</option>
+              {RENTAL_TYPES.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
+            </select>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div><label className={labelClass}>Area (sq.ft)</label><input type="number" className={inputClass} placeholder="850" value={addForm.area_sqft} onChange={e => setAddForm(f => ({ ...f, area_sqft: e.target.value }))} /></div>
             <div><label className={labelClass}>Monthly Rent (₹)</label><input type="number" className={inputClass} placeholder="25000" value={addForm.monthly_rent} onChange={e => setAddForm(f => ({ ...f, monthly_rent: e.target.value }))} /></div>
@@ -386,7 +404,7 @@ export default function LandlordProperties() {
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge status={flat.status} />
-                      <button onClick={() => { setEditFlat(flat); setEditForm({ flat_number: flat.flat_number, block: flat.block ?? "", flat_type: flat.flat_type ?? "", floor_number: flat.floor_number != null ? String(flat.floor_number) : "", area_sqft: flat.area_sqft != null ? String(flat.area_sqft) : "", monthly_rent: flat.monthly_rent != null ? String(flat.monthly_rent) : "", security_deposit: flat.security_deposit != null ? String(flat.security_deposit) : "", society_id: "", society_name_custom: "" }); }}
+                      <button onClick={() => { setEditFlat(flat); setEditForm({ flat_number: flat.flat_number, block: flat.block ?? "", flat_type: flat.flat_type ?? "", rental_type: flat.rental_type ?? "", floor_number: flat.floor_number != null ? String(flat.floor_number) : "", area_sqft: flat.area_sqft != null ? String(flat.area_sqft) : "", monthly_rent: flat.monthly_rent != null ? String(flat.monthly_rent) : "", security_deposit: flat.security_deposit != null ? String(flat.security_deposit) : "", society_id: "", society_name_custom: "" }); }}
                         className="p-1.5 rounded-lg border border-border-default text-ink-muted text-[11px] cursor-pointer hover:bg-warm-50">✏️</button>
                       <button onClick={() => setDeleteFlat(flat)} className="p-1.5 rounded-lg border border-red-200 text-red-500 text-[11px] cursor-pointer hover:bg-red-50">🗑️</button>
                     </div>
@@ -639,6 +657,7 @@ export default function LandlordProperties() {
               {[
                 { label: "Flat No.", value: `${detailFlat.flat_number}${detailFlat.block ? ` (${detailFlat.block})` : ""}` },
                 { label: "Type", value: detailFlat.flat_type ?? "—" },
+                { label: "Rental Type", value: RENTAL_TYPES.find(t => t.v === detailFlat.rental_type)?.l ?? "—" },
                 { label: "Floor", value: detailFlat.floor_number != null ? `Floor ${detailFlat.floor_number}` : "—" },
                 { label: "Area", value: detailFlat.area_sqft ? `${detailFlat.area_sqft} sq.ft` : "—" },
                 { label: "Monthly Rent", value: formatCurrency(detailFlat.monthly_rent ?? 0) },
@@ -678,6 +697,13 @@ export default function LandlordProperties() {
                   </select>
                 </div>
                 <div><label className={labelClass}>Floor</label><input type="number" className={inputClass} value={editForm.floor_number} onChange={e => setEditForm(f => ({ ...f, floor_number: e.target.value }))} /></div>
+              </div>
+              <div>
+                <label className={labelClass}>Rental Type</label>
+                <select className={inputClass} value={editForm.rental_type} onChange={e => setEditForm(f => ({ ...f, rental_type: e.target.value }))}>
+                  <option value="">— Select —</option>
+                  {RENTAL_TYPES.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><label className={labelClass}>Area (sq.ft)</label><input type="number" className={inputClass} value={editForm.area_sqft} onChange={e => setEditForm(f => ({ ...f, area_sqft: e.target.value }))} /></div>

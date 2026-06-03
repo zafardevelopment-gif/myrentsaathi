@@ -45,7 +45,8 @@ export async function dbLogin(email: string, password: string): Promise<{
     return { success: false, error: "No account found with this email or User ID." };
   }
 
-  if (data.password !== password) {
+  // Trim both sides — copy-pasting a password from email often adds a trailing space/newline.
+  if ((data.password ?? "").trim() !== password.trim()) {
     return { success: false, error: "Incorrect password." };
   }
 
@@ -71,7 +72,7 @@ export async function superAdminLogin(userId: string, password: string): Promise
     return { success: false, error: "Invalid User ID or account not found." };
   }
 
-  if (data.password !== password) {
+  if ((data.password ?? "").trim() !== password.trim()) {
     return { success: false, error: "Incorrect password." };
   }
 
