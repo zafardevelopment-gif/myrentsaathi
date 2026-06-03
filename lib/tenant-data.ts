@@ -40,6 +40,20 @@ export type TenantRentPayment = {
   paid_amount?: number | null;    // for partial payments
 };
 
+export type TenantInvoice = {
+  id: string;
+  invoice_number: string;
+  invoice_type: string;
+  billing_period: string | null;
+  issue_date: string;
+  due_date: string | null;
+  sub_total: number;
+  gst_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  status: string;
+};
+
 export type TenantTicket = {
   id: string;
   ticket_number: string | null;
@@ -158,6 +172,20 @@ export async function getTenantRentPayments(email: string): Promise<TenantRentPa
     .order("month_year", { ascending: false });
   if (error) throw error;
   return (data ?? []) as TenantRentPayment[];
+}
+
+// ─── INVOICES (combined rent + maintenance + electricity) ────
+
+/** Invoices billed TO this tenant (recipient_user_id = their users.id). */
+export async function getTenantInvoices(userId: string): Promise<TenantInvoice[]> {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, invoice_type, billing_period, issue_date, due_date, sub_total, gst_amount, total_amount, amount_paid, status")
+    .eq("recipient_user_id", userId)
+    .neq("status", "cancelled")
+    .order("issue_date", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as TenantInvoice[];
 }
 
 // ─── TICKETS ─────────────────────────────────────────────────

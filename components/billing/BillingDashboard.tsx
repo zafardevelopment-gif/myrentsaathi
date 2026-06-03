@@ -30,6 +30,7 @@ export default function BillingDashboard() {
   const [elecRate, setElecRate] = useState("");
   const [loadingFlats, setLoadingFlats] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [editInv, setEditInv] = useState<{ id: string; number: string } | null>(null);
   const [editLines, setEditLines] = useState<{ id: string; description: string; unit_rate: string }[]>([]);
@@ -44,6 +45,7 @@ export default function BillingDashboard() {
     ]);
     setSummary(s && !s.error ? s : null);
     setInvoices(inv.invoices ?? []);
+    setLoaded(true);
   }, [user]);
 
   useEffect(() => { if (hydrated && user) load(); }, [hydrated, user, load]);
@@ -139,12 +141,19 @@ export default function BillingDashboard() {
       <h2 className="text-[15px] font-extrabold text-ink">🧾 Billing &amp; Invoices</h2>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-        {stats.map(([label, val]) => (
-          <div key={label} className="rounded-[14px] border border-border-default bg-white p-3">
-            <div className="text-[10px] uppercase tracking-wide text-ink-muted">{label}</div>
-            <div className="mt-1 text-lg font-extrabold text-ink">{val}</div>
-          </div>
-        ))}
+        {!loaded
+          ? [...Array(7)].map((_, i) => (
+              <div key={i} className="rounded-[14px] border border-border-default bg-white p-3">
+                <div className="h-2.5 w-12 rounded bg-warm-100" />
+                <div className="mt-2 h-5 w-10 rounded bg-warm-100" />
+              </div>
+            ))
+          : stats.map(([label, val]) => (
+              <div key={label} className="rounded-[14px] border border-border-default bg-white p-3">
+                <div className="text-[10px] uppercase tracking-wide text-ink-muted">{label}</div>
+                <div className="mt-1 text-lg font-extrabold text-ink">{val}</div>
+              </div>
+            ))}
       </div>
 
       <SetupProgressCard />
@@ -236,8 +245,9 @@ export default function BillingDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {invoices.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-ink-muted">No invoices yet.</td></tr>}
-                {invoices.map((i) => (
+                {!loaded && <tr><td colSpan={7} className="px-3 py-8 text-center text-ink-muted">Loading invoices…</td></tr>}
+                {loaded && invoices.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-ink-muted">No invoices yet.</td></tr>}
+                {loaded && invoices.map((i) => (
                   <tr key={i.id} className="border-t border-border-default">
                     <td className="px-3 py-2 font-mono text-xs text-ink">{i.invoice_number}</td>
                     <td className="px-3 py-2 capitalize text-ink">{i.invoice_type}</td>

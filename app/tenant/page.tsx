@@ -8,10 +8,12 @@ import {
   getTenantRentPayments,
   getTenantNotices,
   getTenantAgreement,
+  getTenantInvoices,
   type TenantProfile,
   type TenantRentPayment,
   type TenantNotice,
   type TenantAgreement,
+  type TenantInvoice,
 } from "@/lib/tenant-data";
 import PayRentModal from "@/components/tenant/PayRentModal";
 import ReceiptModal from "@/components/tenant/ReceiptModal";
@@ -28,6 +30,7 @@ export default function TenantHome() {
   const [payments, setPayments] = useState<TenantRentPayment[]>([]);
   const [notices, setNotices] = useState<TenantNotice[]>([]);
   const [agreement, setAgreement] = useState<TenantAgreement | null>(null);
+  const [invoices, setInvoices] = useState<TenantInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPayModal, setShowPayModal] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -39,11 +42,12 @@ export default function TenantHome() {
       const p = await getTenantProfile(user!.email);
       setProfile(p);
       if (p) {
-        const [pay, societyNotices, ag, tk] = await Promise.all([
+        const [pay, societyNotices, ag, tk, inv] = await Promise.all([
           getTenantRentPayments(user!.email).catch(() => []),
           p.society_id ? getTenantNotices(p.society_id).catch(() => []) : Promise.resolve([]),
           getTenantAgreement(user!.email).catch(() => null),
           getTenantTickets(user!.email).catch(() => []),
+          p.user?.id ? getTenantInvoices(p.user.id).catch(() => []) : Promise.resolve([]),
         ]);
         // Also fetch landlord direct notices
         let landlordNotices: TenantNotice[] = [];
@@ -68,6 +72,7 @@ export default function TenantHome() {
         setNotices(allNotices);
         setAgreement(ag);
         setTickets(tk);
+        setInvoices(inv);
       }
       setLoading(false);
     }
@@ -149,8 +154,40 @@ export default function TenantHome() {
         </div>
       </div>
 
-      {/* Current month status */}
-      {myPayment?.status === "paid" ? (
+      {/* Combined invoices (Rent + Maintenance + Electricity) from the billing module */}
+      {invoices.length > 0 ? (
+        <div className="space-y-3 mb-4">
+          {invoices.map((inv) => {
+            const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+            const isPaid = inv.status === "paid" || outstanding <= 0.5;
+            const open = () => window.open(`/api/invoices/${inv.id}/pdf`, "_blank");
+            return (
+              <div key={inv.id} className={`rounded-[14px] p-4 border ${isPaid ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"}`}>
+                <div className="flex justify-between items-start flex-wrap gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${isPaid ? "bg-green-100" : "bg-red-100"}`}>{isPaid ? "✅" : "🧾"}</div>
+                    <div>
+                      <div className={`text-sm font-extrabold ${isPaid ? "text-green-700" : "text-red-700"}`}>
+                        {inv.billing_period ?? inv.invoice_type} Bill — {isPaid ? "Paid" : inv.status === "overdue" ? "Overdue" : "Due"}
+                      </div>
+                      <div className="text-xs text-ink-muted mt-0.5">{inv.invoice_number} · Rent + Maintenance + Electricity</div>
+                      <div className="text-xs text-ink-muted mt-0.5">
+                        Total <b className="text-ink">{formatCurrency(inv.total_amount)}</b>
+                        {Number(inv.gst_amount) > 0 ? ` (incl. GST ${formatCurrency(inv.gst_amount)})` : ""}
+                        {!isPaid && ` · Outstanding ${formatCurrency(outstanding)}`}
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={open} className={`px-3 py-1.5 rounded-lg text-white text-[11px] font-bold cursor-pointer flex-shrink-0 ${isPaid ? "bg-green-600" : "bg-red-600"}`}>
+                    {isPaid ? "View Invoice" : "View & Pay →"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : /* Legacy current-month rent status (tenants without combined invoices) */
+      myPayment?.status === "paid" ? (
         <div className="bg-green-50 rounded-[14px] p-4 border border-green-100 mb-4">
           <div className="flex justify-between items-center flex-wrap gap-3">
             <div className="flex items-center gap-3">
