@@ -42,8 +42,9 @@ async function landlordSteps(landlordId: string): Promise<SetupStep[]> {
   const flatCount = await countRows("flats", [["owner_id", landlordId]]);
 
   // tenants on owned flats
-  const { data: ownedFlats } = await supabaseAdmin.from("flats").select("id").eq("owner_id", landlordId);
+  const { data: ownedFlats } = await supabaseAdmin.from("flats").select("id, monthly_rent").eq("owner_id", landlordId);
   const flatIds = (ownedFlats ?? []).map((f) => f.id);
+  const anyRentConfigured = (ownedFlats ?? []).some((f) => Number(f.monthly_rent) > 0);
   let tenantCount = 0;
   if (flatIds.length) {
     const { count } = await supabaseAdmin
@@ -67,7 +68,7 @@ async function landlordSteps(landlordId: string): Promise<SetupStep[]> {
     { key: "bank", title: "Add Bank Account", required: true, href: "/landlord/settings",
       status: bankCount > 0 ? "completed" : "not_started" },
     { key: "billing", title: "Setup Billing", required: true, href: "/landlord/settings",
-      status: billingCount > 0 ? "completed" : "not_started", hint: "Rent due date, GST, invoice format" },
+      status: (billingCount > 0 || anyRentConfigured) ? "completed" : "not_started", hint: "Set monthly rent on your units" },
   ];
 }
 
@@ -75,8 +76,10 @@ async function landlordSteps(landlordId: string): Promise<SetupStep[]> {
 
 async function societySteps(societyId: string): Promise<SetupStep[]> {
   const { data: soc } = await supabaseAdmin
-    .from("societies").select("name, registration_number").eq("id", societyId).maybeSingle();
-  const societyInfoDone = !!(soc?.name && soc?.registration_number);
+    .from("societies").select("name, address, city, maintenance_amount").eq("id", societyId).maybeSingle();
+  // Society info is "done" once name + a location exist (registration_number is optional).
+  const societyInfoDone = !!(soc?.name && (soc?.address || soc?.city));
+  const maintenanceConfigured = Number(soc?.maintenance_amount ?? 0) > 0;
 
   const { data: flats } = await supabaseAdmin.from("flats").select("id, block, owner_id").eq("society_id", societyId);
   const flatList = flats ?? [];
@@ -108,7 +111,7 @@ async function societySteps(societyId: string): Promise<SetupStep[]> {
     { key: "bank", title: "Add Society Bank Account", required: true, href: "/admin/settings",
       status: bankCount > 0 ? "completed" : "not_started" },
     { key: "billing", title: "Setup Maintenance Billing", required: true, href: "/admin/settings",
-      status: billingCount > 0 ? "completed" : "not_started", hint: "Due date, invoice series, reminders" },
+      status: (billingCount > 0 || maintenanceConfigured) ? "completed" : "not_started", hint: "Set the monthly maintenance amount" },
   ];
 }
 

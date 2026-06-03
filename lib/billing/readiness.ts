@@ -57,9 +57,8 @@ export async function validateBillingReadiness(params: {
   }
   if (flatCount === 0) missing.push({ code: "NO_FLAT", message: "No flat found. Add a flat first.", href: h.flats });
 
-  // Billing profile (carries biller GST + state for the GST split)
-  const profileCount = await count("billing_profiles", billerCol, scopeVal);
-  if (profileCount === 0) missing.push({ code: "NO_BILLING_PROFILE", message: "No billing profile configured. Complete billing setup.", href: h.billing });
+  // Billing profile is OPTIONAL — it only adds biller GST/identity to the PDF.
+  // Invoices generate fine without it (no GST), so it is NOT a hard blocker.
 
   // Bank account (payment details on the PDF)
   const bankEntityType = scope.kind === "society" ? "society" : "landlord";
