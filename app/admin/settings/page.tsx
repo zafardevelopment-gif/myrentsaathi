@@ -7,6 +7,8 @@ import toast from "react-hot-toast";
 import { Toaster } from "react-hot-toast";
 import SubscriptionSection from "@/components/settings/SubscriptionSection";
 import BankAccountForm from "@/components/settings/BankAccountForm";
+import GstRatesSection from "@/components/settings/GstRatesSection";
+import CompanyProfileSection from "@/components/settings/CompanyProfileSection";
 
 export default function AdminSettings() {
   const { user } = useAuth();
@@ -245,6 +247,9 @@ export default function AdminSettings() {
           )}
         </div>
       ))}
+
+      <CompanyProfileSection />
+      <GstRatesSection />
 
       <SubscriptionSection planType="society" />
     </div>

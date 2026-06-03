@@ -415,6 +415,59 @@ export async function recomputeInvoiceTotals(invoiceId: string): Promise<void> {
   }).eq("id", invoiceId);
 }
 
+/**
+ * Edit an UNPAID invoice's line amounts (§ user edit). Re-resolves GST per line
+ * from the current per-type rates and recomputes totals. Refused once any
+ * payment exists (paid/partially_paid) or the invoice is cancelled.
+ */
+export async function updateInvoiceLines(
+  invoiceId: string,
+  updates: { id: string; unit_rate: number }[],
+): Promise<{ success: boolean; error?: string }> {
+  const { data: inv } = await supabaseAdmin
+    .from("invoices").select("status, amount_paid, place_of_supply, society_id, landlord_id").eq("id", invoiceId).maybeSingle();
+  if (!inv) return { success: false, error: "Invoice not found" };
+  if (inv.status === "cancelled") return { success: false, error: "Cannot edit a cancelled invoice" };
+  if (Number(inv.amount_paid) > 0) return { success: false, error: "Cannot edit a bill that already has a payment" };
+
+  const scope: BillerScope = inv.society_id
+    ? { kind: "society", societyId: inv.society_id }
+    : { kind: "landlord", landlordId: inv.landlord_id as string };
+  const billerCol = scope.kind === "society" ? "society_id" : "landlord_id";
+  const billerVal = scope.kind === "society" ? scope.societyId : scope.landlordId;
+  const { data: prof } = await supabaseAdmin.from("billing_profiles").select("state_code").eq(billerCol, billerVal).maybeSingle();
+  const billerState = prof?.state_code ?? null;
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Current per-type GST rates.
+  const rates: Record<string, number> = {
+    rent: (await getActiveGstRate(scope, "rent", today)).rate_percent,
+    maintenance: (await getActiveGstRate(scope, "maintenance", today)).rate_percent,
+    electricity: (await getActiveGstRate(scope, "electricity", today)).rate_percent,
+  };
+  const typeOf = (desc: string): keyof typeof rates =>
+    /^rent/i.test(desc) ? "rent" : /^maintenance/i.test(desc) ? "maintenance" : "electricity";
+
+  for (const u of updates) {
+    const { data: line } = await supabaseAdmin
+      .from("invoice_line_items").select("description, hsn_sac, quantity, line_kind, charge_type_id, meter_reading_id").eq("id", u.id).maybeSingle();
+    if (!line) continue;
+    const gstPct = line.line_kind === "late_fee" ? 0 : rates[typeOf(line.description)];
+    const c = computeLine(
+      { description: line.description, hsn_sac: line.hsn_sac, quantity: line.quantity ?? 1, unit_rate: u.unit_rate,
+        gst_applicable: gstPct > 0, gst_percent: gstPct, line_kind: line.line_kind, charge_type_id: line.charge_type_id, meter_reading_id: line.meter_reading_id },
+      { rate_percent: gstPct, cgst_percent: 0, sgst_percent: 0 }, billerState, inv.place_of_supply,
+    );
+    await supabaseAdmin.from("invoice_line_items").update({
+      unit_rate: c.unit_rate, line_total: c.line_total, gst_applicable: c.gst_applicable, gst_percent: c.gst_percent,
+      gst_amount: c.gst_amount, cgst_percent: c.cgst_percent, cgst_amount: c.cgst_amount,
+      sgst_percent: c.sgst_percent, sgst_amount: c.sgst_amount, igst_percent: c.igst_percent, igst_amount: c.igst_amount,
+    }).eq("id", u.id);
+  }
+  await recomputeInvoiceTotals(invoiceId);
+  return { success: true };
+}
+
 export async function getInvoiceDetail(invoiceId: string) {
   const { data: invoice } = await supabaseAdmin.from("invoices").select("*").eq("id", invoiceId).maybeSingle();
   if (!invoice) return null;

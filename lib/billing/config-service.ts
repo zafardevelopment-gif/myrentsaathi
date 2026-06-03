@@ -138,6 +138,29 @@ export async function createReminderRule(scope: BillerScope, input: {
   return { success: true as const };
 }
 
+// ─── electricity per-unit rate (charge_rate_config) ─────────
+
+export async function getElectricityRate(scope: BillerScope): Promise<number> {
+  const { column, value } = scopeColumn(scope);
+  const { data } = await supabaseAdmin
+    .from("charge_rate_config").select("flat_rate").eq(column, value).eq("charge_kind", "electricity").eq("is_active", true).maybeSingle();
+  return Number(data?.flat_rate ?? 0);
+}
+
+export async function setElectricityRate(scope: BillerScope, rate: number): Promise<{ success: boolean; error?: string }> {
+  const { column, value } = scopeColumn(scope);
+  const { data: existing } = await supabaseAdmin
+    .from("charge_rate_config").select("id").eq(column, value).eq("charge_kind", "electricity").eq("is_active", true).maybeSingle();
+  if (existing) {
+    const { error } = await supabaseAdmin.from("charge_rate_config").update({ flat_rate: rate }).eq("id", existing.id);
+    if (error) return { success: false, error: error.message };
+  } else {
+    const { error } = await supabaseAdmin.from("charge_rate_config").insert({ ...scopeInsert(scope), charge_kind: "electricity", rate_type: "flat", flat_rate: rate });
+    if (error) return { success: false, error: error.message };
+  }
+  return { success: true };
+}
+
 // ─── invoice_templates (§25) ─────────────────────────────────
 
 export async function listTemplates(scope: BillerScope) {

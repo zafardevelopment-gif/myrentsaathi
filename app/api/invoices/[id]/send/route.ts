@@ -27,8 +27,16 @@ export async function POST(_request: NextRequest, ctx: Ctx) {
       ? { kind: "society", societyId: inv.society_id as string }
       : { kind: "landlord", landlordId: inv.landlord_id as string };
     const config = await resolveTemplateConfig(scope, inv.invoice_type as string, inv.template_id as string | null);
+    let billerName: string | null = null;
+    if (inv.society_id) {
+      const { data: s } = await supabaseAdmin.from("societies").select("name").eq("id", inv.society_id as string).maybeSingle();
+      billerName = s?.name ?? null;
+    } else if (inv.landlord_id) {
+      const { data: l } = await supabaseAdmin.from("users").select("full_name").eq("id", inv.landlord_id as string).maybeSingle();
+      billerName = l?.full_name ?? null;
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const html = renderInvoiceHtml(inv as any, detail.lines as any, config);
+    const html = renderInvoiceHtml(inv as any, detail.lines as any, config, { billerName, recipientName: user.full_name });
 
     const res = await fetch(`${APP_URL}/api/email/send`, {
       method: "POST", headers: { "Content-Type": "application/json" },

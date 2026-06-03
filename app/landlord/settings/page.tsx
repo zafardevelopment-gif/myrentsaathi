@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import SubscriptionSection from "@/components/settings/SubscriptionSection";
 import BankAccountForm from "@/components/settings/BankAccountForm";
+import GstRatesSection from "@/components/settings/GstRatesSection";
+import CompanyProfileSection from "@/components/settings/CompanyProfileSection";
 
 export default function LandlordSettings() {
   const { user } = useAuth();
@@ -80,6 +82,9 @@ export default function LandlordSettings() {
           )}
         </div>
       ))}
+
+      <CompanyProfileSection />
+      <GstRatesSection />
 
       <SubscriptionSection planType="landlord" />
     </div>

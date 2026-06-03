@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getInvoiceDetail } from "@/lib/billing/invoice-service";
+import { getInvoiceDetail, updateInvoiceLines } from "@/lib/billing/invoice-service";
 
 export const runtime = "nodejs";
 
@@ -24,7 +24,14 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
 export async function PATCH(request: NextRequest, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const body = (await request.json()) as { action?: string; notes?: string };
+    const body = (await request.json()) as { action?: string; notes?: string; lines?: { id: string; unit_rate: number }[] };
+
+    if (body.action === "update_lines") {
+      if (!body.lines?.length) return NextResponse.json({ error: "lines required" }, { status: 400 });
+      const res = await updateInvoiceLines(id, body.lines);
+      if (!res.success) return NextResponse.json({ error: res.error }, { status: 400 });
+      return NextResponse.json({ success: true });
+    }
 
     if (body.action === "cancel") {
       const { error } = await supabaseAdmin

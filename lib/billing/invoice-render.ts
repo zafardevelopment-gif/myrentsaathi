@@ -15,6 +15,7 @@ type Line = {
   gst_percent: number; cgst_amount: number; sgst_amount: number; igst_amount: number; line_kind: string;
 };
 type Invoice = {
+  id: string;
   invoice_number: string; invoice_type: string; issue_date: string; due_date: string | null;
   billing_period: string | null; status: string;
   sub_total: number; cgst_total: number; sgst_total: number; igst_total: number; gst_amount: number;
@@ -32,11 +33,17 @@ export function renderInvoiceHtml(
   inv: Invoice,
   lines: Line[],
   config: Record<string, unknown> = {},
+  parties: { billerName?: string | null; recipientName?: string | null; billerGst?: string | null; recipientGst?: string | null; qrDataUrl?: string | null } = {},
 ): string {
-  const theme = (config.theme_color as string) || "#1a1a2e";
-  const biller = inv.biller_snapshot?.legal_name ?? "MyRentSaathi";
+  const theme = (config.theme_color as string) || "#c2660a";
+  const biller = inv.biller_snapshot?.legal_name ?? parties.billerName ?? "MyRentSaathi";
+  const recipientName = parties.recipientName ?? "—";
+  const billerGst = inv.biller_gst ?? parties.billerGst ?? null;
+  const recipientGst = inv.recipient_gst ?? parties.recipientGst ?? null;
   const isInter = Number(inv.igst_total) > 0;
   const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+  const payable = outstanding > 0 && inv.status !== "paid" && inv.status !== "cancelled";
+  const payHref = `/api/payment/redirect?invoice=${inv.id}`;
 
   const rows = lines.map((l) => `
     <tr>
@@ -64,27 +71,42 @@ export function renderInvoiceHtml(
     .grand{font-weight:800;font-size:16px;color:${theme}}
     .muted{color:#777;font-size:12px}
     .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase}
+    .noprint{text-align:right;margin-bottom:14px}
+    .btn{display:inline-block;padding:9px 18px;border-radius:8px;font-weight:700;font-size:13px;text-decoration:none;cursor:pointer;border:none}
+    @media print{.noprint{display:none!important}body{padding:0}}
   </style></head><body>
+    <div class="noprint">
+      ${payable ? `<a href="${payHref}" class="btn" style="background:#16a34a;color:#fff;margin-right:8px">Pay Now →</a>` : ""}
+      <button class="btn" style="background:${theme};color:#fff" onclick="window.print()">🖨️ Print / Download PDF</button>
+    </div>
     <div class="head">
-      <div><h1 class="title">${esc(biller)}</h1>
+      <div>
+        <div style="font-size:22px;font-weight:900;letter-spacing:-0.5px"><span style="color:#1a1a2e">🏠 MyRent</span><span style="color:${theme}">Saathi</span></div>
+        <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-top:8px">${esc(biller)}</div>
         <div class="muted">${esc(inv.biller_snapshot?.address ?? "")}</div>
-        ${inv.biller_gst ? `<div class="muted">GSTIN: ${esc(inv.biller_gst)}</div>` : ""}
+        ${billerGst ? `<div class="muted">GSTIN: <b>${esc(billerGst)}</b></div>` : ""}
       </div>
       <div style="text-align:right">
-        <div style="font-size:18px;font-weight:700">TAX INVOICE</div>
+        <div style="font-size:18px;font-weight:800;color:${theme}">TAX INVOICE</div>
         <div class="muted">${esc(inv.invoice_number)}</div>
         <div class="muted">Issue: ${esc(inv.issue_date)}${inv.due_date ? ` · Due: ${esc(inv.due_date)}` : ""}</div>
-        <span class="badge" style="background:${inv.status === "paid" ? "#16a34a" : inv.status === "overdue" ? "#dc2626" : "#f59e0b"};color:#fff">${esc(inv.status)}</span>
+        ${payable
+          ? `<a href="${payHref}" class="badge" style="background:${inv.status === "overdue" ? "#dc2626" : "#f59e0b"};color:#fff;text-decoration:none">${esc(inv.status)} · Pay →</a>`
+          : `<span class="badge" style="background:${inv.status === "paid" ? "#16a34a" : "#9ca3af"};color:#fff">${esc(inv.status)}</span>`}
       </div>
     </div>
 
-    <div style="display:flex;justify-content:space-between;margin-top:14px;font-size:13px">
-      <div>
-        <div class="muted">Bill To</div>
-        ${inv.recipient_gst ? `<div class="muted">GSTIN: ${esc(inv.recipient_gst)}</div>` : ""}
-        ${inv.place_of_supply ? `<div class="muted">Place of supply: ${esc(inv.place_of_supply)}</div>` : ""}
+    <div style="display:flex;gap:16px;margin-top:16px;font-size:13px">
+      <div style="flex:1;background:#faf7f2;border:1px solid #eee;border-radius:8px;padding:12px">
+        <div class="muted" style="font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Bill To</div>
+        <div style="font-weight:700;color:#222;margin-top:2px">${esc(recipientName)}</div>
+        ${recipientGst ? `<div class="muted">GSTIN: <b>${esc(recipientGst)}</b></div>` : ""}
       </div>
-      <div class="muted">Period: ${esc(inv.billing_period ?? "—")} · Type: ${esc(inv.invoice_type)}</div>
+      <div style="flex:1;background:#faf7f2;border:1px solid #eee;border-radius:8px;padding:12px;text-align:right">
+        <div class="muted">Period: <b style="color:#333">${esc(inv.billing_period ?? "—")}</b></div>
+        <div class="muted">Type: <b style="color:#333">${esc(inv.invoice_type)}</b></div>
+        ${inv.place_of_supply ? `<div class="muted">Place of supply: <b style="color:#333">${esc(inv.place_of_supply)}</b></div>` : ""}
+      </div>
     </div>
 
     <table>
@@ -101,9 +123,15 @@ export function renderInvoiceHtml(
       <tr><td>Outstanding</td><td style="text-align:right">${formatINR(outstanding)}</td></tr>
     </table>
 
-    ${inv.payment_link_url ? `<p style="margin-top:18px"><a href="${esc(inv.payment_link_url)}" style="background:${theme};color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700">Pay Now →</a></p>` : ""}
+    <div style="display:flex;align-items:center;gap:18px;margin-top:20px">
+      ${parties.qrDataUrl ? `<div style="text-align:center">
+        <img src="${parties.qrDataUrl}" width="118" height="118" alt="Scan to pay" style="border:1px solid #eee;border-radius:8px"/>
+        <div class="muted" style="font-size:10px;margin-top:3px">Scan to Pay</div>
+      </div>` : ""}
+      ${payable ? `<a href="${payHref}" style="background:${theme};color:#fff;padding:12px 26px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">Pay Now →</a>` : ""}
+    </div>
     <p class="muted" style="margin-top:24px;border-top:1px solid #eee;padding-top:10px">
-      ${esc((config.footer_note as string) ?? "This is a computer-generated invoice.")}
+      ${esc((config.footer_note as string) ?? "This is a computer-generated invoice. Thank you for your business with MyRentSaathi.")}
     </p>
   </body></html>`;
 }
