@@ -27,11 +27,11 @@ export default function PlanExpiredPage() {
 
         {/* Heading */}
         <h1 className="text-2xl font-extrabold text-white mb-2">
-          Aapka Plan Expire Ho Gaya
+          Your Plan Has Expired
         </h1>
         <p className="text-gray-400 text-sm mb-6 leading-relaxed">
-          Aapka subscription plan active nahi hai. Apna plan renew karein — aapka
-          sabhi data safe hai aur plan activate hone ke baad wapas milega.
+          Your subscription plan is not active. Please renew your plan — all your
+          data is safe and will be available again once the plan is activated.
         </p>
 
         {/* Plan info box */}
@@ -46,9 +46,9 @@ export default function PlanExpiredPage() {
           <div className="flex items-start gap-2">
             <span className="text-green-400 text-base mt-0.5">✓</span>
             <div>
-              <div className="text-xs font-bold text-green-400 mb-0.5">Aapka data safe hai</div>
+              <div className="text-xs font-bold text-green-400 mb-0.5">Your data is safe</div>
               <div className="text-xs text-green-300/70">
-                Societies, tenants, payments — sab records preserve hain. Plan activate karne ke baad sab wapas accessible hoga.
+                Societies, tenants, payments — all records are preserved. Everything becomes accessible again once the plan is activated.
               </div>
             </div>
           </div>
@@ -60,7 +60,7 @@ export default function PlanExpiredPage() {
             onClick={handleRenew}
             className="w-full py-3.5 rounded-xl bg-[#e07b2e] text-white font-bold text-sm hover:bg-[#c96d24] transition-colors cursor-pointer"
           >
-            Plan Renew Karein / Naya Plan Chunein →
+            Renew Plan / Choose a New Plan →
           </button>
           <button
             onClick={handleLogout}
@@ -71,7 +71,7 @@ export default function PlanExpiredPage() {
         </div>
 
         <p className="text-[11px] text-gray-600 mt-6">
-          Support chahiye?{" "}
+          Need support?{" "}
           <a href="mailto:support@myrentsaathi.com" className="text-[#e07b2e] hover:underline">
             support@myrentsaathi.com
           </a>

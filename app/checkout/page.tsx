@@ -67,7 +67,7 @@ function CheckoutContent() {
 
   function handleApplyPromo() {
     const code = promoInput.trim();
-    if (!code) { setPromoError("Promo code enter karein."); return; }
+    if (!code) { setPromoError("Please enter a promo code."); return; }
     const result = validatePromo(code);
     if (!result.valid) { setPromoError(result.error); setPromoApplied(null); return; }
     setPromoApplied(result.promo);
@@ -102,7 +102,7 @@ function CheckoutContent() {
       };
 
       if (!orderRes.ok || !orderData.orderId) {
-        toast.error(orderData.error ?? "Payment initiate nahi ho saka.");
+        toast.error(orderData.error ?? "Could not initiate payment.");
         setPaying(false);
         return;
       }
@@ -147,7 +147,7 @@ function CheckoutContent() {
               durationDays: duration.months * 30,
             });
 
-            if (!result.success) throw new Error(result.error ?? "Plan activate nahi hua");
+            if (!result.success) throw new Error(result.error ?? "Plan could not be activated");
 
             // WhatsApp + Email payment confirmation (fire-and-forget)
             const userRecord = user as unknown as Record<string, string>;
@@ -179,10 +179,10 @@ function CheckoutContent() {
               }).catch(() => {});
             }
 
-            toast.success(`${planName} plan activate ho gaya!`);
+            toast.success(`${planName} plan activated!`);
             router.push(planType === "society" ? "/admin" : "/landlord");
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Payment verify nahi hua.");
+            toast.error(err instanceof Error ? err.message : "Payment could not be verified.");
           } finally {
             setPaying(false);
           }
@@ -194,7 +194,7 @@ function CheckoutContent() {
 
       rzp.open();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Kuch gadbad ho gaya.");
+      toast.error(err instanceof Error ? err.message : "Something went wrong.");
       setPaying(false);
     }
   }
@@ -241,7 +241,7 @@ function CheckoutContent() {
 
         {/* ── Duration Selector ── */}
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
-          <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">Kitne Months Ke Liye?</div>
+          <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-3">For How Many Months?</div>
           <div className="grid grid-cols-2 gap-2.5">
             {DURATIONS.map((d) => (
               <button
@@ -359,7 +359,7 @@ function CheckoutContent() {
         </button>
 
         <p className="text-center text-[11px] text-gray-600 pb-6">
-          Aapka data safe hai. Plan expire hone ke baad bhi sab records preserved rahenge.
+          Your data is safe. All records are preserved even after the plan expires.
         </p>
       </div>
     </div>

@@ -113,7 +113,7 @@ export default function PricingCards({ societyPlans, landlordPlans, freeTrialDay
               {/* Quantity selector */}
               <div className={`rounded-xl p-3 mb-4 ${plan.is_popular ? "bg-white/15" : "bg-white/[0.06] border border-white/10"}`}>
                 <div className="text-[11px] font-bold opacity-70 mb-2 uppercase tracking-wide">
-                  Kitne {tab === "society" ? "landlords hain?" : "flats / tenants hain?"}
+                  How many {tab === "society" ? "landlords?" : "flats / tenants?"}
                 </div>
                 <div className="flex items-center justify-center gap-3">
                   <button

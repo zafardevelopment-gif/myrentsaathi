@@ -132,8 +132,8 @@ function SelectPlanContent() {
             <div className="text-white text-sm font-bold mb-0.5">Per-Unit Pricing</div>
             <div className="text-gray-400 text-[13px]">
               {planType === "society"
-                ? <>Yeh plans <strong className="text-white">per landlord</strong> ke hisaab se hain. Apni society mein kitne landlords hain woh select karo — total price automatically calculate hoga.</>
-                : <>Yeh plans <strong className="text-white">per flat ya tenant</strong> ke hisaab se hain. Kitne flats manage karne hain woh select karo — total price automatically calculate hoga.</>
+                ? <>These plans are priced <strong className="text-white">per landlord</strong>. Select how many landlords are in your society — the total price is calculated automatically.</>
+                : <>These plans are priced <strong className="text-white">per flat or tenant</strong>. Select how many flats you need to manage — the total price is calculated automatically.</>
               }
             </div>
           </div>
@@ -200,7 +200,7 @@ function SelectPlanContent() {
                 {/* Quantity selector — both society and landlord */}
                 <div className={`rounded-xl p-3 mb-4 ${plan.is_popular ? "bg-white/15" : "bg-white/[0.04] border border-[#333]"}`}>
                     <div className="text-[11px] font-bold opacity-60 mb-2 uppercase tracking-wide">
-                      {planType === "society" ? "Kitne landlords hain?" : "Kitne flats / tenants hain?"}
+                      {planType === "society" ? "How many landlords?" : "How many flats / tenants?"}
                     </div>
                     <div className="flex items-center justify-center gap-3">
                       <button
@@ -279,7 +279,7 @@ function SelectPlanContent() {
       )}
 
       <p className="text-[11px] text-gray-600 mt-8">
-        Aapka data safe hai — plan expire hone ke baad bhi sab records preserve rahenge.
+        Your data is safe — all records are preserved even after the plan expires.
       </p>
     </div>
   );

@@ -11,7 +11,7 @@ export default function LandlordSettings() {
 
   const CARDS = [
     { key: "profile",  label: "My Profile",    desc: `${user?.name ?? "—"} · ${user?.email ?? ""}`, icon: "👤" },
-    { key: "bank",     label: "Bank Account",  desc: "Rent directly aapke account mein aayega via Razorpay Route", icon: "🏦" },
+    { key: "bank",     label: "Bank Account",  desc: "Rent is deposited directly into your account via Razorpay Route", icon: "🏦" },
     { key: "whatsapp", label: "WhatsApp Notifications", desc: "Tenant alerts aur reminders", icon: "📱" },
   ];
 
@@ -49,7 +49,7 @@ export default function LandlordSettings() {
                       <span className="text-[11px] font-semibold text-ink">{row.value ?? "—"}</span>
                     </div>
                   ))}
-                  <p className="text-[9px] text-ink-muted mt-2">Profile edit karne ke liye super admin se contact karen.</p>
+                  <p className="text-[9px] text-ink-muted mt-2">Contact the super admin to edit your profile.</p>
                 </div>
               )}
 
@@ -63,8 +63,8 @@ export default function LandlordSettings() {
 
               {card.key === "whatsapp" && (
                 <div className="py-2 text-[11px] text-ink-muted">
-                  WhatsApp notifications platform-level se configure hain.
-                  Aapko koi setup nahi karna — alerts automatically milenge.
+                  WhatsApp notifications are configured at the platform level.
+                  You don&apos;t need to set up anything — alerts arrive automatically.
                 </div>
               )}
             </div>

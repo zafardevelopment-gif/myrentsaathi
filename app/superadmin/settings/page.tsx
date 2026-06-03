@@ -53,7 +53,7 @@ const SETTING_GROUPS = [
       { icon: "🏦", title: "Platform Bank Account",     desc: "Bank details for subscription revenue collection",            tag: null,       editable: true,  editType: "generic" },
       { icon: "💳", title: "Razorpay Master Account",   desc: "Platform Razorpay keys, Route API for agent payouts",        tag: "Connected", editable: true, editType: "razorpay" },
       { icon: "💰", title: "Pricing Configuration",     desc: "Society plans, landlord plans, agreement pricing, markup",    tag: "Editable", editable: true,  editType: "pricing" },
-      { icon: "🎁", title: "Free Trial Duration",        desc: "Kitne din ka free trial naye users ko milega (society + landlord)", tag: "Editable", editable: true, editType: "trial" },
+      { icon: "🎁", title: "Free Trial Duration",        desc: "How many days of free trial new users get (society + landlord)", tag: "Editable", editable: true, editType: "trial" },
       { icon: "📑", title: "Invoice Settings",           desc: "Invoice template, GST number, billing cycle",                tag: null,       editable: true,  editType: "generic" },
     ],
   },
@@ -133,7 +133,7 @@ function SecretField({
       {hint && <p className="text-[9px] text-ink-muted mt-1">{hint}</p>}
       {isMasked && (
         <p className="text-[9px] text-amber-600 mt-1">
-          Existing value saved. New value type karo to replace karen.
+          Existing value saved. Type a new value to replace it.
         </p>
       )}
     </div>
@@ -278,8 +278,8 @@ export default function SuperAdminSettings() {
         <div className="mx-4 mb-3 p-4 bg-warm-50 rounded-xl border border-border-default">
           <div className="text-[12px] font-bold text-ink mb-1">Edit: Razorpay Master Account</div>
           <p className="text-[10px] text-ink-muted mb-3">
-            Razorpay Dashboard → Settings → API Keys se keys copy karen.
-            Test keys <code className="bg-gray-100 px-1 rounded">rzp_test_</code> se shuru hoti hain, live keys <code className="bg-gray-100 px-1 rounded">rzp_live_</code> se.
+            Copy the keys from Razorpay Dashboard → Settings → API Keys.
+            Test keys start with <code className="bg-gray-100 px-1 rounded">rzp_test_</code>, live keys with <code className="bg-gray-100 px-1 rounded">rzp_live_</code>.
           </p>
           {!configLoaded ? (
             <div className="text-[11px] text-ink-muted py-4 text-center">Loading...</div>
@@ -291,7 +291,7 @@ export default function SuperAdminSettings() {
                 value={razorpayDraft.razorpay_key_id}
                 onChange={(v) => setRazorpayDraft((d) => ({ ...d, razorpay_key_id: v }))}
                 placeholder="rzp_test_xxxxxxxxxxxx"
-                hint="Frontend mein use hoti hai — safe to expose"
+                hint="Used in the frontend — safe to expose"
               />
               <SecretField
                 label="Key Secret"
@@ -299,7 +299,7 @@ export default function SuperAdminSettings() {
                 value={razorpayDraft.razorpay_key_secret}
                 onChange={(v) => setRazorpayDraft((d) => ({ ...d, razorpay_key_secret: v }))}
                 placeholder="Enter Razorpay Key Secret"
-                hint="Backend only — kabhi frontend pe expose mat karo"
+                hint="Backend only — never expose on the frontend"
               />
               <SecretField
                 label="Webhook Secret"
@@ -329,8 +329,8 @@ export default function SuperAdminSettings() {
           </div>
           <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
             <p className="text-[9px] text-amber-700 font-semibold">
-              ⚠️ Live keys use karne se pehle ensure karen ki Razorpay account fully verified hai.
-              Server restart required nahi — changes turant apply ho jaate hain.
+              ⚠️ Before using live keys, ensure the Razorpay account is fully verified.
+              No server restart required — changes apply instantly.
             </p>
           </div>
         </div>
@@ -343,7 +343,7 @@ export default function SuperAdminSettings() {
         <div className="mx-4 mb-3 p-4 bg-warm-50 rounded-xl border border-border-default">
           <div className="text-[12px] font-bold text-ink mb-1">Edit: WhatsApp Business API</div>
           <p className="text-[10px] text-ink-muted mb-3">
-            Meta Business Manager → WhatsApp → API Setup se credentials copy karen.
+            Copy the credentials from Meta Business Manager → WhatsApp → API Setup.
           </p>
           {!configLoaded ? (
             <div className="text-[11px] text-ink-muted py-4 text-center">Loading...</div>
@@ -375,7 +375,7 @@ export default function SuperAdminSettings() {
               {typeof window !== "undefined" ? window.location.origin : "https://yourdomain.com"}/api/whatsapp/webhook
             </code>
             <p className="text-[9px] text-blue-500 mt-1">
-              Yeh URL Meta Dashboard mein Webhook field mein paste karen.
+              Paste this URL into the Webhook field in the Meta Dashboard.
             </p>
           </div>
 
@@ -441,7 +441,7 @@ export default function SuperAdminSettings() {
               </button>
             </div>
             <p className="text-[9px] text-ink-muted mt-1">
-              Save karne ke baad test karen. Phone number format: 919876543210 (country code + number, no +)
+              Test after saving. Phone number format: 919876543210 (country code + number, no +)
             </p>
           </div>
         </div>
@@ -541,7 +541,7 @@ export default function SuperAdminSettings() {
         <div className="mx-4 mb-3 p-4 bg-warm-50 rounded-xl border border-border-default">
           <div className="text-[12px] font-bold text-ink mb-1">Edit: Email Configuration (SMTP)</div>
           <p className="text-[10px] text-ink-muted mb-3">
-            Gmail ke liye: App Password use karen (2FA on hone par). Port 587 (TLS) ya 465 (SSL).
+            For Gmail: use an App Password (when 2FA is on). Port 587 (TLS) or 465 (SSL).
           </p>
           {!configLoaded ? (
             <div className="text-[11px] text-ink-muted py-4 text-center">Loading...</div>
@@ -553,7 +553,7 @@ export default function SuperAdminSettings() {
                 value={smtpDraft.smtp_host}
                 onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_host: v }))}
                 placeholder="smtp.gmail.com"
-                hint="Gmail: smtp.gmail.com · Outlook: smtp.office365.com · Custom: aapka SMTP server"
+                hint="Gmail: smtp.gmail.com · Outlook: smtp.office365.com · Custom: your SMTP server"
               />
               <PlainField
                 label="SMTP Port"
@@ -569,7 +569,7 @@ export default function SuperAdminSettings() {
                 value={smtpDraft.smtp_user}
                 onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_user: v }))}
                 placeholder="noreply@myrentsaathi.com"
-                hint="Woh email address jo login karta hai SMTP server par"
+                hint="The email address that logs in to the SMTP server"
               />
               <SecretField
                 label="SMTP Password / App Password"
@@ -577,7 +577,7 @@ export default function SuperAdminSettings() {
                 value={smtpDraft.smtp_password}
                 onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_password: v }))}
                 placeholder="Gmail App Password ya SMTP password"
-                hint="Gmail: Google Account → Security → App Passwords se generate karen"
+                hint="Gmail: generate from Google Account → Security → App Passwords"
               />
               <PlainField
                 label="From Email (optional)"
@@ -585,7 +585,7 @@ export default function SuperAdminSettings() {
                 value={smtpDraft.smtp_from_email}
                 onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_from_email: v }))}
                 placeholder="noreply@myrentsaathi.com"
-                hint="Agar blank hai to SMTP username use hoga"
+                hint="If blank, the SMTP username is used"
               />
               <PlainField
                 label="From Name"
@@ -593,7 +593,7 @@ export default function SuperAdminSettings() {
                 value={smtpDraft.smtp_from_name}
                 onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_from_name: v }))}
                 placeholder="MyRentSaathi"
-                hint="Email mein sender ka naam dikhai dega"
+                hint="The sender name shown in the email"
               />
             </div>
           )}
@@ -644,7 +644,7 @@ export default function SuperAdminSettings() {
                     });
                     const data = await res.json() as { success?: boolean; error?: string };
                     if (data.success) {
-                      toast.success("✅ Test email sent! Inbox check karen.");
+                      toast.success("✅ Test email sent! Check your inbox.");
                     } else {
                       toast.error(`Email error: ${data.error ?? "Unknown"}`);
                     }
@@ -660,7 +660,7 @@ export default function SuperAdminSettings() {
               </button>
             </div>
             <p className="text-[9px] text-ink-muted mt-1">
-              Pehle Save karo, phir test karen. Gmail App Password required hai agar 2FA on hai.
+              Save first, then test. A Gmail App Password is required if 2FA is on.
             </p>
           </div>
         </div>

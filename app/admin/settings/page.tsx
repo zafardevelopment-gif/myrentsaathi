@@ -91,13 +91,13 @@ export default function AdminSettings() {
     {
       key: "bank",
       label: "Bank Account",
-      desc: "Rent & maintenance directly aapke account mein aayega",
+      desc: "Rent & maintenance is deposited directly into your account",
       icon: "🏦",
     },
     {
       key: "whatsapp",
       label: "WhatsApp Notifications",
-      desc: "Tenant alerts aapke number se jaayenge",
+      desc: "Tenant alerts are sent from your number",
       icon: "📱",
     },
   ];
@@ -229,7 +229,7 @@ export default function AdminSettings() {
               )}
               {card.key === "whatsapp" && (
                 <div className="py-2 text-[11px] text-ink-muted">
-                  WhatsApp notifications platform-level configured hain. Super Admin se contact karen custom number ke liye.
+                  WhatsApp notifications are configured at the platform level. Contact the Super Admin for a custom number.
                 </div>
               )}
             </div>

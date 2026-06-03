@@ -59,12 +59,12 @@ export default function SuperAdminPromos() {
 
   function validate() {
     if (!form.code.trim()) { toast.error("Promo code required"); return false; }
-    if (!/^[A-Z0-9]+$/.test(form.code.toUpperCase())) { toast.error("Code mein sirf letters aur numbers hone chahiye"); return false; }
+    if (!/^[A-Z0-9]+$/.test(form.code.toUpperCase())) { toast.error("Code must contain only letters and numbers"); return false; }
     if (!form.value || isNaN(Number(form.value)) || Number(form.value) <= 0) { toast.error("Valid discount value required"); return false; }
-    if (form.type === "percentage" && Number(form.value) > 100) { toast.error("Percentage 100 se zyada nahi ho sakta"); return false; }
+    if (form.type === "percentage" && Number(form.value) > 100) { toast.error("Percentage cannot be more than 100"); return false; }
     if (!form.maxUses || isNaN(Number(form.maxUses)) || Number(form.maxUses) <= 0) { toast.error("Valid max uses required"); return false; }
     if (!form.validTill) { toast.error("Valid till date required"); return false; }
-    if (new Date(form.validTill) < new Date() && !editingCode) { toast.error("Valid till date past mein nahi ho sakti"); return false; }
+    if (new Date(form.validTill) < new Date() && !editingCode) { toast.error("Valid-till date cannot be in the past"); return false; }
     return true;
   }
 

@@ -101,7 +101,7 @@ export default function BankAccountForm({ entityType, entityId, userId }: Props)
       const data = await res.json() as { success: boolean; error?: string };
       if (!data.success) throw new Error(data.error ?? "Save failed");
 
-      toast.success("Bank account linked successfully! Payments will be auto-transferred.");
+      toast.success("Bank account saved successfully.");
       // Refresh
       const refreshed = await fetch(`/api/razorpay-route?entityType=${entityType}&entityId=${entityId}`).then(r => r.json()) as { success: boolean; account: BankAccount | null };
       if (refreshed.success && refreshed.account) setAccount(refreshed.account);
@@ -126,7 +126,7 @@ export default function BankAccountForm({ entityType, entityId, userId }: Props)
           <div className="flex-1">
             <div className="text-[12px] font-bold text-green-700">Bank Account Linked</div>
             <div className="text-[11px] text-green-600 mt-0.5">
-              Payments automatically transfer ho jaate hain is account mein.
+              Payments are transferred automatically to this account.
             </div>
           </div>
         </div>
@@ -143,8 +143,8 @@ export default function BankAccountForm({ entityType, entityId, userId }: Props)
         </div>
 
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[10px] text-amber-700">
-          <strong>Note:</strong> Account change karne se pehle Razorpay verification process hoti hai.
-          Galat details se payments fail ho sakti hain.
+          <strong>Note:</strong> Changing the account triggers a Razorpay verification process.
+          Incorrect details can cause payments to fail.
         </div>
 
         <button
@@ -173,9 +173,9 @@ export default function BankAccountForm({ entityType, entityId, userId }: Props)
     <div className="space-y-3 pt-1">
       {!account && (
         <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-[10px] text-blue-700">
-          <strong>Ek baar setup karein:</strong> Aapka bank account Razorpay Route se link ho jaayega.
-          Jab bhi tenant payment kare, amount automatically aapke account mein transfer ho jaayega.
-          Aapko khud Razorpay account nahi chahiye.
+          <strong>Set up once:</strong> Your bank account gets linked via Razorpay Route.
+          Whenever a tenant pays, the amount is automatically transferred to your account.
+          You don&apos;t need your own Razorpay account.
         </div>
       )}
 
@@ -280,7 +280,7 @@ export default function BankAccountForm({ entityType, entityId, userId }: Props)
           placeholder="ABCDE1234F"
           className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-white focus:outline-none focus:border-amber-400 font-mono uppercase"
         />
-        <p className="text-[9px] text-ink-muted mt-1">TDS compliance ke liye required hai ₹50,000+ transfers pe</p>
+        <p className="text-[9px] text-ink-muted mt-1">Required for TDS compliance on transfers above ₹50,000</p>
       </div>
 
       <div>

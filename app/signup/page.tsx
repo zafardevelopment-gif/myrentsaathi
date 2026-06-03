@@ -75,7 +75,7 @@ function SignupContent() {
       return;
     }
 
-    toast.success("Society created! Ab apna plan chunein...");
+    toast.success("Society created! Now choose your plan...");
     const loginResult = await login(society.email, society.password);
     if (loginResult.success) {
       // Redirect to plan selection with type=society and societyId
@@ -111,7 +111,7 @@ function SignupContent() {
       return;
     }
 
-    toast.success("Account created! Ab apna plan chunein...");
+    toast.success("Account created! Now choose your plan...");
     const loginResult = await login(landlord.email, landlord.password);
     if (loginResult.success) {
       // Redirect to plan selection with type=landlord

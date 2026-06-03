@@ -65,40 +65,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
     }
 
-    const { keyId, keySecret } = await getRazorpayKeys();
-    if (!keyId || !keySecret) {
-      return NextResponse.json(
-        { success: false, error: "Razorpay not configured. Super Admin settings mein keys add karen." },
-        { status: 500 }
-      );
+    // ── Razorpay Route validation TEMPORARILY DISABLED ──
+    // For now we only store the bank details; we do NOT create a Razorpay
+    // Contact / Fund Account (that flow errored: reference_id > 40 chars, and
+    // needs a configured Razorpay account). Flip to true to re-enable.
+    const ENABLE_RAZORPAY_ROUTE = false;
+
+    let contactId: string | null = null;
+    let fundAccountId: string | null = null;
+
+    if (ENABLE_RAZORPAY_ROUTE) {
+      const { keyId, keySecret } = await getRazorpayKeys();
+      if (!keyId || !keySecret) {
+        return NextResponse.json(
+          { success: false, error: "Razorpay not configured. Add keys in Super Admin settings." },
+          { status: 500 }
+        );
+      }
+
+      // Step 1: Create Razorpay Contact. reference_id must be <= 40 chars,
+      // so use only the last 32 chars of the entity id.
+      const contactPayload: Record<string, unknown> = {
+        name: bank.account_holder_name,
+        type: "vendor",
+        reference_id: `${entityType.slice(0, 3)}_${entityId.slice(-32)}`,
+      };
+      if (bank.pan_number) contactPayload.gstin = bank.gst_number ?? undefined;
+
+      const contact = await razorpayRequest("/contacts", "POST", keyId, keySecret, contactPayload);
+      contactId = contact.id as string;
+
+      // Step 2: Create Fund Account (bank account)
+      const fundAccount = await razorpayRequest("/fund_accounts", "POST", keyId, keySecret, {
+        contact_id: contactId,
+        account_type: "bank_account",
+        bank_account: {
+          name: bank.account_holder_name,
+          ifsc: bank.ifsc_code.toUpperCase(),
+          account_number: bank.account_number,
+        },
+      });
+      fundAccountId = fundAccount.id as string;
     }
 
-    // Step 1: Create Razorpay Contact
-    const contactPayload: Record<string, unknown> = {
-      name: bank.account_holder_name,
-      type: entityType === "society" ? "vendor" : "vendor",
-      reference_id: `${entityType}_${entityId}`,
-    };
-    if (bank.pan_number) contactPayload.gstin = bank.gst_number ?? undefined;
-
-    const contact = await razorpayRequest("/contacts", "POST", keyId, keySecret, contactPayload);
-    const contactId = contact.id as string;
-
-    // Step 2: Create Fund Account (bank account)
-    const fundPayload: Record<string, unknown> = {
-      contact_id: contactId,
-      account_type: "bank_account",
-      bank_account: {
-        name: bank.account_holder_name,
-        ifsc: bank.ifsc_code.toUpperCase(),
-        account_number: bank.account_number,
-      },
-    };
-
-    const fundAccount = await razorpayRequest("/fund_accounts", "POST", keyId, keySecret, fundPayload);
-    const fundAccountId = fundAccount.id as string;
-
-    // Step 3: Save to Supabase bank_accounts table
+    // Save to Supabase bank_accounts table (verified only once Razorpay is linked).
     const { error: dbError } = await supabaseAdmin.from("bank_accounts").upsert(
       {
         entity_type: entityType,
@@ -112,7 +122,7 @@ export async function POST(req: NextRequest) {
         gst_number: bank.gst_number ?? null,
         razorpay_contact_id: contactId,
         razorpay_fund_account_id: fundAccountId,
-        is_verified: true,
+        is_verified: ENABLE_RAZORPAY_ROUTE,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "entity_type,entity_id" }
@@ -120,11 +130,7 @@ export async function POST(req: NextRequest) {
 
     if (dbError) throw dbError;
 
-    return NextResponse.json({
-      success: true,
-      contactId,
-      fundAccountId,
-    });
+    return NextResponse.json({ success: true, contactId, fundAccountId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[razorpay-route] ERROR:", msg);
