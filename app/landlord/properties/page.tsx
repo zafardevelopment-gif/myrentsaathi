@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
@@ -55,6 +56,7 @@ type Complaint = { id: string; subject: string; category: string; priority: stri
 
 export default function LandlordProperties() {
   const { user } = useAuth();
+  const router = useRouter();
   const [flats, setFlats] = useState<LandlordFlat[]>([]);
   const [landlordId, setLandlordId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -412,13 +414,20 @@ export default function LandlordProperties() {
                     </div>
                   ) : (
                     <div className="rounded-xl bg-warm-50 border border-dashed border-border-default p-3 mb-3 text-center">
-                      <div className="text-xs text-ink-muted">No tenant — property vacant</div>
+                      <div className="text-xs text-ink-muted mb-2">No tenant — property vacant</div>
+                      <button
+                        onClick={() => router.push(`/landlord/tenants?flat=${flat.id}`)}
+                        className="px-3 py-1.5 rounded-lg bg-brand-500 text-white text-[11px] font-bold cursor-pointer hover:bg-brand-600"
+                      >➕ Add Tenant</button>
                     </div>
                   )}
 
                   {/* All Action Buttons — single row, scroll on overflow */}
                   <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                     <button onClick={() => setDetailFlat(flat)} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">Details</button>
+                    {!tenantUser && (
+                      <button onClick={() => router.push(`/landlord/tenants?flat=${flat.id}`)} className="px-2.5 py-1.5 rounded-lg border border-brand-200 bg-brand-50 text-brand-600 text-[10px] font-semibold cursor-pointer hover:bg-brand-100 whitespace-nowrap flex-shrink-0">➕ Add Tenant</button>
+                    )}
                     {tenantUser && (
                       <>
                         <button onClick={() => openTenantModal(flat)} className="px-2.5 py-1.5 rounded-lg border border-brand-200 bg-brand-50 text-brand-600 text-[10px] font-semibold cursor-pointer hover:bg-brand-100 whitespace-nowrap flex-shrink-0">👤 Tenant</button>

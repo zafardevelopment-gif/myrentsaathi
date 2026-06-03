@@ -372,6 +372,22 @@ export default function LandlordTenants() {
 
   useEffect(() => { loadData().catch(() => setLoading(false)); }, [user]);
 
+  // Deep-link from Properties page: /landlord/tenants?flat=<id> → open the add form preselected.
+  useEffect(() => {
+    if (typeof window === "undefined" || flats.length === 0) return;
+    const flatId = new URLSearchParams(window.location.search).get("flat");
+    if (!flatId) return;
+    const flat = flats.find((f) => f.id === flatId);
+    if (!flat || flat.current_tenant_id) return; // skip if not found or already occupied
+    setShowForm(true);
+    setForm((f) => ({
+      ...f,
+      flat_id: flatId,
+      monthly_rent: flat.monthly_rent ? String(flat.monthly_rent) : f.monthly_rent,
+      security_deposit: flat.security_deposit ? String(flat.security_deposit) : f.security_deposit,
+    }));
+  }, [flats]);
+
   async function openKyc(flat: LandlordFlat) {
     setKycFlat(flat);
     setTenantDetail(null);
