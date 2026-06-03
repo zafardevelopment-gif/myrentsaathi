@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import SubscriptionSection from "@/components/settings/SubscriptionSection";
 import BankAccountForm from "@/components/settings/BankAccountForm";
@@ -9,10 +9,19 @@ export default function LandlordSettings() {
   const { user } = useAuth();
   const [openPanel, setOpenPanel] = useState<string | null>(null);
 
+  // Deep-link: /landlord/settings?section=bank → open that section and scroll to it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const section = new URLSearchParams(window.location.search).get("section");
+    if (!section) return;
+    setOpenPanel(section);
+    setTimeout(() => document.getElementById(`settings-${section}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+  }, []);
+
   const CARDS = [
     { key: "profile",  label: "My Profile",    desc: `${user?.name ?? "—"} · ${user?.email ?? ""}`, icon: "👤" },
     { key: "bank",     label: "Bank Account",  desc: "Rent is deposited directly into your account via Razorpay Route", icon: "🏦" },
-    { key: "whatsapp", label: "WhatsApp Notifications", desc: "Tenant alerts aur reminders", icon: "📱" },
+    { key: "whatsapp", label: "WhatsApp Notifications", desc: "Tenant alerts and reminders", icon: "📱" },
   ];
 
   return (
@@ -20,7 +29,7 @@ export default function LandlordSettings() {
       <h2 className="text-[15px] font-extrabold text-ink mb-4">⚙️ Account Settings</h2>
 
       {CARDS.map((card) => (
-        <div key={card.key} className="bg-white rounded-[14px] border border-border-default mb-2 overflow-hidden">
+        <div key={card.key} id={`settings-${card.key}`} className="bg-white rounded-[14px] border border-border-default mb-2 overflow-hidden scroll-mt-20">
           <div
             className="p-4 flex items-center gap-3 cursor-pointer hover:bg-warm-50 transition-colors"
             onClick={() => setOpenPanel(openPanel === card.key ? null : card.key)}

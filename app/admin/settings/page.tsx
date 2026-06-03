@@ -39,6 +39,15 @@ export default function AdminSettings() {
     load().catch(() => setLoading(false));
   }, [user]);
 
+  // Deep-link: /admin/settings?section=bank → open that section and scroll to it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const section = new URLSearchParams(window.location.search).get("section");
+    if (!section) return;
+    setOpenPanel(section);
+    setTimeout(() => document.getElementById(`settings-${section}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+  }, []);
+
   async function handleSave() {
     if (!society?.id) return;
     setSaving(true);
@@ -205,7 +214,7 @@ export default function AdminSettings() {
 
       {/* Integration Cards */}
       {INTEGRATION_CARDS.map((card) => (
-        <div key={card.key} className="bg-white rounded-[14px] border border-border-default mb-2 overflow-hidden">
+        <div key={card.key} id={`settings-${card.key}`} className="bg-white rounded-[14px] border border-border-default mb-2 overflow-hidden scroll-mt-20">
           <div
             className="p-4 flex items-center gap-3 cursor-pointer hover:bg-warm-50 transition-colors"
             onClick={() => setOpenPanel(openPanel === card.key ? null : card.key)}
