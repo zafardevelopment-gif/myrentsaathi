@@ -17,6 +17,7 @@ const NAV_ITEMS: Record<MockRole, NavItem[]> = {
     { icon: "📊", label: "Overview",      href: "/superadmin" },
     { icon: "🏢", label: "Societies",     href: "/superadmin/societies" },
     { icon: "💰", label: "Revenue",       href: "/superadmin/revenue" },
+    { icon: "🏦", label: "Route Accounts", href: "/superadmin/route-accounts" },
     { icon: "👥", label: "Users",         href: "/superadmin/users" },
     { icon: "📋", label: "Subscriptions", href: "/superadmin/subscriptions" },
     { icon: "💎", label: "Pricing",       href: "/superadmin/pricing" },
