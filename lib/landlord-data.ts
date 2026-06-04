@@ -270,7 +270,7 @@ export async function getLandlordAgreements(email: string): Promise<LandlordAgre
 
   // Step 2: fetch tenant records to get user_ids
   const tenantIds = agreements.map(a => a.tenant_id).filter(Boolean) as string[];
-  let tenantUserMap: Record<string, { full_name: string; phone?: string | null; email?: string | null }> = {};
+  const tenantUserMap: Record<string, { full_name: string; phone?: string | null; email?: string | null }> = {};
 
   if (tenantIds.length > 0) {
     const { data: tenantRows } = await supabase
@@ -464,9 +464,22 @@ export async function findOrCreateSociety(name: string): Promise<{ id: string | 
     .maybeSingle();
   if (existing?.id) return { id: existing.id, created: false };
 
+  // societies.address/city/state are NOT NULL — fill with placeholders the
+  // landlord can edit later. A landlord-typed "society/area" is often just a
+  // label, so we don't force them to enter full society details here.
   const { data: created, error } = await supabase
     .from("societies")
-    .insert({ name: trimmed, is_active: true })
+    .insert({
+      name: trimmed,
+      address: trimmed,        // typed name doubles as a placeholder address
+      city: "—",
+      state: "—",
+      total_flats: 0,
+      total_floors: 0,
+      maintenance_amount: 0,
+      subscription_plan: "free",
+      is_active: true,
+    })
     .select("id")
     .single();
   if (error || !created) return { id: null, created: false, error: error?.message ?? "Failed to create society." };
