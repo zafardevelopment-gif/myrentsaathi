@@ -15,17 +15,32 @@ type Invoice = {
 };
 type Notification = { id: string; type: "email" | "whatsapp"; status: string; created_at: string; invoice_id: string | null };
 type MeterReading = { billing_period: string; units_consumed: number; meter: { id: string; flat_id: string; flat: { flat_number: string; block: string | null } | null } | null };
+type MaintLine = { period: string; flatLabel: string; amount: number; paid: boolean };
 
-type Tab = "overview" | "invoices" | "monthly" | "electricity" | "notifications" | "gst";
+type Tab = "overview" | "invoices" | "monthly" | "electricity" | "maintenance" | "notifications" | "gst";
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "overview", label: "Overview", icon: "📊" },
   { key: "invoices", label: "Invoices", icon: "🧾" },
   { key: "monthly", label: "Monthly", icon: "📅" },
   { key: "electricity", label: "Electricity", icon: "⚡" },
+  { key: "maintenance", label: "Maintenance", icon: "🔧" },
   { key: "notifications", label: "Notifications", icon: "🔔" },
   { key: "gst", label: "GST / Tax", icon: "🏛️" },
 ];
+
+// Download an array of objects as a CSV file.
+function downloadCSV(filename: string, rows: Record<string, string | number>[]) {
+  if (rows.length === 0) return;
+  const headers = Object.keys(rows[0]);
+  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const csv = [headers.map(esc).join(","), ...rows.map((r) => headers.map((h) => esc(r[h] ?? "")).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 
 const STATUS_COLOR: Record<string, string> = {
   paid: "bg-green-100 text-green-700", unpaid: "bg-yellow-100 text-yellow-700",
@@ -39,7 +54,11 @@ export default function LandlordReports() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [notifications] = useState<Notification[]>([]);
   const [readings, setReadings] = useState<MeterReading[]>([]);
+  const [maintLines, setMaintLines] = useState<MaintLine[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [maintSearch, setMaintSearch] = useState("");
+  const [maintPage, setMaintPage] = useState(1);
 
   // Shared filter / search / pagination state per tab
   const [invSearch, setInvSearch] = useState("");
@@ -65,7 +84,26 @@ export default function LandlordReports() {
     async function load() {
       const q = `userId=${user!.id}&role=${user!.role}`;
       const invRes = await fetch(`/api/invoices?${q}`).then(r => r.json()).catch(() => ({ invoices: [] }));
-      setInvoices(invRes.invoices ?? []);
+      const invList: Invoice[] = invRes.invoices ?? [];
+      setInvoices(invList);
+
+      // Maintenance is a LINE ITEM inside combined bills — fetch those lines so
+      // maintenance collection can be reported (not a separate invoice type).
+      const invById = Object.fromEntries(invList.map((i) => [i.id, i]));
+      const invIds = invList.filter((i) => i.status !== "cancelled").map((i) => i.id);
+      if (invIds.length > 0) {
+        const { data: lines } = await supabase
+          .from("invoice_line_items")
+          .select("invoice_id, description, line_total")
+          .in("invoice_id", invIds)
+          .ilike("description", "Maintenance%");
+        const ml: MaintLine[] = (lines ?? []).map((l: { invoice_id: string; line_total: number }) => {
+          const inv = invById[l.invoice_id];
+          const flatLabel = inv?.flat ? `${inv.flat.flat_number}${inv.flat.block ? ` (${inv.flat.block})` : ""}` : "—";
+          return { period: inv?.billing_period ?? "—", flatLabel, amount: Number(l.line_total) || 0, paid: inv?.status === "paid" };
+        });
+        setMaintLines(ml);
+      }
 
       // Fetch meter readings via supabase
       const { data: metersData } = await supabase.from("meters")
@@ -118,11 +156,13 @@ export default function LandlordReports() {
 
   const byType = (type: string) => active.filter(i => i.invoice_type === type);
   const rentInv = byType("rent");
-  const maintInv = byType("maintenance");
   const elecInv = byType("electricity");
   const rentCollected = rentInv.reduce((a, i) => a + Number(i.amount_paid), 0);
-  const maintCollected = maintInv.reduce((a, i) => a + Number(i.amount_paid), 0);
   const elecCollected = elecInv.reduce((a, i) => a + Number(i.amount_paid), 0);
+
+  // Maintenance is a line item → derive from maintLines (billed = all, collected = paid invoices).
+  const maintBilled = maintLines.reduce((a, l) => a + l.amount, 0);
+  const maintCollected = maintLines.filter((l) => l.paid).reduce((a, l) => a + l.amount, 0);
 
   // Monthly revenue
   const monthlyMap: Record<string, { billed: number; collected: number }> = {};
@@ -170,6 +210,14 @@ export default function LandlordReports() {
   const elecTotalPages = Math.max(1, Math.ceil(filteredElec.length / PAGE_SIZE));
   const elecPaged = filteredElec.slice((elecPage - 1) * PAGE_SIZE, elecPage * PAGE_SIZE);
 
+  // Filtered maintenance lines
+  const filteredMaint = maintLines.filter((m) => {
+    const q = maintSearch.toLowerCase();
+    return q === "" || m.flatLabel.toLowerCase().includes(q) || m.period.toLowerCase().includes(q);
+  });
+  const maintTotalPages = Math.max(1, Math.ceil(filteredMaint.length / PAGE_SIZE));
+  const maintPaged = filteredMaint.slice((maintPage - 1) * PAGE_SIZE, maintPage * PAGE_SIZE);
+
   const card = (label: string, value: string, sub?: string, color?: string) => (
     <div className="rounded-[14px] border border-border-default bg-white p-4">
       <div className="text-[10px] uppercase tracking-wide text-ink-muted">{label}</div>
@@ -203,7 +251,7 @@ export default function LandlordReports() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {card("Rent Collected", inr(rentCollected), `${rentInv.length} invoices`)}
-            {card("Maintenance Collected", inr(maintCollected), `${maintInv.length} invoices`)}
+            {card("Maintenance Collected", inr(maintCollected), `${maintLines.length} charges`)}
             {card("Electricity Collected", inr(elecCollected), `${totalUnits} units total`)}
             {card("Total Invoices", String(active.length), `${paid.length} paid · ${unpaid.length + overdue.length} unpaid`)}
           </div>
@@ -234,20 +282,20 @@ export default function LandlordReports() {
       {/* ── INVOICES ── */}
       {tab === "invoices" && (
         <div className="space-y-4">
-          {/* Type summary cards */}
+          {/* Type summary cards (maintenance is a line item, derived separately) */}
           <div className="grid grid-cols-3 gap-3">
-            {[{ label: "Rent", invoices: rentInv }, { label: "Maintenance", invoices: maintInv }, { label: "Electricity", invoices: elecInv }].map(t => {
-              const billed = t.invoices.reduce((a, i) => a + Number(i.total_amount), 0);
-              const collected = t.invoices.reduce((a, i) => a + Number(i.amount_paid), 0);
-              return (
-                <div key={t.label} className="rounded-[14px] border border-border-default bg-white p-3">
-                  <div className="text-xs font-semibold text-ink-muted">{t.label}</div>
-                  <div className="text-base font-extrabold text-ink mt-1">{inr(billed)}</div>
-                  <div className="text-[11px] text-green-600 mt-0.5">Collected: {inr(collected)}</div>
-                  <div className="text-[11px] text-red-500">Due: {inr(billed - collected)}</div>
-                </div>
-              );
-            })}
+            {[
+              { label: "Rent", billed: rentInv.reduce((a, i) => a + Number(i.total_amount), 0), collected: rentCollected },
+              { label: "Maintenance", billed: maintBilled, collected: maintCollected },
+              { label: "Electricity", billed: elecInv.reduce((a, i) => a + Number(i.total_amount), 0), collected: elecCollected },
+            ].map(t => (
+              <div key={t.label} className="rounded-[14px] border border-border-default bg-white p-3">
+                <div className="text-xs font-semibold text-ink-muted">{t.label}</div>
+                <div className="text-base font-extrabold text-ink mt-1">{inr(t.billed)}</div>
+                <div className="text-[11px] text-green-600 mt-0.5">Collected: {inr(t.collected)}</div>
+                <div className="text-[11px] text-red-500">Due: {inr(t.billed - t.collected)}</div>
+              </div>
+            ))}
           </div>
 
           {/* Filters */}
@@ -277,6 +325,14 @@ export default function LandlordReports() {
                 <button onClick={() => { setInvSearch(""); setInvFilterType("all"); setInvFilterStatus("all"); setInvFilterPeriod(""); resetInvPage(); }}
                   className="text-xs text-ink-muted hover:text-red-500 cursor-pointer">Clear</button>
               )}
+              <button onClick={() => downloadCSV(`invoices-${user.id}.csv`, filteredInv.map((i) => ({
+                Invoice: i.invoice_number,
+                Flat: i.flat ? `${i.flat.flat_number}${i.flat.block ? ` (${i.flat.block})` : ""}` : "—",
+                Type: i.invoice_type, Period: i.billing_period ?? "—",
+                Total: Number(i.total_amount), Collected: Number(i.amount_paid),
+                Due: Number(i.total_amount) - Number(i.amount_paid), Status: i.status,
+              })))}
+                className="rounded-lg border border-brand-300 text-brand-600 px-2.5 py-1.5 text-xs font-semibold cursor-pointer hover:bg-brand-50">⬇ Export CSV</button>
               <span className="ml-auto text-[11px] text-ink-muted">{filteredInv.length} invoices</span>
             </div>
             <table className="w-full text-xs">
@@ -423,6 +479,67 @@ export default function LandlordReports() {
                 </tbody>
               </table>
               {elecTotalPages > 1 && <Pagination page={elecPage} total={elecTotalPages} onChange={setElecPage} />}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MAINTENANCE ── */}
+      {tab === "maintenance" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {card("Maintenance Billed", inr(maintBilled), `${maintLines.length} charges`)}
+            {card("Maintenance Collected", inr(maintCollected), pct(maintCollected, maintBilled) + " collected", "text-green-700")}
+            {card("Maintenance Outstanding", inr(maintBilled - maintCollected), undefined, "text-brand-500")}
+          </div>
+
+          {maintLines.length === 0 ? (
+            <div className="rounded-[14px] border border-border-default bg-white p-8 text-center text-ink-muted text-sm">
+              No maintenance charges yet. Add maintenance when generating bills to see data here.
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-[14px] border border-border-default bg-white">
+              <div className="flex flex-wrap items-center gap-2 border-b border-border-default px-3 py-2.5">
+                <input type="text" placeholder="Search flat or period…" value={maintSearch}
+                  onChange={e => { setMaintSearch(e.target.value); setMaintPage(1); }}
+                  className="rounded-lg border border-border-default bg-warm-50 px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-brand-500 w-44" />
+                {maintSearch && <button onClick={() => { setMaintSearch(""); setMaintPage(1); }} className="text-xs text-ink-muted hover:text-red-500 cursor-pointer">Clear</button>}
+                <button onClick={() => downloadCSV(`maintenance-${user.id}.csv`, filteredMaint.map((m) => ({ Period: m.period, Flat: m.flatLabel, Amount: m.amount, Status: m.paid ? "Collected" : "Pending" })))}
+                  className="rounded-lg border border-brand-300 text-brand-600 px-2.5 py-1.5 text-xs font-semibold cursor-pointer hover:bg-brand-50">⬇ Export CSV</button>
+                <span className="ml-auto text-[11px] text-ink-muted">{filteredMaint.length} charges</span>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-warm-50 text-left text-ink-muted">
+                  <tr>
+                    <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide">Period</th>
+                    <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide">Flat</th>
+                    <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide">Amount</th>
+                    <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {maintPaged.map((m, i) => (
+                    <tr key={i} className="border-t border-border-default">
+                      <td className="px-4 py-2.5 font-semibold text-ink">{m.period}</td>
+                      <td className="px-4 py-2.5 text-ink-muted">{m.flatLabel}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-ink">{inr(m.amount)}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.paid ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                          {m.paid ? "Collected" : "Pending"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-brand-200 bg-warm-50">
+                    <td colSpan={2} className="px-4 py-2.5 font-extrabold text-ink">
+                      {filteredMaint.length < maintLines.length ? `Filtered Total (${filteredMaint.length})` : "Total"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-extrabold text-brand-500">{inr(filteredMaint.reduce((a, m) => a + m.amount, 0))}</td>
+                    <td className="px-4 py-2.5 text-[11px] text-green-700">{inr(filteredMaint.filter((m) => m.paid).reduce((a, m) => a + m.amount, 0))} collected</td>
+                  </tr>
+                </tbody>
+              </table>
+              {maintTotalPages > 1 && <Pagination page={maintPage} total={maintTotalPages} onChange={setMaintPage} />}
             </div>
           )}
         </div>
