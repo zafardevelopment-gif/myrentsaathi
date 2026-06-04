@@ -69,6 +69,8 @@ export default function LandlordSettings() {
                   entityType="landlord"
                   entityId={user.id}
                   userId={user.id}
+                  defaultEmail={user.email}
+                  defaultPhone={(user as { phone?: string }).phone}
                 />
               )}
 

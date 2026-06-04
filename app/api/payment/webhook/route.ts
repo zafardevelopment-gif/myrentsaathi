@@ -2,22 +2,73 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { emailInvoicePaymentReceipt, emailPaymentReceivedLandlord } from "@/lib/email";
+import { getRazorpayKeys } from "@/lib/platform-config";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com";
 
 export const runtime = "nodejs";
 
-// Razorpay sends webhooks — verify with webhook secret (separate from API secret)
-function verifyWebhook(body: string, signature: string): boolean {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+// Route: split a captured invoice payment to the payee's linked account.
+// Payment Links don't support inline transfers, so we transfer after capture.
+async function routeInvoiceTransfer(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  invoiceId: string,
+  paymentId: string,
+  amountPaise: number,
+) {
+  try {
+    const { data: inv } = await supabase
+      .from("invoices").select("landlord_id, society_id").eq("id", invoiceId).maybeSingle();
+    if (!inv) return;
+    const entityType = inv.society_id ? "society" : "landlord";
+    const entityId = inv.society_id ?? inv.landlord_id;
+    if (!entityId) return;
+
+    const { data: bank } = await supabase
+      .from("bank_accounts").select("razorpay_linked_account_id, route_status")
+      .eq("entity_type", entityType).eq("entity_id", entityId).maybeSingle();
+    const linkedAccountId = bank?.razorpay_linked_account_id;
+    if (!linkedAccountId || bank?.route_status === "failed") return;
+
+    const { keyId, keySecret } = await getRazorpayKeys();
+    if (!keyId || !keySecret) return;
+
+    // Idempotency: skip if a transfer already exists for this payment.
+    const existing = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/transfers`, {
+      headers: { Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}` },
+    }).then((r) => r.json()).catch(() => null);
+    if (existing?.items?.length > 0) return; // already transferred
+
+    const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/transfers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}` },
+      body: JSON.stringify({
+        transfers: [{ account: linkedAccountId, amount: amountPaise, currency: "INR", notes: { invoice_id: invoiceId }, on_hold: 0 }],
+      }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      console.error("[webhook] invoice route transfer failed:", JSON.stringify(d));
+    }
+  } catch (e) {
+    console.error("[webhook] routeInvoiceTransfer error:", e instanceof Error ? e.message : String(e));
+  }
+}
+
+// Razorpay sends webhooks — verify with webhook secret (separate from API secret).
+// Read DB-first (platform_config), falling back to env — same as all other creds.
+async function verifyWebhook(body: string, signature: string): Promise<boolean> {
+  const { webhookSecret } = await getRazorpayKeys();
+  const secret = webhookSecret || process.env.RAZORPAY_WEBHOOK_SECRET || "";
   if (!secret) {
     // SECURITY: never skip verification in production — an unsigned webhook could
     // mark invoices paid. Only allow the bypass in local development.
     if (process.env.NODE_ENV === "production") {
-      console.error("[payment/webhook] RAZORPAY_WEBHOOK_SECRET not set — rejecting in production");
+      console.error("[payment/webhook] webhook secret not set — rejecting in production");
       return false;
     }
-    console.warn("[payment/webhook] RAZORPAY_WEBHOOK_SECRET not set — skipping verification (dev only)");
+    console.warn("[payment/webhook] webhook secret not set — skipping verification (dev only)");
     return true;
   }
   const expected = crypto.createHmac("sha256", secret).update(body).digest("hex");
@@ -105,7 +156,7 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text();
     const signature = request.headers.get("x-razorpay-signature") ?? "";
 
-    if (!verifyWebhook(rawBody, signature)) {
+    if (!(await verifyWebhook(rawBody, signature))) {
       console.error("[payment/webhook] Invalid webhook signature");
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
@@ -151,6 +202,9 @@ export async function POST(request: NextRequest) {
 
         // Fire-and-forget: send payment confirmation emails
         sendPaymentEmails(supabase, invoiceId, payment.amount / 100, payment.id).catch(() => {});
+
+        // Route: auto-split the captured amount to the landlord/society linked account.
+        routeInvoiceTransfer(supabase, invoiceId, payment.id, payment.amount).catch(() => {});
       }
       if (linkId) await supabase.from("invoices").update({ payment_link_status: "paid" }).eq("id", invoiceId);
       return NextResponse.json({ received: true });

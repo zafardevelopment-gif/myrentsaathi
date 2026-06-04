@@ -19,68 +19,9 @@ async function verifySignature(orderId: string, paymentId: string, signature: st
   return expectedSig === signature;
 }
 
-// Razorpay Route: transfer amount to linked fund account after payment capture
-async function triggerRouteTransfer({
-  paymentId,
-  fundAccountId,
-  amount,  // in paise
-  keyId,
-  keySecret,
-  notes,
-}: {
-  paymentId: string;
-  fundAccountId: string;
-  amount: number;
-  keyId: string;
-  keySecret: string;
-  notes?: Record<string, string>;
-}) {
-  const base64 = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-
-  // Route transfer via payment transfers API
-  const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/transfers`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Basic ${base64}`,
-    },
-    body: JSON.stringify({
-      transfers: [
-        {
-          account: fundAccountId,
-          amount,
-          currency: "INR",
-          notes: notes ?? {},
-          linked_account_notes: [],
-          on_hold: 0,
-        },
-      ],
-    }),
-  });
-
-  const data = await res.json() as Record<string, unknown>;
-  if (!res.ok) {
-    const errMsg = (data.error as Record<string, string> | undefined)?.description ?? JSON.stringify(data);
-    console.error("[payment/verify] Route transfer failed:", errMsg);
-    // Non-fatal — payment already verified, just log it
-  }
-  return data;
-}
-
-// Look up fund_account_id for an entity
-async function getFundAccountId(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  entityType: "society" | "landlord",
-  entityId: string
-): Promise<string | null> {
-  const { data } = await supabase
-    .from("bank_accounts")
-    .select("razorpay_fund_account_id")
-    .eq("entity_type", entityType)
-    .eq("entity_id", entityId)
-    .single();
-  return (data?.razorpay_fund_account_id as string | null) ?? null;
-}
+// NOTE: Route auto-split now happens at ORDER creation (inline `transfers` for
+// rent/maintenance) and in the webhook (for invoice payment links). The verify
+// route only confirms the payment in our DB — no transfer is triggered here.
 
 export async function POST(request: NextRequest) {
   try {
@@ -106,7 +47,7 @@ export async function POST(request: NextRequest) {
     const {
       razorpay_order_id, razorpay_payment_id, razorpay_signature,
       type, tenantId, monthYear, amount, existingPaymentId,
-      flatId, expenseId, landlordId, societyId, shareAmount,
+      flatId, expenseId, landlordId, shareAmount,
     } = body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -120,7 +61,6 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getSupabaseAdmin();
-    const { keyId, keySecret } = await getRazorpayKeys();
     const today = new Date().toISOString().slice(0, 10);
     const now = new Date().toISOString();
 
@@ -142,20 +82,7 @@ export async function POST(request: NextRequest) {
         if (error) throw error;
       }
 
-      // Route transfer to landlord's linked bank account (fire-and-forget)
-      if (landlordId && keyId && keySecret) {
-        const fundAccountId = await getFundAccountId(supabase, "landlord", landlordId);
-        if (fundAccountId) {
-          triggerRouteTransfer({
-            paymentId: razorpay_payment_id,
-            fundAccountId,
-            amount: Math.round(amount * 100), // paise
-            keyId,
-            keySecret,
-            notes: { type: "rent", tenantId, monthYear },
-          }).catch(console.error);
-        }
-      }
+      // Route auto-split handled at order creation (inline transfers).
 
     } else if (type === "maintenance") {
       if (!flatId || !expenseId || !shareAmount) {
@@ -177,20 +104,7 @@ export async function POST(request: NextRequest) {
         }, { onConflict: "expense_id,flat_id,month_year" });
       if (error) throw error;
 
-      // Route transfer to society's linked bank account (fire-and-forget)
-      if (societyId && keyId && keySecret) {
-        const fundAccountId = await getFundAccountId(supabase, "society", societyId);
-        if (fundAccountId) {
-          triggerRouteTransfer({
-            paymentId: razorpay_payment_id,
-            fundAccountId,
-            amount: Math.round(shareAmount * 100),
-            keyId,
-            keySecret,
-            notes: { type: "maintenance", expenseId, flatId },
-          }).catch(console.error);
-        }
-      }
+      // Route auto-split handled at order creation (inline transfers).
 
     } else if (type === "subscription") {
       // Signature verified — plan activation handled client-side

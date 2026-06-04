@@ -1,13 +1,14 @@
 /**
- * Razorpay Route API — Create Contact + Linked Account for society/landlord
+ * Razorpay Route — Create a LINKED ACCOUNT (sub-merchant) for a society/landlord.
  *
- * Flow:
- * 1. POST /api/razorpay-route  { entityType, entityId, bankDetails }
- * 2. Creates Razorpay Contact (the payee)
- * 3. Creates Fund Account (bank account linked to contact)
- * 4. Saves razorpay_contact_id + razorpay_fund_account_id to bank_accounts table
+ * Route v2 onboarding flow (money settles directly to the linked account's bank):
+ *   1. POST /v2/accounts                        → linked account (acc_*)
+ *   2. POST /v2/accounts/{id}/stakeholders       → stakeholder (KYC owner)
+ *   3. POST /v2/accounts/{id}/products           → request the "route" product
+ *   4. PATCH /v2/accounts/{id}/products/{prodId}  → add settlement bank details
  *
- * These IDs are later used in payment transfers (Route splits).
+ * The linked account id (acc_*) is later used as the `account` in payment
+ * transfers, so the tenant's payment auto-splits to the landlord/society.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,94 +22,146 @@ type BankDetails = {
   account_number: string;
   ifsc_code: string;
   account_type: "savings" | "current";
-  pan_number?: string;
+  pan_number: string;
   gst_number?: string;
-  entity_name?: string; // for current accounts
+  business_type?: string;       // individual | proprietorship | partnership | private_limited | trust | society | ngo
+  contact_email: string;
+  contact_phone: string;
+  address_street: string;
+  address_city: string;
+  address_state: string;        // e.g. KARNATAKA (uppercase state name)
+  address_postal_code: string;
 };
 
-async function razorpayRequest(
+async function rzp(
   path: string,
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PATCH",
   keyId: string,
   keySecret: string,
-  body?: Record<string, unknown>
+  body?: Record<string, unknown>,
 ) {
-  const base64 = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-  const res = await fetch(`https://api.razorpay.com/v1${path}`, {
+  const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+  const res = await fetch(`https://api.razorpay.com${path}`, {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Basic ${base64}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const data = await res.json() as Record<string, unknown>;
+  const data = (await res.json()) as Record<string, unknown>;
   if (!res.ok) {
     const errMsg = (data.error as Record<string, string> | undefined)?.description ?? JSON.stringify(data);
-    throw new Error(`Razorpay API error: ${errMsg}`);
+    throw new Error(errMsg);
   }
   return data;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as {
+    const body = (await req.json()) as {
       entityType: "society" | "landlord";
-      entityId: string;        // society_id or user_id
-      userId: string;          // the admin/landlord user id
+      entityId: string;
+      userId: string;
       bank: BankDetails;
     };
-
     const { entityType, entityId, userId, bank } = body;
 
-    if (!entityType || !entityId || !userId || !bank?.account_number || !bank?.ifsc_code || !bank?.account_holder_name) {
-      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
+    // ── Validation ──
+    if (!entityType || !entityId || !userId) {
+      return NextResponse.json({ success: false, error: "Missing entity fields" }, { status: 400 });
+    }
+    const required: [keyof BankDetails, string][] = [
+      ["account_holder_name", "Account holder name"], ["account_number", "Account number"],
+      ["ifsc_code", "IFSC code"], ["pan_number", "PAN number"], ["contact_email", "Email"],
+      ["contact_phone", "Phone"], ["address_street", "Address"], ["address_city", "City"],
+      ["address_state", "State"], ["address_postal_code", "Postal code"],
+    ];
+    for (const [key, label] of required) {
+      if (!bank?.[key]) return NextResponse.json({ success: false, error: `${label} is required` }, { status: 400 });
+    }
+    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(bank.pan_number.toUpperCase())) {
+      return NextResponse.json({ success: false, error: "Invalid PAN format" }, { status: 400 });
     }
 
-    // ── Razorpay Route validation TEMPORARILY DISABLED ──
-    // For now we only store the bank details; we do NOT create a Razorpay
-    // Contact / Fund Account (that flow errored: reference_id > 40 chars, and
-    // needs a configured Razorpay account). Flip to true to re-enable.
-    const ENABLE_RAZORPAY_ROUTE = false;
+    const { keyId, keySecret } = await getRazorpayKeys();
+    if (!keyId || !keySecret) {
+      return NextResponse.json({ success: false, error: "Razorpay not configured. Add keys in Super Admin settings." }, { status: 500 });
+    }
 
-    let contactId: string | null = null;
-    let fundAccountId: string | null = null;
+    const businessType = bank.business_type ?? (entityType === "landlord" ? "individual" : "society");
+    const pan = bank.pan_number.toUpperCase();
+    const phone = bank.contact_phone.replace(/\D/g, "").slice(-10);
 
-    if (ENABLE_RAZORPAY_ROUTE) {
-      const { keyId, keySecret } = await getRazorpayKeys();
-      if (!keyId || !keySecret) {
-        return NextResponse.json(
-          { success: false, error: "Razorpay not configured. Add keys in Super Admin settings." },
-          { status: 500 }
-        );
+    let linkedAccountId: string | null = null;
+    let stakeholderId: string | null = null;
+    let productId: string | null = null;
+    let routeStatus = "failed";
+    let routeError: string | null = null;
+
+    try {
+      // Step 1: Linked account
+      const account = await rzp("/v2/accounts", "POST", keyId, keySecret, {
+        email: bank.contact_email,
+        phone,
+        type: "route",
+        reference_id: `${entityType.slice(0, 3)}_${entityId.slice(-30)}`,
+        legal_business_name: bank.account_holder_name,
+        business_type: businessType,
+        contact_name: bank.account_holder_name,
+        profile: {
+          category: "others",
+          subcategory: "others",
+          addresses: {
+            registered: {
+              street1: bank.address_street,
+              street2: bank.address_city,
+              city: bank.address_city,
+              state: bank.address_state.toUpperCase(),
+              postal_code: bank.address_postal_code,
+              country: "IN",
+            },
+          },
+        },
+        legal_info: { pan, ...(bank.gst_number ? { gst: bank.gst_number.toUpperCase() } : {}) },
+      });
+      linkedAccountId = account.id as string;
+
+      // Step 2: Stakeholder (KYC owner)
+      try {
+        const stakeholder = await rzp(`/v2/accounts/${linkedAccountId}/stakeholders`, "POST", keyId, keySecret, {
+          name: bank.account_holder_name,
+          email: bank.contact_email,
+          kyc: { pan },
+        });
+        stakeholderId = stakeholder.id as string;
+      } catch (e) {
+        routeError = `Stakeholder: ${e instanceof Error ? e.message : String(e)}`;
       }
 
-      // Step 1: Create Razorpay Contact. reference_id must be <= 40 chars,
-      // so use only the last 32 chars of the entity id.
-      const contactPayload: Record<string, unknown> = {
-        name: bank.account_holder_name,
-        type: "vendor",
-        reference_id: `${entityType.slice(0, 3)}_${entityId.slice(-32)}`,
-      };
-      if (bank.pan_number) contactPayload.gstin = bank.gst_number ?? undefined;
-
-      const contact = await razorpayRequest("/contacts", "POST", keyId, keySecret, contactPayload);
-      contactId = contact.id as string;
-
-      // Step 2: Create Fund Account (bank account)
-      const fundAccount = await razorpayRequest("/fund_accounts", "POST", keyId, keySecret, {
-        contact_id: contactId,
-        account_type: "bank_account",
-        bank_account: {
-          name: bank.account_holder_name,
-          ifsc: bank.ifsc_code.toUpperCase(),
-          account_number: bank.account_number,
-        },
+      // Step 3: Request route product
+      const product = await rzp(`/v2/accounts/${linkedAccountId}/products`, "POST", keyId, keySecret, {
+        product_name: "route",
+        tnc_accepted: true,
       });
-      fundAccountId = fundAccount.id as string;
+      productId = product.id as string;
+
+      // Step 4: Add settlement bank details to the product config
+      const updated = await rzp(`/v2/accounts/${linkedAccountId}/products/${productId}`, "PATCH", keyId, keySecret, {
+        settlements: {
+          account_number: bank.account_number,
+          ifsc_code: bank.ifsc_code.toUpperCase(),
+          beneficiary_name: bank.account_holder_name,
+        },
+        tnc_accepted: true,
+      });
+      const activationStatus = (updated.activation_status as string) ?? "";
+      routeStatus = activationStatus === "activated" ? "activated"
+        : activationStatus === "needs_clarification" ? "needs_clarification"
+        : "created";
+    } catch (e) {
+      routeError = (routeError ? routeError + " | " : "") + (e instanceof Error ? e.message : String(e));
+      // If linked account was created but a later step failed, keep the id so we can retry.
     }
 
-    // Save to Supabase bank_accounts table (verified only once Razorpay is linked).
+    // ── Persist ──
     const { error: dbError } = await supabaseAdmin.from("bank_accounts").upsert(
       {
         entity_type: entityType,
@@ -118,19 +171,38 @@ export async function POST(req: NextRequest) {
         account_number_masked: bank.account_number.slice(-4).padStart(bank.account_number.length, "•"),
         ifsc_code: bank.ifsc_code.toUpperCase(),
         account_type: bank.account_type,
-        pan_number: bank.pan_number ?? null,
-        gst_number: bank.gst_number ?? null,
-        razorpay_contact_id: contactId,
-        razorpay_fund_account_id: fundAccountId,
-        is_verified: ENABLE_RAZORPAY_ROUTE,
+        pan_number: pan,
+        gst_number: bank.gst_number?.toUpperCase() ?? null,
+        business_type: businessType,
+        contact_email: bank.contact_email,
+        contact_phone: phone,
+        address_street: bank.address_street,
+        address_city: bank.address_city,
+        address_state: bank.address_state.toUpperCase(),
+        address_postal_code: bank.address_postal_code,
+        razorpay_linked_account_id: linkedAccountId,
+        razorpay_stakeholder_id: stakeholderId,
+        razorpay_product_id: productId,
+        route_status: routeStatus,
+        route_error: routeError,
+        is_verified: routeStatus === "activated" || routeStatus === "created",
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "entity_type,entity_id" }
+      { onConflict: "entity_type,entity_id" },
     );
-
     if (dbError) throw dbError;
 
-    return NextResponse.json({ success: true, contactId, fundAccountId });
+    if (!linkedAccountId) {
+      return NextResponse.json({ success: false, error: routeError ?? "Could not create linked account" }, { status: 502 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      linkedAccountId,
+      productId,
+      routeStatus,
+      ...(routeError ? { warning: routeError } : {}),
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[razorpay-route] ERROR:", msg);
@@ -141,19 +213,16 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const entityType = req.nextUrl.searchParams.get("entityType");
   const entityId = req.nextUrl.searchParams.get("entityId");
-
   if (!entityType || !entityId) {
     return NextResponse.json({ success: false, error: "entityType and entityId required" }, { status: 400 });
   }
-
   try {
     const { data } = await supabaseAdmin
       .from("bank_accounts")
-      .select("account_holder_name, account_number_masked, ifsc_code, account_type, pan_number, gst_number, razorpay_contact_id, razorpay_fund_account_id, is_verified, updated_at")
+      .select("account_holder_name, account_number_masked, ifsc_code, account_type, pan_number, gst_number, business_type, contact_email, contact_phone, address_street, address_city, address_state, address_postal_code, razorpay_linked_account_id, razorpay_product_id, route_status, route_error, is_verified, updated_at")
       .eq("entity_type", entityType)
       .eq("entity_id", entityId)
-      .single();
-
+      .maybeSingle();
     return NextResponse.json({ success: true, account: data ?? null });
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });

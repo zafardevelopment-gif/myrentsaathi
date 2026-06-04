@@ -236,6 +236,8 @@ export default function AdminSettings() {
                   entityType="society"
                   entityId={society.id}
                   userId={user.id}
+                  defaultEmail={user.email}
+                  defaultPhone={(user as { phone?: string }).phone}
                 />
               )}
               {card.key === "whatsapp" && (
