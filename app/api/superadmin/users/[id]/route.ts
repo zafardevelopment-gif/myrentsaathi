@@ -38,36 +38,58 @@ export async function DELETE(_request: NextRequest, ctx: Ctx) {
       return NextResponse.json({ error: "Cannot delete a Super Admin account" }, { status: 403 });
     }
 
-    // ── Collect ids the user owns so we can cascade their data ──
+    // ── Collect ids the user owns ──
     const { data: ownedFlats } = await supabaseAdmin.from("flats").select("id").eq("owner_id", id);
     const flatIds = (ownedFlats ?? []).map((f) => f.id);
 
-    const { data: tenantRows } = await supabaseAdmin.from("tenants").select("id").eq("user_id", id);
-    const tenantIds = (tenantRows ?? []).map((t) => t.id);
+    // Tenant rows for this user, PLUS tenant rows living in this user's flats.
+    const { data: tenantByUser } = await supabaseAdmin.from("tenants").select("id").eq("user_id", id);
+    let tenantIds = (tenantByUser ?? []).map((t) => t.id);
+    for (const fid of flatIds) {
+      const { data: tf } = await supabaseAdmin.from("tenants").select("id").eq("flat_id", fid);
+      tenantIds = tenantIds.concat((tf ?? []).map((t) => t.id));
+    }
+    tenantIds = [...new Set(tenantIds)];
 
-    // ── Detach FK references that block deletion (RESTRICT FKs, nullable cols) ──
-    // Flats may point at this user as their current tenant.
-    await tryNull("flats", "current_tenant_id", id);
-    // Flats may point at this user's tenant record(s).
-    for (const tid of tenantIds) {
-      await tryNull("flats", "current_tenant_id", tid);
+    // Meter ids for owned flats (meter_readings reference these).
+    let meterIds: string[] = [];
+    for (const fid of flatIds) {
+      const { data: m } = await supabaseAdmin.from("meters").select("id").eq("flat_id", fid);
+      meterIds = meterIds.concat((m ?? []).map((x) => x.id));
     }
 
-    // ── Delete leaf/dependent data first (best-effort) ──
-    // Payments, agreements & ledger tied to this tenant
+    // ── Detach FK references that block deletion (nullable RESTRICT cols) ──
+    await tryNull("flats", "current_tenant_id", id);
+    for (const tid of tenantIds) await tryNull("flats", "current_tenant_id", tid);
+
+    // ── Purge every tenant's dependent rows (payments, invoices, agreements) ──
     for (const tid of tenantIds) {
       await tryDelete("rent_payments", "tenant_id", tid);
       await tryDelete("society_due_payments", "tenant_id", tid);
       await tryDelete("invoices", "tenant_id", tid);
       await tryDelete("agreements", "tenant_id", tid);
     }
-    // Agreements where this user is the landlord
-    await tryDelete("agreements", "landlord_id", id);
-    // Invoices addressed to this user (line items/payments cascade via their own FKs)
-    await tryDelete("invoice_payments", "razorpay_order_id", id); // no-op guard
-    await tryDelete("invoices", "recipient_user_id", id);
 
-    // Things the user created / uploaded (RESTRICT FKs would otherwise block)
+    // ── Purge per-flat dependents (meters → readings, charges, parking, etc.) ──
+    for (const mid of meterIds) await tryDelete("meter_readings", "meter_id", mid);
+    for (const fid of flatIds) {
+      await tryDelete("meter_readings", "flat_id", fid);
+      await tryDelete("meters", "flat_id", fid);
+      await tryDelete("rent_payments", "flat_id", fid);
+      await tryDelete("society_due_payments", "flat_id", fid);
+      await tryDelete("unit_recurring_charges", "flat_id", fid);
+      await tryDelete("rent_hike_history", "flat_id", fid);
+      await tryDelete("vehicle_parking_passes", "flat_id", fid);
+      await tryDelete("vehicles", "flat_id", fid);
+      await tryDelete("tickets", "flat_id", fid);
+      await tryDelete("invoices", "flat_id", fid);
+      await tryDelete("agreements", "flat_id", fid);
+      await tryDelete("tenants", "flat_id", fid);
+    }
+
+    // ── User-owned / created records ──
+    await tryDelete("agreements", "landlord_id", id);
+    await tryDelete("invoices", "recipient_user_id", id);
     await tryDelete("documents", "uploaded_by", id);
     await tryDelete("notices", "created_by", id);
     await tryDelete("tickets", "created_by", id);
@@ -78,15 +100,10 @@ export async function DELETE(_request: NextRequest, ctx: Ctx) {
     await tryDelete("bank_accounts", "entity_id", id);
     await tryDelete("subscriptions", "user_id", id);
 
-    // Tenant records for this user
+    // Tenant records for this user (and any leftover in owned flats)
     await tryDelete("tenants", "user_id", id);
 
-    // Flats owned by this user (cascades agreements/tenants/invoices via their FKs)
-    for (const fid of flatIds) {
-      await tryDelete("agreements", "flat_id", fid);
-      await tryDelete("invoices", "flat_id", fid);
-      await tryDelete("tenants", "flat_id", fid);
-    }
+    // Finally the flats themselves
     await tryDelete("flats", "owner_id", id);
 
     // ── Finally, the user ──
