@@ -9,6 +9,7 @@ import { supabaseAdmin } from "../supabase-admin";
 import { enumerateBillerScopes } from "./cron-service";
 import { scopeColumn, type BillerScope } from "./scope";
 import { formatINR } from "./money";
+import { emailInvoiceOverdueReminder } from "../email";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
@@ -90,14 +91,24 @@ async function drain(): Promise<{ sent: number; failed: number }> {
 
       let ok = false;
       if (row.channel === "email" && user?.email) {
-        const html = `<p>Namaste ${user.full_name ?? ""},</p>
-          <p>${label[row.template] ?? "Payment reminder"} for invoice <b>${row.payload?.invoice_number ?? ""}</b>.</p>
-          <p>Outstanding: <b>${outstanding}</b>${row.payload?.due_date ? ` · Due: ${row.payload.due_date}` : ""}</p>`;
-        const res = await fetch(`${APP_URL}/api/email/send`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: user.email, subject, html }),
+        const dueDate = row.payload?.due_date ?? "";
+        const daysPastDue = dueDate
+          ? Math.max(0, Math.floor((Date.now() - new Date(dueDate + "T00:00:00Z").getTime()) / 86_400_000))
+          : 0;
+        const payUrl = `${APP_URL}/api/payment/redirect?invoice=${row.invoice_id}`;
+        await emailInvoiceOverdueReminder({
+          to: user.email,
+          tenantName: user.full_name ?? "Tenant",
+          invoiceNumber: row.payload?.invoice_number ?? "",
+          invoiceType: row.payload?.invoice_type ?? "rent",
+          billingPeriod: row.payload?.billing_period ?? null,
+          outstanding: Number(row.payload?.outstanding ?? 0),
+          dueDate,
+          daysPastDue,
+          payUrl,
+          template: row.template as "reminder_before" | "reminder_due" | "reminder_after" | "month_end",
         });
-        ok = res.ok;
+        ok = true;
       } else if (row.channel === "whatsapp" && user?.phone) {
         // best-effort: reuse generic whatsapp send route
         const res = await fetch(`${APP_URL}/api/whatsapp/send`, {

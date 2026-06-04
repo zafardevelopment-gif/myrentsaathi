@@ -5,6 +5,7 @@
     { "path": "/api/cron/generate-electricity", "schedule": "0 2 5 * *" },
     { "path": "/api/cron/apply-late-fees", "schedule": "0 1 * * *" },
     { "path": "/api/cron/mark-overdue", "schedule": "30 0 * * *" },
-    { "path": "/api/cron/process-reminders", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/process-reminders", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/check-agreement-expiry", "schedule": "0 9 * * *" }
   ]
 }

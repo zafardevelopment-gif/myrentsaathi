@@ -268,3 +268,248 @@ export async function emailPaymentConfirmation(params: {
     `),
   });
 }
+
+// ─── INVOICE PAYMENT RECEIPT (tenant ko) ─────────────────────
+
+export async function emailInvoicePaymentReceipt(params: {
+  to: string;
+  tenantName: string;
+  invoiceNumber: string;
+  billingPeriod: string | null;
+  amountPaid: number;
+  paymentDate: string;
+  paymentId: string;
+  landlordName: string;
+  viewUrl: string;
+}): Promise<void> {
+  const { to, tenantName, invoiceNumber, billingPeriod, amountPaid, paymentDate, paymentId, landlordName, viewUrl } = params;
+  await sendEmail({
+    to,
+    subject: `Payment Receipt — ${invoiceNumber} | MyRentSaathi`,
+    html: wrap(`
+      <p style="color:#333;font-size:15px">Namaste <strong>${tenantName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        Aapka payment successfully receive ho gaya hai. Neeche receipt ki details hain:
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Invoice No.</span>
+          <span style="color:#333;font-weight:600;font-family:monospace">${invoiceNumber}</span>
+        </div>
+        ${billingPeriod ? `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Period</span>
+          <span style="color:#333;font-weight:600">${billingPeriod}</span>
+        </div>` : ""}
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Amount Paid</span>
+          <span style="color:#16a34a;font-weight:700;font-size:15px">₹${amountPaid.toLocaleString("en-IN")}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Payment Date</span>
+          <span style="color:#333;font-weight:600">${paymentDate}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Landlord</span>
+          <span style="color:#333;font-weight:600">${landlordName}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0">
+          <span style="color:#888">Transaction ID</span>
+          <span style="color:#555;font-family:monospace;font-size:11px">${paymentId}</span>
+        </div>
+      </div>
+      <div style="background:#16a34a;border-radius:8px;padding:12px;text-align:center;margin:16px 0">
+        <span style="color:#fff;font-size:18px;font-weight:700">✓ Payment Confirmed</span>
+      </div>
+      <a href="${viewUrl}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px">
+        Receipt Dekhen →
+      </a>
+      <p style="color:#888;font-size:11px;margin-top:16px">Yeh email payment confirmation hai. Koi sawaal ho to apne landlord se sampark karen.</p>
+    `),
+  });
+}
+
+// ─── PAYMENT RECEIVED NOTIFICATION (landlord ko) ─────────────
+
+export async function emailPaymentReceivedLandlord(params: {
+  to: string;
+  landlordName: string;
+  tenantName: string;
+  flatNumber: string;
+  invoiceNumber: string;
+  billingPeriod: string | null;
+  amountPaid: number;
+  paymentDate: string;
+  paymentId: string;
+  dashboardUrl: string;
+}): Promise<void> {
+  const { to, landlordName, tenantName, flatNumber, invoiceNumber, billingPeriod, amountPaid, paymentDate, paymentId, dashboardUrl } = params;
+  await sendEmail({
+    to,
+    subject: `Payment Received — ${invoiceNumber} from ${tenantName}`,
+    html: wrap(`
+      <p style="color:#333;font-size:15px">Namaste <strong>${landlordName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        <strong>${tenantName}</strong> ne Flat <strong>${flatNumber}</strong> ka payment kar diya hai.
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Invoice No.</span>
+          <span style="color:#333;font-weight:600;font-family:monospace">${invoiceNumber}</span>
+        </div>
+        ${billingPeriod ? `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Period</span>
+          <span style="color:#333;font-weight:600">${billingPeriod}</span>
+        </div>` : ""}
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Flat</span>
+          <span style="color:#333;font-weight:600">${flatNumber}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Tenant</span>
+          <span style="color:#333;font-weight:600">${tenantName}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Amount Received</span>
+          <span style="color:#16a34a;font-weight:700;font-size:15px">₹${amountPaid.toLocaleString("en-IN")}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #bbf7d0">
+          <span style="color:#888">Payment Date</span>
+          <span style="color:#333;font-weight:600">${paymentDate}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0">
+          <span style="color:#888">Transaction ID</span>
+          <span style="color:#555;font-family:monospace;font-size:11px">${paymentId}</span>
+        </div>
+      </div>
+      <a href="${dashboardUrl}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px">
+        Dashboard Dekhen →
+      </a>
+    `),
+  });
+}
+
+// ─── INVOICE OVERDUE REMINDER (improved) ─────────────────────
+
+export async function emailInvoiceOverdueReminder(params: {
+  to: string;
+  tenantName: string;
+  invoiceNumber: string;
+  invoiceType: string;
+  billingPeriod: string | null;
+  outstanding: number;
+  dueDate: string;
+  daysPastDue: number;
+  payUrl: string;
+  template: "reminder_before" | "reminder_due" | "reminder_after" | "month_end";
+}): Promise<void> {
+  const { to, tenantName, invoiceNumber, invoiceType, billingPeriod, outstanding, dueDate, daysPastDue, payUrl, template } = params;
+  const isOverdue = template === "reminder_after" || template === "month_end";
+  const subjectMap = {
+    reminder_before: `Upcoming Payment — ${invoiceNumber}`,
+    reminder_due: `Payment Due Today — ${invoiceNumber}`,
+    reminder_after: `Overdue Payment — ${invoiceNumber} (${daysPastDue} days overdue)`,
+    month_end: `Month-end Reminder — ${invoiceNumber}`,
+  };
+  const headerColor = isOverdue ? "#dc2626" : template === "reminder_due" ? "#f59e0b" : "#1a1a2e";
+  const headerText = isOverdue ? "⚠️ Payment Overdue" : template === "reminder_due" ? "📅 Payment Due Today" : "🔔 Payment Reminder";
+
+  await sendEmail({
+    to,
+    subject: subjectMap[template],
+    html: wrap(`
+      <div style="background:${headerColor};border-radius:8px;padding:12px 16px;margin-bottom:16px;text-align:center">
+        <span style="color:#fff;font-size:15px;font-weight:700">${headerText}</span>
+      </div>
+      <p style="color:#333;font-size:15px">Namaste <strong>${tenantName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        ${isOverdue
+          ? `Aapka invoice <strong>${daysPastDue} din</strong> se overdue hai. Please jaldi se payment karen.`
+          : template === "reminder_due"
+          ? `Aapka payment aaj due hai. Please abhi payment karen.`
+          : `Aapka upcoming payment reminder.`}
+      </p>
+      <div style="background:#fff8f0;border:1px solid #fcd9b0;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fcd9b0">
+          <span style="color:#888">Invoice No.</span>
+          <span style="color:#333;font-weight:600;font-family:monospace">${invoiceNumber}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fcd9b0">
+          <span style="color:#888">Type</span>
+          <span style="color:#333;font-weight:600;text-transform:capitalize">${invoiceType}</span>
+        </div>
+        ${billingPeriod ? `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fcd9b0">
+          <span style="color:#888">Period</span>
+          <span style="color:#333;font-weight:600">${billingPeriod}</span>
+        </div>` : ""}
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fcd9b0">
+          <span style="color:#888">Due Date</span>
+          <span style="color:${isOverdue ? "#dc2626" : "#333"};font-weight:600">${dueDate}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0">
+          <span style="color:#888;font-weight:700">Outstanding Amount</span>
+          <span style="color:#c2660a;font-weight:700;font-size:16px">₹${outstanding.toLocaleString("en-IN")}</span>
+        </div>
+      </div>
+      <a href="${payUrl}" style="display:block;text-align:center;background:#16a34a;color:#fff;text-decoration:none;padding:14px 24px;border-radius:8px;font-weight:700;font-size:15px;margin:16px 0">
+        💳 Abhi Pay Karen — ₹${outstanding.toLocaleString("en-IN")}
+      </a>
+      <p style="color:#888;font-size:11px;text-align:center">
+        Agar payment already kar diya hai to is email ko ignore karen. Late payment par late fee lag sakti hai.
+      </p>
+    `),
+  });
+}
+
+// ─── AGREEMENT EXPIRY REMINDER ────────────────────────────────
+
+export async function emailAgreementExpiring(params: {
+  to: string;
+  tenantName: string;
+  flatNumber: string;
+  endDate: string;
+  daysLeft: number;
+  landlordName: string;
+  dashboardUrl: string;
+}): Promise<void> {
+  const { to, tenantName, flatNumber, endDate, daysLeft, landlordName, dashboardUrl } = params;
+  const urgency = daysLeft <= 7 ? "#dc2626" : daysLeft <= 15 ? "#f59e0b" : "#1a1a2e";
+  await sendEmail({
+    to,
+    subject: `Rent Agreement Expiring in ${daysLeft} Days — Flat ${flatNumber}`,
+    html: wrap(`
+      <div style="background:${urgency};border-radius:8px;padding:12px 16px;margin-bottom:16px;text-align:center">
+        <span style="color:#fff;font-size:15px;font-weight:700">📋 Agreement Expiry Notice</span>
+      </div>
+      <p style="color:#333;font-size:15px">Namaste <strong>${tenantName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        Aapka rent agreement Flat <strong>${flatNumber}</strong> ke liye
+        <strong style="color:${urgency}">${daysLeft} din</strong> mein expire ho raha hai.
+        Please apne landlord se renewal ke baare mein baat karen.
+      </p>
+      <div style="background:#fff8f0;border:1px solid #fcd9b0;border-radius:10px;padding:16px;margin:16px 0;font-size:13px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fcd9b0">
+          <span style="color:#888">Flat</span>
+          <span style="color:#333;font-weight:600">${flatNumber}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fcd9b0">
+          <span style="color:#888">Landlord</span>
+          <span style="color:#333;font-weight:600">${landlordName}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #fcd9b0">
+          <span style="color:#888">Agreement Ends</span>
+          <span style="color:${urgency};font-weight:700">${endDate}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0">
+          <span style="color:#888">Days Remaining</span>
+          <span style="color:${urgency};font-weight:700;font-size:16px">${daysLeft} days</span>
+        </div>
+      </div>
+      <a href="${dashboardUrl}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:10px 24px;border-radius:8px;font-weight:700;font-size:13px">
+        Agreement Dekhen →
+      </a>
+      <p style="color:#888;font-size:11px;margin-top:16px">
+        Renewal ke liye apne landlord se sampark karen. Time pe renewal na hone par ghar khali karna pad sakta hai.
+      </p>
+    `),
+  });
+}

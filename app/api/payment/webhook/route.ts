@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { emailInvoicePaymentReceipt, emailPaymentReceivedLandlord } from "@/lib/email";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com";
 
 export const runtime = "nodejs";
 
@@ -19,6 +22,73 @@ function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   return createClient(url, key);
+}
+
+async function sendPaymentEmails(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  invoiceId: string,
+  amountPaid: number,
+  paymentId: string,
+) {
+  try {
+    // Fetch invoice with flat and landlord info
+    const { data: inv } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, billing_period, invoice_type, recipient_user_id, landlord_id, society_id, flat_id")
+      .eq("id", invoiceId).maybeSingle();
+    if (!inv) return;
+
+    const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    const viewUrl = `${APP_URL}/api/invoices/${invoiceId}/pdf`;
+    const dashboardUrl = `${APP_URL}/landlord/billing`;
+
+    // Get tenant info
+    let tenantEmail: string | null = null;
+    let tenantName = "Tenant";
+    if (inv.recipient_user_id) {
+      const { data: u } = await supabase.from("users").select("email, full_name").eq("id", inv.recipient_user_id).maybeSingle();
+      tenantEmail = u?.email ?? null;
+      tenantName = u?.full_name ?? "Tenant";
+    }
+
+    // Get flat number
+    let flatNumber = "—";
+    if (inv.flat_id) {
+      const { data: f } = await supabase.from("flats").select("flat_number, block").eq("id", inv.flat_id).maybeSingle();
+      if (f) flatNumber = `${f.flat_number}${f.block ? ` (${f.block})` : ""}`;
+    }
+
+    // Get landlord info
+    let landlordEmail: string | null = null;
+    let landlordName = "Landlord";
+    const landlordUserId = inv.landlord_id;
+    if (landlordUserId) {
+      const { data: l } = await supabase.from("users").select("email, full_name").eq("id", landlordUserId).maybeSingle();
+      landlordEmail = l?.email ?? null;
+      landlordName = l?.full_name ?? "Landlord";
+    }
+
+    // Email to tenant — payment receipt
+    if (tenantEmail) {
+      await emailInvoicePaymentReceipt({
+        to: tenantEmail, tenantName, invoiceNumber: inv.invoice_number,
+        billingPeriod: inv.billing_period, amountPaid, paymentDate: today,
+        paymentId, landlordName, viewUrl,
+      });
+    }
+
+    // Email to landlord — payment received notification
+    if (landlordEmail) {
+      await emailPaymentReceivedLandlord({
+        to: landlordEmail, landlordName, tenantName, flatNumber,
+        invoiceNumber: inv.invoice_number, billingPeriod: inv.billing_period,
+        amountPaid, paymentDate: today, paymentId, dashboardUrl,
+      });
+    }
+  } catch {
+    // Never block the webhook
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -69,6 +139,9 @@ export async function POST(request: NextRequest) {
           razorpay_order_id: payment.order_id ?? null, payment_link_id: linkId, status: "confirmed",
         });
         // DB trigger recomputes invoice amount_paid + status.
+
+        // Fire-and-forget: send payment confirmation emails
+        sendPaymentEmails(supabase, invoiceId, payment.amount / 100, payment.id).catch(() => {});
       }
       if (linkId) await supabase.from("invoices").update({ payment_link_status: "paid" }).eq("id", invoiceId);
       return NextResponse.json({ received: true });

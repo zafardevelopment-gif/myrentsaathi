@@ -6,6 +6,7 @@ import { generateElectricityForPeriod } from "@/lib/billing/meter-service";
 import { generateChargesForPeriod } from "@/lib/billing/charge-service";
 import { applyLateFees } from "@/lib/billing/late-fee-service";
 import { processReminders } from "@/lib/billing/reminder-service";
+import { checkAgreementExpiry } from "@/lib/billing/agreement-expiry-service";
 
 export const runtime = "nodejs";
 
@@ -63,6 +64,10 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       }
       case "process-reminders": {
         const result = await processReminders();
+        return NextResponse.json({ task, ...result });
+      }
+      case "check-agreement-expiry": {
+        const result = await checkAgreementExpiry();
         return NextResponse.json({ task, ...result });
       }
       default:
