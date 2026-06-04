@@ -49,24 +49,27 @@ export default function LandlordReports() {
       setInvoices(invRes.invoices ?? []);
 
       // Fetch meter readings via supabase
-      type MeterRow = { id: string; flat_id: string; flat: { flat_number: string; block: string | null } | { flat_number: string; block: string | null }[] | null };
       const { data: metersData } = await supabase.from("meters")
         .select("id, flat_id, flat:flats(flat_number, block)")
         .eq(user!.role === "landlord" ? "landlord_id" : "society_id", user!.id);
 
       if (metersData?.length) {
-        const meterIds = (metersData as MeterRow[]).map(m => m.id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const metersRaw = metersData as any[];
+        const meterIds: string[] = metersRaw.map((m) => String(m.id));
         const { data: rdgs } = await supabase.from("meter_readings")
           .select("billing_period, units_consumed, meter_id")
           .in("meter_id", meterIds).order("billing_period", { ascending: false });
 
-        // Normalize flat (Supabase may return array or object for join)
-        const normalize = (m: MeterRow): { id: string; flat_id: string; flat: { flat_number: string; block: string | null } | null } => {
-          const f = m.flat;
-          const flat = Array.isArray(f) ? (f[0] ?? null) : f;
-          return { id: m.id, flat_id: m.flat_id, flat };
-        };
-        const meterMap = Object.fromEntries((metersData as MeterRow[]).map(m => [m.id, normalize(m)]));
+        // Build meterMap: normalize flat (Supabase returns array or object for join)
+        const meterMap: Record<string, { id: string; flat_id: string; flat: { flat_number: string; block: string | null } | null }> = {};
+        for (const m of metersRaw) {
+          const rawFlat = m.flat;
+          const flat = Array.isArray(rawFlat)
+            ? (rawFlat[0] ? { flat_number: String(rawFlat[0].flat_number), block: rawFlat[0].block ?? null } : null)
+            : (rawFlat ? { flat_number: String(rawFlat.flat_number), block: rawFlat.block ?? null } : null);
+          meterMap[String(m.id)] = { id: String(m.id), flat_id: String(m.flat_id), flat };
+        }
 
         setReadings((rdgs ?? []).map((r: { billing_period: string; units_consumed: number; meter_id: string }) => ({
           billing_period: r.billing_period,
