@@ -60,13 +60,25 @@ async function handle(invoiceId: string | null) {
   if (!keyId || !keySecret) return NextResponse.json({ error: "Razorpay not configured" }, { status: 500 });
   const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
 
-  // Fetch the payment link to see if it's paid. Expand payments so we can also
-  // get the capturing payment id (for the Route transfer).
-  const link = await fetch(`https://api.razorpay.com/v1/payment_links/${inv.payment_link_id}?expand[]=payments`, {
+  // Fetch the payment link to see if it's paid (standard response includes
+  // `status`, `amount_paid` and a `payments` array).
+  const link = await fetch(`https://api.razorpay.com/v1/payment_links/${inv.payment_link_id}`, {
     headers: { Authorization: `Basic ${auth}` },
   }).then((r) => r.json()).catch(() => null);
-  if (!link || link.status !== "paid") {
-    return NextResponse.json({ reconciled: false, status: link?.status ?? "unknown" });
+
+  // Razorpay marks a fully-paid link as "paid"; partial as "partially_paid".
+  const linkStatus = link?.status as string | undefined;
+  const isPaid = linkStatus === "paid" || Number(link?.amount_paid ?? 0) > 0;
+  if (!link || !isPaid) {
+    return NextResponse.json({
+      reconciled: false,
+      debug: {
+        payment_link_id: inv.payment_link_id,
+        link_status: linkStatus ?? null,
+        link_error: link?.error?.description ?? null,
+        amount_paid: link?.amount_paid ?? null,
+      },
+    });
   }
 
   const amountPaise = Number(link.amount_paid ?? link.amount ?? 0);
@@ -76,11 +88,13 @@ async function handle(invoiceId: string | null) {
   // We do NOT need the exact payment id for this — the link being "paid" is enough.
   const linkRef = `plink_${inv.payment_link_id}`;
   const { data: dupe } = await supabaseAdmin.from("invoice_payments").select("id").eq("reference", linkRef).maybeSingle();
+  let insertError: string | null = null;
   if (!dupe) {
-    await supabaseAdmin.from("invoice_payments").insert({
+    const { error } = await supabaseAdmin.from("invoice_payments").insert({
       invoice_id: invoiceId, amount: amountPaise / 100,
       method: "payment_link", reference: linkRef, payment_link_id: inv.payment_link_id, status: "confirmed",
     });
+    insertError = error?.message ?? null;
   }
   await supabaseAdmin.from("invoices").update({ payment_link_status: "paid" }).eq("id", invoiceId);
 
@@ -91,7 +105,14 @@ async function handle(invoiceId: string | null) {
   const paymentId = captured?.payment_id ?? captured?.id;
   if (paymentId) await routeTransfer(invoiceId, paymentId, amountPaise, keyId, keySecret);
 
-  return NextResponse.json({ reconciled: true, paymentId: paymentId ?? null });
+  // Read back the invoice status so we can confirm the DB trigger fired.
+  const { data: after } = await supabaseAdmin.from("invoices").select("status, amount_paid").eq("id", invoiceId).maybeSingle();
+
+  return NextResponse.json({
+    reconciled: true,
+    paymentId: paymentId ?? null,
+    debug: { amountPaise, already_recorded: !!dupe, insertError, invoice_after: after },
+  });
 }
 
 export async function GET(request: NextRequest) {
