@@ -5,6 +5,7 @@
  */
 
 import { supabase } from "./supabase";
+import { emailAccountWelcome } from "./email";
 
 export type DBUser = {
   id: string;
@@ -154,6 +155,13 @@ export async function signupSocietyAdmin(params: {
     // Don't fail, society was created successfully
   }
 
+  // Fire-and-forget welcome email
+  emailAccountWelcome({
+    to: params.email.trim().toLowerCase(),
+    fullName: params.full_name.trim(),
+    role: "society_admin",
+  }).catch(() => {});
+
   return { success: true, userId: user.id, societyId: societyId };
 }
 
@@ -186,6 +194,13 @@ export async function signupLandlord(params: {
     .select("id")
     .single();
   if (error || !user) return { success: false, error: error?.message ?? "Failed to create account." };
+
+  // Fire-and-forget welcome email
+  emailAccountWelcome({
+    to: params.email.trim().toLowerCase(),
+    fullName: params.full_name.trim(),
+    role: "landlord",
+  }).catch(() => {});
 
   return { success: true, userId: user.id };
 }

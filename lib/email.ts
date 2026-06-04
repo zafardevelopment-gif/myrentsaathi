@@ -41,6 +41,44 @@ const wrap = (content: string) => `
 
 // ─── TYPED SENDERS ───────────────────────────────────────────
 
+export async function emailAccountWelcome(params: {
+  to: string;
+  fullName: string;
+  role: "society_admin" | "landlord";
+  loginUrl?: string;
+}): Promise<void> {
+  const { to, fullName, role, loginUrl } = params;
+  const roleLabel = role === "society_admin" ? "Society Admin" : "Landlord";
+  const dashUrl = loginUrl ?? `${BASE}/login`;
+  const nextSteps = role === "landlord"
+    ? ["Add your properties / units", "Add tenants & create agreements", "Link your bank account (Razorpay) for auto rent settlement", "Start generating rent / maintenance / electricity invoices"]
+    : ["Add flats & residents to your society", "Invite board members", "Link the society bank account", "Start billing maintenance & dues"];
+  await sendEmail({
+    to,
+    subject: `Welcome to MyRentSaathi, ${fullName}! 🎉`,
+    html: wrap(`
+      <p style="color:#333;font-size:15px">Namaste <strong>${fullName}</strong>,</p>
+      <p style="color:#555;font-size:13px;line-height:1.6">
+        Aapka <strong>${roleLabel}</strong> account successfully ban gaya hai. MyRentSaathi mein aapka swagat hai! 🏠
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:14px;margin:16px 0;font-size:13px">
+        <div style="font-weight:700;color:#16a34a;margin-bottom:6px">✓ Account Active</div>
+        <div style="color:#555">Login Email: <strong>${to}</strong></div>
+      </div>
+      <div style="font-size:13px;color:#333;font-weight:700;margin-bottom:8px">Agle steps:</div>
+      <ol style="color:#555;font-size:12px;line-height:1.8;padding-left:18px;margin:0 0 16px">
+        ${nextSteps.map((s) => `<li>${s}</li>`).join("")}
+      </ol>
+      <a href="${dashUrl}" style="display:inline-block;background:#f59e0b;color:#fff;text-decoration:none;padding:11px 26px;border-radius:8px;font-weight:700;font-size:13px">
+        Dashboard Kholen →
+      </a>
+      <p style="color:#888;font-size:11px;margin-top:16px">
+        Koi madad chahiye? Hamein support@myrentsaathi.com pe likhein.
+      </p>
+    `),
+  });
+}
+
 export async function emailRentHikeNotice(params: {
   to: string;
   tenantName: string;
