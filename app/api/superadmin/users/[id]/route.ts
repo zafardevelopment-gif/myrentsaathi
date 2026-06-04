@@ -15,6 +15,16 @@ async function tryDelete(table: string, column: string, value: string) {
   }
 }
 
+// Best-effort: null out a referencing column (for FKs that use ON ... RESTRICT
+// but allow NULL, e.g. flats.current_tenant_id pointing at the user).
+async function tryNull(table: string, column: string, value: string) {
+  try {
+    await supabaseAdmin.from(table).update({ [column]: null }).eq(column, value);
+  } catch {
+    /* ignore */
+  }
+}
+
 // DELETE /api/superadmin/users/[id] — permanently remove a user + their data.
 // Refuses to delete a superadmin. Used for test-account cleanup.
 export async function DELETE(_request: NextRequest, ctx: Ctx) {
@@ -35,12 +45,24 @@ export async function DELETE(_request: NextRequest, ctx: Ctx) {
     const { data: tenantRows } = await supabaseAdmin.from("tenants").select("id").eq("user_id", id);
     const tenantIds = (tenantRows ?? []).map((t) => t.id);
 
+    // ── Detach FK references that block deletion (RESTRICT FKs, nullable cols) ──
+    // Flats may point at this user as their current tenant.
+    await tryNull("flats", "current_tenant_id", id);
+    // Flats may point at this user's tenant record(s).
+    for (const tid of tenantIds) {
+      await tryNull("flats", "current_tenant_id", tid);
+    }
+
     // ── Delete leaf/dependent data first (best-effort) ──
-    // Payments & ledger tied to this tenant
+    // Payments, agreements & ledger tied to this tenant
     for (const tid of tenantIds) {
       await tryDelete("rent_payments", "tenant_id", tid);
       await tryDelete("society_due_payments", "tenant_id", tid);
+      await tryDelete("invoices", "tenant_id", tid);
+      await tryDelete("agreements", "tenant_id", tid);
     }
+    // Agreements where this user is the landlord
+    await tryDelete("agreements", "landlord_id", id);
     // Invoices addressed to this user (line items/payments cascade via their own FKs)
     await tryDelete("invoice_payments", "razorpay_order_id", id); // no-op guard
     await tryDelete("invoices", "recipient_user_id", id);
