@@ -73,6 +73,22 @@ export default function TenantHome() {
         setAgreement(ag);
         setTickets(tk);
         setInvoices(inv);
+
+        // Auto-reconcile unpaid invoices that may already be paid on Razorpay
+        // (covers the case where the webhook didn't fire). If any reconciled,
+        // refresh the invoice list so the "Due" badge updates to "Paid".
+        const unpaid = (inv as { id: string; status: string }[]).filter((i) => i.status !== "paid" && i.status !== "cancelled");
+        if (unpaid.length > 0 && p.user?.id) {
+          const results = await Promise.all(
+            unpaid.map((i) =>
+              fetch(`/api/payment/reconcile?invoice=${i.id}`).then((r) => r.json()).catch(() => null)
+            )
+          );
+          if (results.some((r) => r?.reconciled)) {
+            const fresh = await getTenantInvoices(p.user.id).catch(() => inv);
+            setInvoices(fresh);
+          }
+        }
       }
       setLoading(false);
     }
