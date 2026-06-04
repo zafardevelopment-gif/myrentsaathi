@@ -37,6 +37,16 @@ export default function GstRatesSection() {
 
   useEffect(() => { if (open && user) load(); }, [open, user, load]);
 
+  // Deep-link: /landlord/settings?section=rates → auto-open + scroll here.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const section = new URLSearchParams(window.location.search).get("section");
+    if (section === "rates") {
+      setOpen(true);
+      setTimeout(() => document.getElementById("settings-rates")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+    }
+  }, []);
+
   const save = async () => {
     if (!user) return;
     setSaving(true); setMsg("");
