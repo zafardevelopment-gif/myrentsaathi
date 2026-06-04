@@ -680,7 +680,7 @@ export default function LandlordTenants() {
             <div><label className={labelClass}>Full Name *</label><input required className={inputClass} placeholder="Rajesh Sharma" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} /></div>
             <div><label className={labelClass}>Phone *</label><input required className={inputClass} placeholder="10-digit mobile" maxLength={10} inputMode="numeric" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))} /></div>
           </div>
-          <div><label className={labelClass}>Email *</label><input required type="email" className={inputClass} placeholder="rajesh@gmail.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
+          <div><label className={labelClass}>Email *</label><input required type="email" autoComplete="off" className={inputClass} placeholder="rajesh@gmail.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} /></div>
           <div>
             <label className={labelClass}>Select Flat *</label>
             <select required className={inputClass} value={form.flat_id} onChange={e => {

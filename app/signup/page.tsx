@@ -183,19 +183,19 @@ function SignupContent() {
 
                 <div>
                   <label className={labelClass}>Email *</label>
-                  <input required className={inputClass} placeholder="admin@yoursociety.com" type="email"
+                  <input required className={inputClass} placeholder="admin@yoursociety.com" type="email" autoComplete="off"
                     value={society.email} onChange={e => setSociety(s => ({ ...s, email: e.target.value }))} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelClass}>Password *</label>
-                    <input required className={inputClass} placeholder="Min 6 chars" type="password"
+                    <input required className={inputClass} placeholder="Min 6 chars" type="password" autoComplete="new-password"
                       value={society.password} onChange={e => setSociety(s => ({ ...s, password: e.target.value }))} />
                   </div>
                   <div>
                     <label className={labelClass}>Confirm Password *</label>
-                    <input required className={inputClass} placeholder="Re-enter" type="password"
+                    <input required className={inputClass} placeholder="Re-enter" type="password" autoComplete="new-password"
                       value={society.confirm_password} onChange={e => setSociety(s => ({ ...s, confirm_password: e.target.value }))} />
                   </div>
                 </div>
@@ -274,19 +274,19 @@ function SignupContent() {
 
                 <div>
                   <label className={labelClass}>Email *</label>
-                  <input required className={inputClass} placeholder="you@gmail.com" type="email"
+                  <input required className={inputClass} placeholder="you@gmail.com" type="email" autoComplete="off"
                     value={landlord.email} onChange={e => setLandlord(l => ({ ...l, email: e.target.value }))} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelClass}>Password *</label>
-                    <input required className={inputClass} placeholder="Min 6 chars" type="password"
+                    <input required className={inputClass} placeholder="Min 6 chars" type="password" autoComplete="new-password"
                       value={landlord.password} onChange={e => setLandlord(l => ({ ...l, password: e.target.value }))} />
                   </div>
                   <div>
                     <label className={labelClass}>Confirm Password *</label>
-                    <input required className={inputClass} placeholder="Re-enter" type="password"
+                    <input required className={inputClass} placeholder="Re-enter" type="password" autoComplete="new-password"
                       value={landlord.confirm_password} onChange={e => setLandlord(l => ({ ...l, confirm_password: e.target.value }))} />
                   </div>
                 </div>

@@ -386,6 +386,7 @@ export default function AdminLandlords() {
               <label className={labelClass}>Email (optional)</label>
               <input
                 type="email"
+                autoComplete="off"
                 className={inputClass}
                 placeholder="landlord@email.com"
                 value={form.email}

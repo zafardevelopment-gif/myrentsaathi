@@ -332,7 +332,7 @@ export default function AdminGovernance() {
           </div>
           <div>
             <label className="text-[10px] font-semibold text-ink-muted block mb-1">Email *</label>
-            <input required type="email" className={inputClass} placeholder="suresh@society.com"
+            <input required type="email" autoComplete="off" className={inputClass} placeholder="suresh@society.com"
               value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
           </div>
           <div>
