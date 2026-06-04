@@ -56,6 +56,11 @@ async function landlordSteps(landlordId: string): Promise<SetupStep[]> {
   const bankCount = await countRows("bank_accounts", [["entity_type", "landlord"], ["entity_id", landlordId]]);
   const billingCount = await countRows("billing_profiles", [["landlord_id", landlordId]]);
 
+  // Billing rates = electricity ₹/unit (charge_rate_config) and/or GST % (gst_rate_config).
+  const elecRateCount = await countRows("charge_rate_config", [["landlord_id", landlordId], ["charge_kind", "electricity"]]);
+  const gstRateCount = await countRows("gst_rate_config", [["landlord_id", landlordId]]);
+  const ratesDone = elecRateCount > 0 || gstRateCount > 0;
+
   return [
     { key: "profile", title: "Profile Information", required: true, href: "/landlord/settings",
       status: profileDone ? "completed" : "in_progress" },
@@ -69,6 +74,8 @@ async function landlordSteps(landlordId: string): Promise<SetupStep[]> {
       status: bankCount > 0 ? "completed" : "not_started" },
     { key: "billing", title: "Setup Billing", required: true, href: "/landlord/settings",
       status: (billingCount > 0 || anyRentConfigured) ? "completed" : "not_started", hint: "Set monthly rent on your units" },
+    { key: "billing_rates", title: "Set Billing Rates", required: true, href: "/landlord/settings?section=rates",
+      status: ratesDone ? "completed" : "not_started", hint: "GST % per type + electricity ₹/unit" },
   ];
 }
 

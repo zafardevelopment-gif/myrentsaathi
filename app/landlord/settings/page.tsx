@@ -86,7 +86,9 @@ export default function LandlordSettings() {
       ))}
 
       <CompanyProfileSection />
-      <GstRatesSection />
+      <div id="settings-rates" className="scroll-mt-20">
+        <GstRatesSection />
+      </div>
 
       <SubscriptionSection planType="landlord" />
     </div>
