@@ -699,6 +699,9 @@ export default function LandlordTenants() {
             <div><label className={labelClass}>Lease Start *</label><input required type="date" className={inputClass} value={form.lease_start} onChange={e => setForm(f => ({ ...f, lease_start: e.target.value }))} /></div>
             <div><label className={labelClass}>Lease End *</label><input required type="date" className={inputClass} value={form.lease_end} onChange={e => setForm(f => ({ ...f, lease_end: e.target.value }))} /></div>
           </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-[11px] text-blue-700">
+            📅 Rent is due on the <strong>last day of each month</strong>.
+          </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2 text-[11px] text-yellow-700">
             Auto password: <strong>{form.full_name ? form.full_name.split(" ")[0] + "@123" : "FirstName@123"}</strong> — share with tenant
           </div>

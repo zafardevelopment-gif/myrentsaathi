@@ -7,6 +7,13 @@
 import { supabase } from "./supabase";
 import { emailAccountWelcome } from "./email";
 
+/** Last calendar day of a "YYYY-MM" month, as "YYYY-MM-DD" (e.g. 2026-02 → 2026-02-28). */
+export function lastDayOfMonth(monthYear: string): string {
+  const [y, m] = monthYear.split("-").map(Number);
+  const last = new Date(y, m, 0).getDate(); // day 0 of next month = last day of this month
+  return `${monthYear}-${String(last).padStart(2, "0")}`;
+}
+
 export type DBUser = {
   id: string;
   email: string;
@@ -395,7 +402,7 @@ export async function addTenant(params: {
     });
   }
 
-  // Create first rent payment record
+  // Create first rent payment record — rent is due on the LAST day of the month.
   const currentMonth = new Date().toISOString().slice(0, 7);
   const rentInsert: Record<string, unknown> = {
     tenant_id: tenantRecord.id,
@@ -404,7 +411,7 @@ export async function addTenant(params: {
     amount: 0,
     expected_amount: params.monthly_rent,
     month_year: currentMonth,
-    due_date: currentMonth + "-05",
+    due_date: lastDayOfMonth(currentMonth),
     status: "pending",
   };
   if (params.society_id) rentInsert.society_id = params.society_id;

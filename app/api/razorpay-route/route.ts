@@ -141,8 +141,13 @@ export async function POST(req: NextRequest) {
     let routeError: string | null = null;
 
     try {
-      // Step 1: Linked account
-      const account = await rzp("/v2/accounts", "POST", keyId, keySecret, {
+      // For an individual/proprietor, PAN is the OWNER's PAN (goes on the
+      // stakeholder), NOT a company PAN — Razorpay rejects `legal_info.pan`
+      // for business_type "individual"/"proprietorship". Only registered
+      // entities (company/partnership/trust/society) carry a company PAN/GST.
+      const isIndividual = businessType === "individual" || businessType === "proprietorship";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const accountPayload: any = {
         email: bank.contact_email,
         phone,
         type: "route",
@@ -164,8 +169,13 @@ export async function POST(req: NextRequest) {
             },
           },
         },
-        legal_info: { pan, ...(bank.gst_number ? { gst: bank.gst_number.toUpperCase() } : {}) },
-      });
+      };
+      if (!isIndividual) {
+        accountPayload.legal_info = { pan, ...(bank.gst_number ? { gst: bank.gst_number.toUpperCase() } : {}) };
+      } else if (bank.gst_number) {
+        accountPayload.legal_info = { gst: bank.gst_number.toUpperCase() };
+      }
+      const account = await rzp("/v2/accounts", "POST", keyId, keySecret, accountPayload);
       linkedAccountId = account.id as string;
 
       // Step 2: Stakeholder (KYC owner)

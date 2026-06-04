@@ -116,7 +116,10 @@ export async function generateCombinedForPeriod(input: {
 }): Promise<{ created: number; updated: number; skipped: number; errors: { ref: string; message: string }[]; runId: string | null; invoiceIds: string[] }> {
   const period = input.billing_period;
   const issueDate = `${period}-01`;
-  const dueDate = `${period}-${String(input.due_day ?? 5).padStart(2, "0")}`;
+  // Default rent due date = last day of the billing month (unless a due_day is set).
+  const [dyY, dyM] = period.split("-").map(Number);
+  const lastDay = new Date(dyY, dyM, 0).getDate();
+  const dueDate = `${period}-${String(input.due_day ?? lastDay).padStart(2, "0")}`;
   const monthLabel = new Date(`${period}-01`).toLocaleString("en-IN", { month: "long", year: "numeric" });
   const errors: { ref: string; message: string }[] = [];
   const invoiceIds: string[] = [];
