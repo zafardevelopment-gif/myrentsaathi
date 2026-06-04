@@ -84,6 +84,23 @@ function getSupabaseAdmin() {
   return createClient(url, key);
 }
 
+// Recompute an invoice's amount_paid + status from its confirmed payments.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function recomputeInvoice(supabase: any, invoiceId: string) {
+  try {
+    const { data: inv } = await supabase.from("invoices").select("total_amount, due_date, status").eq("id", invoiceId).maybeSingle();
+    if (!inv || inv.status === "cancelled" || inv.status === "draft") return;
+    const { data: pays } = await supabase.from("invoice_payments").select("amount").eq("invoice_id", invoiceId).eq("status", "confirmed");
+    const paid = (pays ?? []).reduce((a: number, p: { amount: number }) => a + Number(p.amount || 0), 0);
+    const total = Number(inv.total_amount);
+    let status = "unpaid";
+    if (total > 0 && paid >= total) status = "paid";
+    else if (inv.due_date && new Date(inv.due_date) < new Date()) status = "overdue";
+    else if (paid > 0) status = "partially_paid";
+    await supabase.from("invoices").update({ amount_paid: paid, status, updated_at: new Date().toISOString() }).eq("id", invoiceId);
+  } catch { /* best-effort */ }
+}
+
 async function sendPaymentEmails(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
@@ -198,7 +215,10 @@ export async function POST(request: NextRequest) {
           method: linkId ? "payment_link" : "razorpay", reference: payment.id,
           razorpay_order_id: payment.order_id ?? null, payment_link_id: linkId, status: "confirmed",
         });
-        // DB trigger recomputes invoice amount_paid + status.
+
+        // Recompute invoice amount_paid + status directly (don't rely on a DB
+        // trigger that may be missing in this environment).
+        await recomputeInvoice(supabase, invoiceId);
 
         // Fire-and-forget: send payment confirmation emails
         sendPaymentEmails(supabase, invoiceId, payment.amount / 100, payment.id).catch(() => {});

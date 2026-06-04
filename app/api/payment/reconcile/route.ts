@@ -96,7 +96,22 @@ async function handle(invoiceId: string | null) {
     });
     insertError = error?.message ?? null;
   }
-  await supabaseAdmin.from("invoices").update({ payment_link_status: "paid" }).eq("id", invoiceId);
+
+  // Recompute invoice amount_paid + status directly (don't rely on a DB trigger
+  // that may be missing). Sum all confirmed payments for this invoice.
+  const { data: confirmedPays } = await supabaseAdmin
+    .from("invoice_payments").select("amount").eq("invoice_id", invoiceId).eq("status", "confirmed");
+  const paidTotal = (confirmedPays ?? []).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const total = Number(inv.total_amount);
+  let newStatus = "unpaid";
+  if (total > 0 && paidTotal >= total) newStatus = "paid";
+  else if (paidTotal > 0) newStatus = "partially_paid";
+  await supabaseAdmin.from("invoices").update({
+    amount_paid: paidTotal,
+    status: newStatus,
+    payment_link_status: "paid",
+    updated_at: new Date().toISOString(),
+  }).eq("id", invoiceId);
 
   // Route auto-split — best effort, only if we can resolve the capturing payment id.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
