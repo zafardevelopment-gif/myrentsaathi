@@ -13,7 +13,7 @@ type Invoice = {
   flat_id: string | null; flat: { flat_number: string; block: string | null } | null;
 };
 type Notification = { id: string; type: "email" | "whatsapp"; status: string; created_at: string; invoice_id: string | null };
-type MeterReading = { billing_period: string; units_consumed: number; meter: { flat_id: string; flat: { flat_number: string; block: string | null } | null } | null };
+type MeterReading = { billing_period: string; units_consumed: number; meter: { id: string; flat_id: string; flat: { flat_number: string; block: string | null } | null } | null };
 
 type Tab = "overview" | "invoices" | "monthly" | "electricity" | "notifications" | "gst";
 
@@ -49,16 +49,25 @@ export default function LandlordReports() {
       setInvoices(invRes.invoices ?? []);
 
       // Fetch meter readings via supabase
+      type MeterRow = { id: string; flat_id: string; flat: { flat_number: string; block: string | null } | { flat_number: string; block: string | null }[] | null };
       const { data: metersData } = await supabase.from("meters")
         .select("id, flat_id, flat:flats(flat_number, block)")
         .eq(user!.role === "landlord" ? "landlord_id" : "society_id", user!.id);
 
       if (metersData?.length) {
-        const meterIds = metersData.map((m: { id: string }) => m.id);
+        const meterIds = (metersData as MeterRow[]).map(m => m.id);
         const { data: rdgs } = await supabase.from("meter_readings")
           .select("billing_period, units_consumed, meter_id")
           .in("meter_id", meterIds).order("billing_period", { ascending: false });
-        const meterMap = Object.fromEntries((metersData as { id: string; flat_id: string; flat: { flat_number: string; block: string | null } | null }[]).map(m => [m.id, m]));
+
+        // Normalize flat (Supabase may return array or object for join)
+        const normalize = (m: MeterRow): { id: string; flat_id: string; flat: { flat_number: string; block: string | null } | null } => {
+          const f = m.flat;
+          const flat = Array.isArray(f) ? (f[0] ?? null) : f;
+          return { id: m.id, flat_id: m.flat_id, flat };
+        };
+        const meterMap = Object.fromEntries((metersData as MeterRow[]).map(m => [m.id, normalize(m)]));
+
         setReadings((rdgs ?? []).map((r: { billing_period: string; units_consumed: number; meter_id: string }) => ({
           billing_period: r.billing_period,
           units_consumed: Number(r.units_consumed) || 0,
