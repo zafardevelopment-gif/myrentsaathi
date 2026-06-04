@@ -51,7 +51,7 @@ async function handle(invoiceId: string | null) {
   if (!invoiceId) return NextResponse.json({ error: "invoice required" }, { status: 400 });
 
   const { data: inv } = await supabaseAdmin
-    .from("invoices").select("id, status, total_amount, amount_paid, payment_link_id").eq("id", invoiceId).maybeSingle();
+    .from("invoices").select("id, status, total_amount, amount_paid, payment_link_id, invoice_type, flat_id, billing_period").eq("id", invoiceId).maybeSingle();
   if (!inv) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   if (inv.status === "paid") return NextResponse.json({ reconciled: false, status: "paid" });
   if (!inv.payment_link_id) return NextResponse.json({ reconciled: false, reason: "no payment link" });
@@ -112,6 +112,15 @@ async function handle(invoiceId: string | null) {
     payment_link_status: "paid",
     updated_at: new Date().toISOString(),
   }).eq("id", invoiceId);
+
+  // Sync the legacy rent_payments row (landlord Rent page + Overview read from it)
+  // so it doesn't keep showing "Pending" after an invoice is paid.
+  if (newStatus === "paid" && inv.invoice_type === "rent" && inv.flat_id && inv.billing_period) {
+    const today = new Date().toISOString().slice(0, 10);
+    await supabaseAdmin.from("rent_payments")
+      .update({ status: "paid", payment_date: today, payment_method: "razorpay", updated_at: new Date().toISOString() })
+      .eq("flat_id", inv.flat_id).eq("month_year", inv.billing_period).neq("status", "paid");
+  }
 
   // Route auto-split — best effort, only if we can resolve the capturing payment id.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

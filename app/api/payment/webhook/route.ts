@@ -88,7 +88,7 @@ function getSupabaseAdmin() {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function recomputeInvoice(supabase: any, invoiceId: string) {
   try {
-    const { data: inv } = await supabase.from("invoices").select("total_amount, due_date, status").eq("id", invoiceId).maybeSingle();
+    const { data: inv } = await supabase.from("invoices").select("total_amount, due_date, status, invoice_type, flat_id, billing_period").eq("id", invoiceId).maybeSingle();
     if (!inv || inv.status === "cancelled" || inv.status === "draft") return;
     const { data: pays } = await supabase.from("invoice_payments").select("amount").eq("invoice_id", invoiceId).eq("status", "confirmed");
     const paid = (pays ?? []).reduce((a: number, p: { amount: number }) => a + Number(p.amount || 0), 0);
@@ -98,6 +98,14 @@ async function recomputeInvoice(supabase: any, invoiceId: string) {
     else if (inv.due_date && new Date(inv.due_date) < new Date()) status = "overdue";
     else if (paid > 0) status = "partially_paid";
     await supabase.from("invoices").update({ amount_paid: paid, status, updated_at: new Date().toISOString() }).eq("id", invoiceId);
+
+    // Keep the legacy rent_payments row in sync (landlord Rent page + Overview).
+    if (status === "paid" && inv.invoice_type === "rent" && inv.flat_id && inv.billing_period) {
+      const today = new Date().toISOString().slice(0, 10);
+      await supabase.from("rent_payments")
+        .update({ status: "paid", payment_date: today, payment_method: "razorpay", updated_at: new Date().toISOString() })
+        .eq("flat_id", inv.flat_id).eq("month_year", inv.billing_period).neq("status", "paid");
+    }
   } catch { /* best-effort */ }
 }
 
