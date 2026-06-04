@@ -11,6 +11,8 @@ const PAGE_SIZE = 10;
 type Invoice = {
   id: string; invoice_number: string; invoice_type: string; billing_period: string | null;
   total_amount: number; amount_paid: number; status: string; created_at: string;
+  issue_date?: string | null; recipient_name?: string | null;
+  sub_total?: number; gst_amount?: number; cgst_total?: number; sgst_total?: number; igst_total?: number;
   flat_id: string | null; flat: { flat_number: string; block: string | null } | null;
 };
 type Notification = { id: string; type: "email" | "whatsapp"; status: string; created_at: string; invoice_id: string | null };
@@ -59,6 +61,10 @@ export default function LandlordReports() {
 
   const [maintSearch, setMaintSearch] = useState("");
   const [maintPage, setMaintPage] = useState(1);
+
+  const [gstSearch, setGstSearch] = useState("");
+  const [gstFilterPeriod, setGstFilterPeriod] = useState("");
+  const [gstPage, setGstPage] = useState(1);
 
   // Shared filter / search / pagination state per tab
   const [invSearch, setInvSearch] = useState("");
@@ -217,6 +223,27 @@ export default function LandlordReports() {
   });
   const maintTotalPages = Math.max(1, Math.ceil(filteredMaint.length / PAGE_SIZE));
   const maintPaged = filteredMaint.slice((maintPage - 1) * PAGE_SIZE, maintPage * PAGE_SIZE);
+
+  // GST invoice-level rows (only invoices that actually carry GST).
+  const gstInvoices = active
+    .filter((i) => Number(i.gst_amount ?? 0) > 0)
+    .filter((i) => {
+      const q = gstSearch.toLowerCase();
+      const flatLabel = i.flat ? `${i.flat.flat_number}${i.flat.block ? ` ${i.flat.block}` : ""}`.toLowerCase() : "";
+      const matchSearch = q === "" || i.invoice_number.toLowerCase().includes(q) || flatLabel.includes(q) || (i.recipient_name ?? "").toLowerCase().includes(q);
+      const matchPeriod = gstFilterPeriod === "" || (i.billing_period ?? "").startsWith(gstFilterPeriod);
+      return matchSearch && matchPeriod;
+    });
+  const gstTotalPages = Math.max(1, Math.ceil(gstInvoices.length / PAGE_SIZE));
+  const gstPaged = gstInvoices.slice((gstPage - 1) * PAGE_SIZE, gstPage * PAGE_SIZE);
+  const gstTotals = gstInvoices.reduce((acc, i) => ({
+    taxable: acc.taxable + Number(i.sub_total ?? 0),
+    cgst: acc.cgst + Number(i.cgst_total ?? 0),
+    sgst: acc.sgst + Number(i.sgst_total ?? 0),
+    igst: acc.igst + Number(i.igst_total ?? 0),
+    gst: acc.gst + Number(i.gst_amount ?? 0),
+    total: acc.total + Number(i.total_amount ?? 0),
+  }), { taxable: 0, cgst: 0, sgst: 0, igst: 0, gst: 0, total: 0 });
 
   const card = (label: string, value: string, sub?: string, color?: string) => (
     <div className="rounded-[14px] border border-border-default bg-white p-4">
@@ -612,35 +639,87 @@ export default function LandlordReports() {
             GST rates configured in Settings → Billing Rates. Tax is applied per line item on every invoice.
           </div>
 
-          {/* GST by period */}
-          <div className="overflow-hidden rounded-[14px] border border-border-default bg-white">
-            <div className="border-b border-border-default px-4 py-2.5">
-              <span className="text-sm font-extrabold text-ink">GST Summary by Period</span>
-            </div>
-            <table className="w-full text-sm">
-              <thead className="bg-warm-50 text-left text-ink-muted">
-                <tr>
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide">Period</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide">Taxable (Sub Total)</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide">Total Billed</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide">GST (approx.)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlyRows.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-ink-muted text-sm">No data yet.</td></tr>}
-                {monthlyRows.map(([period, data]) => (
-                  <tr key={period} className="border-t border-border-default">
-                    <td className="px-4 py-2.5 font-semibold text-ink">{period}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-muted">—</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-ink">{inr(data.billed)}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-muted">—</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Totals cards */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {card("Taxable Value", inr(gstTotals.taxable), `${gstInvoices.length} taxable invoices`)}
+            {card("CGST", inr(gstTotals.cgst))}
+            {card("SGST", inr(gstTotals.sgst))}
+            {card("Total GST", inr(gstTotals.gst), gstTotals.igst > 0 ? `incl. IGST ${inr(gstTotals.igst)}` : undefined, "text-brand-500")}
           </div>
 
-          {/* Detailed GST - fetch from API */}
+          {/* Invoice-level GST detail */}
+          <div className="overflow-hidden rounded-[14px] border border-border-default bg-white">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border-default px-4 py-2.5">
+              <span className="text-sm font-extrabold text-ink mr-2">GST Invoice Register</span>
+              <input type="text" placeholder="Search invoice/flat…" value={gstSearch}
+                onChange={(e) => { setGstSearch(e.target.value); setGstPage(1); }}
+                className="rounded-lg border border-border-default bg-warm-50 px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-brand-500 w-40" />
+              <input type="month" value={gstFilterPeriod} onChange={(e) => { setGstFilterPeriod(e.target.value); setGstPage(1); }}
+                className="rounded-lg border border-border-default bg-warm-50 px-2 py-1.5 text-xs text-ink focus:outline-none" />
+              {(gstSearch || gstFilterPeriod) && <button onClick={() => { setGstSearch(""); setGstFilterPeriod(""); setGstPage(1); }} className="text-xs text-ink-muted hover:text-red-500 cursor-pointer">Clear</button>}
+              <button onClick={() => downloadCSV(`gst-register-${user.id}.csv`, gstInvoices.map((i) => ({
+                Invoice: i.invoice_number,
+                Date: i.issue_date ?? "—",
+                Period: i.billing_period ?? "—",
+                "Bill To": i.recipient_name ?? (i.flat ? `${i.flat.flat_number}${i.flat.block ? ` (${i.flat.block})` : ""}` : "—"),
+                Taxable: Number(i.sub_total ?? 0),
+                CGST: Number(i.cgst_total ?? 0),
+                SGST: Number(i.sgst_total ?? 0),
+                IGST: Number(i.igst_total ?? 0),
+                "Total GST": Number(i.gst_amount ?? 0),
+                "Invoice Total": Number(i.total_amount ?? 0),
+                Status: i.status,
+              })))}
+                className="rounded-lg border border-brand-300 text-brand-600 px-2.5 py-1.5 text-xs font-semibold cursor-pointer hover:bg-brand-50">⬇ Export CSV</button>
+              <span className="ml-auto text-[11px] text-ink-muted">{gstInvoices.length} invoices</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-warm-50 text-left text-ink-muted">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold uppercase tracking-wide whitespace-nowrap">Invoice</th>
+                    <th className="px-3 py-2 font-semibold uppercase tracking-wide whitespace-nowrap">Date</th>
+                    <th className="px-3 py-2 font-semibold uppercase tracking-wide whitespace-nowrap">Period</th>
+                    <th className="px-3 py-2 font-semibold uppercase tracking-wide whitespace-nowrap">Bill To</th>
+                    <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide">Taxable</th>
+                    <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide">CGST</th>
+                    <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide">SGST</th>
+                    <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide">GST</th>
+                    <th className="px-3 py-2 text-right font-semibold uppercase tracking-wide">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gstPaged.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-ink-muted">No taxable invoices found.</td></tr>}
+                  {gstPaged.map((i) => (
+                    <tr key={i.id} className="border-t border-border-default">
+                      <td className="px-3 py-2 font-mono text-ink whitespace-nowrap">{i.invoice_number}</td>
+                      <td className="px-3 py-2 text-ink-muted whitespace-nowrap">{i.issue_date ?? "—"}</td>
+                      <td className="px-3 py-2 text-ink-muted">{i.billing_period ?? "—"}</td>
+                      <td className="px-3 py-2 text-ink-muted whitespace-nowrap">{i.recipient_name ?? (i.flat ? `${i.flat.flat_number}${i.flat.block ? ` (${i.flat.block})` : ""}` : "—")}</td>
+                      <td className="px-3 py-2 text-right text-ink">{inr(Number(i.sub_total ?? 0))}</td>
+                      <td className="px-3 py-2 text-right text-ink-muted">{inr(Number(i.cgst_total ?? 0))}</td>
+                      <td className="px-3 py-2 text-right text-ink-muted">{inr(Number(i.sgst_total ?? 0))}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-ink">{inr(Number(i.gst_amount ?? 0))}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-ink">{inr(Number(i.total_amount ?? 0))}</td>
+                    </tr>
+                  ))}
+                  {gstInvoices.length > 0 && (
+                    <tr className="border-t-2 border-brand-200 bg-warm-50 font-extrabold">
+                      <td colSpan={4} className="px-3 py-2 text-ink">Total ({gstInvoices.length})</td>
+                      <td className="px-3 py-2 text-right text-ink">{inr(gstTotals.taxable)}</td>
+                      <td className="px-3 py-2 text-right text-ink">{inr(gstTotals.cgst)}</td>
+                      <td className="px-3 py-2 text-right text-ink">{inr(gstTotals.sgst)}</td>
+                      <td className="px-3 py-2 text-right text-brand-500">{inr(gstTotals.gst)}</td>
+                      <td className="px-3 py-2 text-right text-ink">{inr(gstTotals.total)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {gstTotalPages > 1 && <Pagination page={gstPage} total={gstTotalPages} onChange={setGstPage} />}
+          </div>
+
+          {/* GSTR-3B summary (filing helper) */}
           <GstDetailSection userId={user.id} role={user.role} />
         </div>
       )}

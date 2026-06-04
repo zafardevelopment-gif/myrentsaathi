@@ -252,7 +252,7 @@ export async function listInvoices(scope: BillerScope, filters: InvoiceFilters =
     : { column: "landlord_id", value: scope.landlordId };
   let q = supabaseAdmin
     .from("invoices")
-    .select("id, invoice_number, invoice_type, flat_id, recipient_type, recipient_user_id, billing_period, issue_date, due_date, sub_total, gst_amount, total_amount, amount_paid, status, created_at, flat:flats(flat_number, block)")
+    .select("id, invoice_number, invoice_type, flat_id, recipient_type, recipient_user_id, recipient_name, billing_period, issue_date, due_date, sub_total, gst_amount, cgst_total, sgst_total, igst_total, total_amount, amount_paid, status, created_at, flat:flats(flat_number, block)")
     .eq(column, value)
     .order("created_at", { ascending: false });
   if (filters.status) q = q.eq("status", filters.status);
