@@ -252,7 +252,7 @@ export async function listInvoices(scope: BillerScope, filters: InvoiceFilters =
     : { column: "landlord_id", value: scope.landlordId };
   let q = supabaseAdmin
     .from("invoices")
-    .select("id, invoice_number, invoice_type, flat_id, recipient_type, recipient_user_id, billing_period, issue_date, due_date, sub_total, gst_amount, total_amount, amount_paid, status, created_at")
+    .select("id, invoice_number, invoice_type, flat_id, recipient_type, recipient_user_id, billing_period, issue_date, due_date, sub_total, gst_amount, total_amount, amount_paid, status, created_at, flat:flats(flat_number, block)")
     .eq(column, value)
     .order("created_at", { ascending: false });
   if (filters.status) q = q.eq("status", filters.status);
@@ -422,7 +422,7 @@ export async function recomputeInvoiceTotals(invoiceId: string): Promise<void> {
  */
 export async function updateInvoiceLines(
   invoiceId: string,
-  updates: { id: string; unit_rate: number }[],
+  updates: { id: string; unit_rate: number; description?: string }[],
 ): Promise<{ success: boolean; error?: string }> {
   const { data: inv } = await supabaseAdmin
     .from("invoices").select("status, amount_paid, place_of_supply, society_id, landlord_id").eq("id", invoiceId).maybeSingle();
@@ -452,13 +452,15 @@ export async function updateInvoiceLines(
     const { data: line } = await supabaseAdmin
       .from("invoice_line_items").select("description, hsn_sac, quantity, line_kind, charge_type_id, meter_reading_id").eq("id", u.id).maybeSingle();
     if (!line) continue;
-    const gstPct = line.line_kind === "late_fee" ? 0 : rates[typeOf(line.description)];
+    const effectiveDesc = u.description ?? line.description;
+    const gstPct = line.line_kind === "late_fee" ? 0 : rates[typeOf(effectiveDesc)];
     const c = computeLine(
-      { description: line.description, hsn_sac: line.hsn_sac, quantity: line.quantity ?? 1, unit_rate: u.unit_rate,
+      { description: effectiveDesc, hsn_sac: line.hsn_sac, quantity: line.quantity ?? 1, unit_rate: u.unit_rate,
         gst_applicable: gstPct > 0, gst_percent: gstPct, line_kind: line.line_kind, charge_type_id: line.charge_type_id, meter_reading_id: line.meter_reading_id },
       { rate_percent: gstPct, cgst_percent: 0, sgst_percent: 0 }, billerState, inv.place_of_supply,
     );
     await supabaseAdmin.from("invoice_line_items").update({
+      ...(u.description ? { description: u.description } : {}),
       unit_rate: c.unit_rate, line_total: c.line_total, gst_applicable: c.gst_applicable, gst_percent: c.gst_percent,
       gst_amount: c.gst_amount, cgst_percent: c.cgst_percent, cgst_amount: c.cgst_amount,
       sgst_percent: c.sgst_percent, sgst_amount: c.sgst_amount, igst_percent: c.igst_percent, igst_amount: c.igst_amount,

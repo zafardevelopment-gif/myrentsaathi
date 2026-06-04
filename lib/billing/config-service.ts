@@ -143,7 +143,8 @@ export async function createReminderRule(scope: BillerScope, input: {
 export async function getElectricityRate(scope: BillerScope): Promise<number> {
   const { column, value } = scopeColumn(scope);
   const { data } = await supabaseAdmin
-    .from("charge_rate_config").select("flat_rate").eq(column, value).eq("charge_kind", "electricity").eq("is_active", true).maybeSingle();
+    .from("charge_rate_config").select("flat_rate").eq(column, value).eq("charge_kind", "electricity")
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
   return Number(data?.flat_rate ?? 0);
 }
 
@@ -151,11 +152,18 @@ export async function setElectricityRate(scope: BillerScope, rate: number): Prom
   const { column, value } = scopeColumn(scope);
   const { data: existing } = await supabaseAdmin
     .from("charge_rate_config").select("id").eq(column, value).eq("charge_kind", "electricity").eq("is_active", true).maybeSingle();
+  // Use far-past date so rate applies to all billing periods (present and historical)
+  const effectiveFrom = "2000-01-01";
   if (existing) {
-    const { error } = await supabaseAdmin.from("charge_rate_config").update({ flat_rate: rate }).eq("id", existing.id);
+    const { error } = await supabaseAdmin.from("charge_rate_config")
+      .update({ flat_rate: rate, is_active: true, effective_from: effectiveFrom })
+      .eq("id", existing.id);
     if (error) return { success: false, error: error.message };
   } else {
-    const { error } = await supabaseAdmin.from("charge_rate_config").insert({ ...scopeInsert(scope), charge_kind: "electricity", rate_type: "flat", flat_rate: rate });
+    const { error } = await supabaseAdmin.from("charge_rate_config").insert({
+      ...scopeInsert(scope), charge_kind: "electricity", rate_type: "flat", flat_rate: rate,
+      is_active: true, effective_from: effectiveFrom,
+    });
     if (error) return { success: false, error: error.message };
   }
   return { success: true };

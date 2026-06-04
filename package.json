@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
+    "@react-pdf/renderer": "^4.5.1",
     "@supabase/supabase-js": "^2.100.0",
     "@types/nodemailer": "^8.0.0",
     "@types/qrcode": "^1.5.6",

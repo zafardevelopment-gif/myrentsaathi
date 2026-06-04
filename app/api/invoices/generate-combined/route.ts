@@ -22,6 +22,13 @@ export async function POST(request: NextRequest) {
       scope, billing_period: body.billing_period, due_day: body.due_day, elec_rate: body.elec_rate,
       flats: body.flats, created_by: body.user.id, trigger: "manual",
     });
+
+    // Fire-and-forget: send invoice email to each newly created invoice's recipient
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    for (const invoiceId of result.invoiceIds) {
+      fetch(`${appUrl}/api/invoices/${invoiceId}/send`, { method: "POST" }).catch(() => {});
+    }
+
     return NextResponse.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

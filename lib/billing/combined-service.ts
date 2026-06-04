@@ -39,13 +39,19 @@ export async function getBillPrefill(scope: BillerScope, period: string): Promis
       .from("tenants").select("id").eq("flat_id", f.id).eq("status", "active").limit(1).maybeSingle();
 
     let last_reading = 0;
-    const { data: meter } = await supabaseAdmin
-      .from("meters").select("id, initial_reading").eq("flat_id", f.id).eq("meter_type", "electricity").eq("scope", "unit").limit(1).maybeSingle();
-    if (meter) {
+    const { data: meters } = await supabaseAdmin
+      .from("meters").select("id, initial_reading").eq("flat_id", f.id).eq("meter_type", "electricity").eq("scope", "unit");
+    if (meters && meters.length > 0) {
+      const meterIds = meters.map((m) => m.id);
       const { data: lastR } = await supabaseAdmin
-        .from("meter_readings").select("current_reading").eq("meter_id", meter.id)
+        .from("meter_readings").select("current_reading").in("meter_id", meterIds)
         .lt("billing_period", period).order("billing_period", { ascending: false }).limit(1).maybeSingle();
-      last_reading = lastR?.current_reading ?? meter.initial_reading ?? 0;
+      if (lastR) {
+        last_reading = lastR.current_reading;
+      } else {
+        const withInitial = meters.find((m) => m.initial_reading != null);
+        last_reading = withInitial?.initial_reading ?? 0;
+      }
     }
     out.push({
       flat_id: f.id, flat_number: f.flat_number, block: f.block,
@@ -107,12 +113,13 @@ export type CombinedFlatInput = {
 export async function generateCombinedForPeriod(input: {
   scope: BillerScope; billing_period: string; due_day?: number; created_by?: string | null;
   flats: CombinedFlatInput[]; elec_rate?: number; trigger?: "manual" | "cron";
-}): Promise<{ created: number; updated: number; skipped: number; errors: { ref: string; message: string }[]; runId: string | null }> {
+}): Promise<{ created: number; updated: number; skipped: number; errors: { ref: string; message: string }[]; runId: string | null; invoiceIds: string[] }> {
   const period = input.billing_period;
   const issueDate = `${period}-01`;
   const dueDate = `${period}-${String(input.due_day ?? 5).padStart(2, "0")}`;
   const monthLabel = new Date(`${period}-01`).toLocaleString("en-IN", { month: "long", year: "numeric" });
   const errors: { ref: string; message: string }[] = [];
+  const invoiceIds: string[] = [];
   let created = 0, updated = 0, skipped = 0;
 
   // Per-unit electricity rate (₹/unit) — distinct from electricity GST %.
@@ -155,8 +162,13 @@ export async function generateCombinedForPeriod(input: {
         if (meterId) {
           let last = fi.electricity.last_reading;
           if (last == null) {
-            const { data: lastR } = await supabaseAdmin.from("meter_readings").select("current_reading").eq("meter_id", meterId)
-              .lt("billing_period", period).order("billing_period", { ascending: false }).limit(1).maybeSingle();
+            const { data: allMeters } = await supabaseAdmin.from("meters").select("id").eq("flat_id", fi.flat_id).eq("meter_type", "electricity").eq("scope", "unit");
+            const allMeterIds = (allMeters ?? []).map((m) => m.id).filter(Boolean);
+            const { data: lastR } = allMeterIds.length
+              ? await supabaseAdmin.from("meter_readings").select("current_reading").in("meter_id", allMeterIds)
+                  .lt("billing_period", period).order("billing_period", { ascending: false }).limit(1).maybeSingle()
+              : await supabaseAdmin.from("meter_readings").select("current_reading").eq("meter_id", meterId)
+                  .lt("billing_period", period).order("billing_period", { ascending: false }).limit(1).maybeSingle();
             last = Number(lastR?.current_reading ?? 0);
           }
           const units = Math.max(Number(fi.electricity.current_reading) - Number(last), 0);
@@ -194,9 +206,10 @@ export async function generateCombinedForPeriod(input: {
         const { data: existingLines } = await supabaseAdmin
           .from("invoice_line_items").select("description, meter_reading_id").eq("invoice_id", existing.id);
         const descs = new Set((existingLines ?? []).map((l) => l.description));
+        const hasElecAlready = (existingLines ?? []).some((l) => l.description?.toLowerCase().includes("electricity"));
         let appended = 0;
         if (maintLine && !descs.has(maintLine.description)) { await appendLine(existing.id, maintLine, billerState, existing.place_of_supply); appended++; }
-        if (elecLine && !descs.has(elecLine.description)) { await appendLine(existing.id, elecLine, billerState, existing.place_of_supply); appended++; }
+        if (elecLine && !hasElecAlready) { await appendLine(existing.id, elecLine, billerState, existing.place_of_supply); appended++; }
         if (appended > 0) updated++; else skipped++;
       } else {
         const lines = [rentLine, maintLine, elecLine].filter(Boolean) as DraftLineItem[];
@@ -207,6 +220,7 @@ export async function generateCombinedForPeriod(input: {
         });
         if (res.success) {
           created++;
+          invoiceIds.push(res.invoiceId!);
           if (elecLine?.meter_reading_id) await supabaseAdmin.from("meter_readings").update({ invoice_id: res.invoiceId }).eq("id", elecLine.meter_reading_id);
         } else if (res.code === "DUPLICATE") skipped++;
         else errors.push({ ref: fi.flat_id, message: res.error });
@@ -224,5 +238,5 @@ export async function generateCombinedForPeriod(input: {
     finished_at: new Date().toISOString(),
   }).select("id").single();
 
-  return { created, updated, skipped, errors, runId: run?.id ?? null };
+  return { created, updated, skipped, errors, runId: run?.id ?? null, invoiceIds };
 }

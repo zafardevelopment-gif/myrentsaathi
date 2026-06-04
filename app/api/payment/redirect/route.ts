@@ -32,11 +32,6 @@ export async function GET(request: NextRequest) {
     const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
     if (outstanding <= 0) return notice("Nothing is outstanding on this invoice. ✓");
 
-    // Reuse an existing live link if present.
-    if (inv.payment_link_url && inv.payment_link_status === "created") {
-      return NextResponse.redirect(inv.payment_link_url);
-    }
-
     const { keyId, keySecret } = await getRazorpayKeys();
     if (!keyId || !keySecret) return notice("Online payment is not configured yet. Please pay offline or contact your landlord.");
 

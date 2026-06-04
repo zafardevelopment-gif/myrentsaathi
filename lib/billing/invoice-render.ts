@@ -12,7 +12,7 @@ import { formatINR } from "./money";
 
 type Line = {
   description: string; hsn_sac: string | null; quantity: number; unit_rate: number; line_total: number;
-  gst_percent: number; cgst_amount: number; sgst_amount: number; igst_amount: number; line_kind: string;
+  gst_percent: number; gst_applicable?: boolean; cgst_amount: number; sgst_amount: number; igst_amount: number; line_kind: string;
 };
 type Invoice = {
   id: string;
@@ -45,14 +45,22 @@ export function renderInvoiceHtml(
   const payable = outstanding > 0 && inv.status !== "paid" && inv.status !== "cancelled";
   const payHref = `/api/payment/redirect?invoice=${inv.id}`;
 
-  const rows = lines.map((l) => `
+  const hasAnyGst = lines.some((l) => l.gst_applicable && l.gst_percent > 0);
+
+  const rows = lines.map((l) => {
+    const taxCell = l.gst_applicable && l.gst_percent > 0
+      ? `${formatINR(l.cgst_amount + l.sgst_amount + l.igst_amount)}<div style="font-size:10px;color:#888">(${l.gst_percent}%)</div>`
+      : `<span style="color:#aaa">—</span>`;
+    return `
     <tr>
       <td>${esc(l.description)}</td>
       <td style="text-align:center">${esc(l.hsn_sac ?? "—")}</td>
       <td style="text-align:right">${l.quantity}</td>
       <td style="text-align:right">${formatINR(l.unit_rate)}</td>
+      <td style="text-align:right">${taxCell}</td>
       <td style="text-align:right">${formatINR(l.line_total)}</td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
 
   const taxRows = isInter
     ? `<tr><td>IGST</td><td style="text-align:right">${formatINR(inv.igst_total)}</td></tr>`
@@ -110,13 +118,13 @@ export function renderInvoiceHtml(
     </div>
 
     <table>
-      <thead><tr><th>Description</th><th style="text-align:center">HSN/SAC</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
+      <thead><tr><th>Description</th><th style="text-align:center">HSN/SAC</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Tax</th><th style="text-align:right">Amount</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
 
     <table style="width:300px;margin-left:auto" class="tot">
       <tr><td>Sub Total</td><td style="text-align:right">${formatINR(inv.sub_total)}</td></tr>
-      ${Number(inv.gst_amount) > 0 ? taxRows : ""}
+      ${hasAnyGst ? taxRows : ""}
       ${Number(inv.late_fee_total) > 0 ? `<tr><td>Late Fee</td><td style="text-align:right">${formatINR(inv.late_fee_total)}</td></tr>` : ""}
       <tr class="grand"><td>Total</td><td style="text-align:right">${formatINR(inv.total_amount)}</td></tr>
       <tr><td>Paid</td><td style="text-align:right">${formatINR(inv.amount_paid)}</td></tr>
