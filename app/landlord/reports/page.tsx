@@ -773,10 +773,21 @@ function GstDetailSection({ userId, role }: { userId: string; role: string }) {
 
   return (
     <div className="rounded-[14px] border border-border-default bg-white p-4">
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <div className="text-sm font-extrabold text-ink">GSTR-3B Summary</div>
         <input type="month" value={period} onChange={e => setPeriod(e.target.value)}
           className="ml-auto rounded-lg border border-border-default bg-warm-50 px-2.5 py-1.5 text-xs text-ink focus:outline-none" />
+        <button
+          disabled={!data}
+          onClick={() => data && downloadCSV(`gstr3b-${period}.csv`, [{
+            Period: data.period ?? period,
+            "Taxable Outward": data.taxable_outward,
+            CGST: data.cgst,
+            SGST: data.sgst,
+            IGST: data.igst,
+            "Total Tax": data.total_tax,
+          }])}
+          className="rounded-lg border border-brand-300 text-brand-600 px-2.5 py-1.5 text-xs font-semibold cursor-pointer hover:bg-brand-50 disabled:opacity-40">⬇ Export CSV</button>
       </div>
       {loading ? (
         <div className="text-xs text-ink-muted">Loading…</div>
