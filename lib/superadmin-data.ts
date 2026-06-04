@@ -138,6 +138,13 @@ export async function updateUserStatus(id: string, is_active: boolean) {
   if (error) throw error;
 }
 
+/** Permanently delete a user + their data (test-account cleanup). Server-side (service role). */
+export async function deleteUser(id: string) {
+  const res = await fetch(`/api/superadmin/users/${id}`, { method: "DELETE" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "Delete failed");
+}
+
 // ─── FLATS ───────────────────────────────────────────────────
 
 export async function getSocietyFlats(societyId?: string) {
