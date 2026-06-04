@@ -146,12 +146,14 @@ export async function POST(req: NextRequest) {
       // for business_type "individual"/"proprietorship". Only registered
       // entities (company/partnership/trust/society) carry a company PAN/GST.
       const isIndividual = businessType === "individual" || businessType === "proprietorship";
+      // reference_id must be ≤ 20 chars: 3-char prefix + "_" + last 16 hex of the id.
+      const refId = `${entityType.slice(0, 3)}_${entityId.replace(/-/g, "").slice(-16)}`.slice(0, 20);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const accountPayload: any = {
         email: bank.contact_email,
         phone,
         type: "route",
-        reference_id: `${entityType.slice(0, 3)}_${entityId.slice(-30)}`,
+        reference_id: refId,
         legal_business_name: bank.account_holder_name,
         business_type: businessType,
         contact_name: bank.account_holder_name,
