@@ -60,36 +60,38 @@ async function handle(invoiceId: string | null) {
   if (!keyId || !keySecret) return NextResponse.json({ error: "Razorpay not configured" }, { status: 500 });
   const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
 
-  // Fetch the payment link to see if it's paid + which payment captured it.
-  const link = await fetch(`https://api.razorpay.com/v1/payment_links/${inv.payment_link_id}`, {
+  // Fetch the payment link to see if it's paid. Expand payments so we can also
+  // get the capturing payment id (for the Route transfer).
+  const link = await fetch(`https://api.razorpay.com/v1/payment_links/${inv.payment_link_id}?expand[]=payments`, {
     headers: { Authorization: `Basic ${auth}` },
   }).then((r) => r.json()).catch(() => null);
   if (!link || link.status !== "paid") {
     return NextResponse.json({ reconciled: false, status: link?.status ?? "unknown" });
   }
 
-  // Find the captured payment id for this link.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const payments: any[] = link.payments ?? [];
-  const captured = payments.find((p) => p.status === "captured") ?? payments[0];
-  const paymentId = captured?.payment_id ?? captured?.id;
   const amountPaise = Number(link.amount_paid ?? link.amount ?? 0);
-  if (!paymentId) return NextResponse.json({ reconciled: false, reason: "no captured payment" });
 
-  // Idempotent insert of the payment record (DB trigger recomputes invoice status).
-  const { data: dupe } = await supabaseAdmin.from("invoice_payments").select("id").eq("reference", paymentId).maybeSingle();
+  // Mark the invoice paid: insert a confirmed payment row keyed on the payment
+  // link id (idempotent). The DB trigger recomputes invoice amount_paid + status.
+  // We do NOT need the exact payment id for this — the link being "paid" is enough.
+  const linkRef = `plink_${inv.payment_link_id}`;
+  const { data: dupe } = await supabaseAdmin.from("invoice_payments").select("id").eq("reference", linkRef).maybeSingle();
   if (!dupe) {
     await supabaseAdmin.from("invoice_payments").insert({
       invoice_id: invoiceId, amount: amountPaise / 100,
-      method: "payment_link", reference: paymentId, payment_link_id: inv.payment_link_id, status: "confirmed",
+      method: "payment_link", reference: linkRef, payment_link_id: inv.payment_link_id, status: "confirmed",
     });
   }
   await supabaseAdmin.from("invoices").update({ payment_link_status: "paid" }).eq("id", invoiceId);
 
-  // Route auto-split to the landlord/society linked account.
-  await routeTransfer(invoiceId, paymentId, amountPaise, keyId, keySecret);
+  // Route auto-split — best effort, only if we can resolve the capturing payment id.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payments: any[] = link.payments?.items ?? link.payments ?? [];
+  const captured = payments.find((p) => p.status === "captured") ?? payments[0];
+  const paymentId = captured?.payment_id ?? captured?.id;
+  if (paymentId) await routeTransfer(invoiceId, paymentId, amountPaise, keyId, keySecret);
 
-  return NextResponse.json({ reconciled: true, paymentId });
+  return NextResponse.json({ reconciled: true, paymentId: paymentId ?? null });
 }
 
 export async function GET(request: NextRequest) {
