@@ -55,14 +55,14 @@ export default function CompanyProfileSection() {
       </div>
       {open && (
         <div className="px-4 pb-4 border-t border-border-light pt-3 space-y-2">
-          <div><label className={lbl}>Legal / Business Name *</label><input className={inp} value={f.legal_name} onChange={(e) => setF({ ...f, legal_name: e.target.value })} /></div>
+          <div><label className={lbl}>Legal / Business Name *</label><input autoComplete="off" className={inp} value={f.legal_name} onChange={(e) => setF({ ...f, legal_name: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-2">
-            <div><label className={lbl}>GSTIN</label><input className={`${inp} uppercase`} maxLength={15} placeholder="27ABCDE1234F1Z5" value={f.gst_number} onChange={(e) => setF({ ...f, gst_number: e.target.value.toUpperCase() })} /></div>
-            <div><label className={lbl}>State code (GST)</label><input className={inp} maxLength={2} placeholder="27" value={f.state_code} onChange={(e) => setF({ ...f, state_code: e.target.value })} /></div>
+            <div><label className={lbl}>GSTIN</label><input autoComplete="off" className={`${inp} uppercase`} maxLength={15} placeholder="27ABCDE1234F1Z5" value={f.gst_number} onChange={(e) => setF({ ...f, gst_number: e.target.value.toUpperCase() })} /></div>
+            <div><label className={lbl}>State code (GST)</label><input autoComplete="off" className={inp} maxLength={2} placeholder="27" value={f.state_code} onChange={(e) => setF({ ...f, state_code: e.target.value })} /></div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div><label className={lbl}>PAN</label><input className={`${inp} uppercase`} maxLength={10} placeholder="ABCDE1234F" value={f.pan_number} onChange={(e) => setF({ ...f, pan_number: e.target.value.toUpperCase() })} /></div>
-            <div><label className={lbl}>Address</label><input className={inp} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>
+            <div><label className={lbl}>PAN</label><input autoComplete="off" className={`${inp} uppercase`} maxLength={10} placeholder="ABCDE1234F" value={f.pan_number} onChange={(e) => setF({ ...f, pan_number: e.target.value.toUpperCase() })} /></div>
+            <div><label className={lbl}>Address</label><input autoComplete="off" className={inp} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>
           </div>
           <button onClick={save} disabled={saving} className="mt-1 px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60 hover:bg-brand-600">
             {saving ? "Saving…" : "Save Profile"}

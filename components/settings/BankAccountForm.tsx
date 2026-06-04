@@ -161,7 +161,13 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
       if (refreshed.success && refreshed.account) setAccount(refreshed.account);
       setEditing(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to link bank account");
+      toast.error(err instanceof Error ? err.message : "Failed to link bank account", { duration: 6000 });
+      // The bank row is still persisted (with a failed/partial status) — refresh
+      // so the saved account + retry option shows instead of leaving a blank form.
+      try {
+        const refreshed = await fetch(`/api/razorpay-route?entityType=${entityType}&entityId=${entityId}`).then(r => r.json()) as { success: boolean; account: BankAccount | null };
+        if (refreshed.success && refreshed.account) { setAccount(refreshed.account); setEditing(false); }
+      } catch { /* ignore */ }
     } finally {
       setSaving(false);
     }
@@ -249,6 +255,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
           Account Holder Name <span className="text-red-400">*</span>
         </label>
         <input
+          autoComplete="off"
           value={form.account_holder_name}
           onChange={e => setForm(f => ({ ...f, account_holder_name: e.target.value }))}
           placeholder="As per bank records"
@@ -284,6 +291,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
         </label>
         <input
           type="password"
+          autoComplete="off"
           value={form.account_number}
           onChange={e => setForm(f => ({ ...f, account_number: e.target.value.replace(/\D/g, "") }))}
           placeholder="Enter account number"
@@ -296,6 +304,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
           Confirm Account Number <span className="text-red-400">*</span>
         </label>
         <input
+          autoComplete="off"
           value={form.confirm_account_number}
           onChange={e => setForm(f => ({ ...f, confirm_account_number: e.target.value.replace(/\D/g, "") }))}
           placeholder="Re-enter account number"
@@ -315,6 +324,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
           IFSC Code <span className="text-red-400">*</span>
         </label>
         <input
+          autoComplete="off"
           value={form.ifsc_code}
           onChange={e => {
             const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11);
@@ -340,6 +350,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
           PAN Number <span className="text-red-400">*</span>
         </label>
         <input
+          autoComplete="off"
           value={form.pan_number}
           onChange={e => setForm(f => ({ ...f, pan_number: e.target.value.toUpperCase().slice(0, 10) }))}
           placeholder="ABCDE1234F"
@@ -353,6 +364,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
           {entityType === "landlord" ? "Account Type (KYC)" : "Organization Type"} <span className="text-red-400">*</span>
         </label>
         <select
+          autoComplete="off"
           value={form.business_type}
           onChange={e => setForm(f => ({ ...f, business_type: e.target.value }))}
           className="w-full px-3 py-2 rounded-xl border border-border-default text-[12px] text-ink bg-white focus:outline-none focus:border-amber-400"
@@ -366,6 +378,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
           <label className="text-[10px] font-bold text-ink-muted block mb-1">Email <span className="text-red-400">*</span></label>
           <input
             type="email"
+            autoComplete="off"
             value={form.contact_email}
             onChange={e => setForm(f => ({ ...f, contact_email: e.target.value }))}
             placeholder="you@example.com"
@@ -375,6 +388,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
         <div>
           <label className="text-[10px] font-bold text-ink-muted block mb-1">Phone <span className="text-red-400">*</span></label>
           <input
+            autoComplete="off"
             value={form.contact_phone}
             onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
             placeholder="9000090000"
@@ -386,6 +400,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
       <div>
         <label className="text-[10px] font-bold text-ink-muted block mb-1">Address (Street) <span className="text-red-400">*</span></label>
         <input
+          autoComplete="off"
           value={form.address_street}
           onChange={e => setForm(f => ({ ...f, address_street: e.target.value }))}
           placeholder="Building, street, area"
@@ -397,6 +412,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
         <div>
           <label className="text-[10px] font-bold text-ink-muted block mb-1">City <span className="text-red-400">*</span></label>
           <input
+            autoComplete="off"
             value={form.address_city}
             onChange={e => setForm(f => ({ ...f, address_city: e.target.value }))}
             placeholder="Bengaluru"
@@ -406,6 +422,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
         <div>
           <label className="text-[10px] font-bold text-ink-muted block mb-1">State <span className="text-red-400">*</span></label>
           <select
+            autoComplete="off"
             value={form.address_state}
             onChange={e => setForm(f => ({ ...f, address_state: e.target.value }))}
             className="w-full px-3 py-2 rounded-xl border border-border-default text-[11px] text-ink bg-white focus:outline-none focus:border-amber-400"
@@ -417,6 +434,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
         <div>
           <label className="text-[10px] font-bold text-ink-muted block mb-1">PIN <span className="text-red-400">*</span></label>
           <input
+            autoComplete="off"
             value={form.address_postal_code}
             onChange={e => setForm(f => ({ ...f, address_postal_code: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
             placeholder="560034"
@@ -430,6 +448,7 @@ export default function BankAccountForm({ entityType, entityId, userId, defaultE
           GST Number <span className="text-ink-muted font-normal">(optional)</span>
         </label>
         <input
+          autoComplete="off"
           value={form.gst_number}
           onChange={e => setForm(f => ({ ...f, gst_number: e.target.value.toUpperCase().slice(0, 15) }))}
           placeholder="22AAAAA0000A1Z5"

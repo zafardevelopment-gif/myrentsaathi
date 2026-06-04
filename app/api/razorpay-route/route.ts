@@ -16,6 +16,7 @@ import { getRazorpayKeys } from "@/lib/platform-config";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
+export const maxDuration = 60; // Route KYC onboarding makes several Razorpay calls
 
 type BankDetails = {
   account_holder_name: string;
@@ -41,11 +42,23 @@ async function rzp(
   body?: Record<string, unknown>,
 ) {
   const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-  const res = await fetch(`https://api.razorpay.com${path}`, {
-    method,
-    headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  // 20s timeout so a slow/unreachable Razorpay call surfaces an error
+  // instead of hanging the "Linking…" button forever.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  let res: Response;
+  try {
+    res = await fetch(`https://api.razorpay.com${path}`, {
+      method,
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    throw new Error((e as Error).name === "AbortError" ? "Razorpay request timed out" : `Network error: ${(e as Error).message}`);
+  }
+  clearTimeout(timer);
   const data = (await res.json()) as Record<string, unknown>;
   if (!res.ok) {
     const errMsg = (data.error as Record<string, string> | undefined)?.description ?? JSON.stringify(data);
@@ -89,6 +102,37 @@ export async function POST(req: NextRequest) {
     const businessType = bank.business_type ?? (entityType === "landlord" ? "individual" : "society");
     const pan = bank.pan_number.toUpperCase();
     const phone = bank.contact_phone.replace(/\D/g, "").slice(-10);
+
+    // ── Persist bank details FIRST (fast write) so the user always gets a saved
+    //    record, even if the Razorpay onboarding below is slow or fails. ──
+    const baseRow = {
+      entity_type: entityType,
+      entity_id: entityId,
+      user_id: userId,
+      account_holder_name: bank.account_holder_name,
+      account_number_masked: bank.account_number.slice(-4).padStart(bank.account_number.length, "•"),
+      ifsc_code: bank.ifsc_code.toUpperCase(),
+      account_type: bank.account_type,
+      pan_number: pan,
+      gst_number: bank.gst_number?.toUpperCase() ?? null,
+      business_type: businessType,
+      contact_email: bank.contact_email,
+      contact_phone: phone,
+      address_street: bank.address_street,
+      address_city: bank.address_city,
+      address_state: bank.address_state.toUpperCase(),
+      address_postal_code: bank.address_postal_code,
+      route_status: "pending",
+      updated_at: new Date().toISOString(),
+    };
+    const { error: saveErr } = await supabaseAdmin.from("bank_accounts").upsert(baseRow, { onConflict: "entity_type,entity_id" });
+    if (saveErr) {
+      // Most likely the Route columns are missing → run the migration.
+      const hint = /column .* does not exist/i.test(saveErr.message)
+        ? " — run migration bank_accounts-route-v2.sql in Supabase."
+        : "";
+      return NextResponse.json({ success: false, error: `Could not save bank details: ${saveErr.message}${hint}` }, { status: 500 });
+    }
 
     let linkedAccountId: string | null = null;
     let stakeholderId: string | null = null;
@@ -161,39 +205,25 @@ export async function POST(req: NextRequest) {
       // If linked account was created but a later step failed, keep the id so we can retry.
     }
 
-    // ── Persist ──
-    const { error: dbError } = await supabaseAdmin.from("bank_accounts").upsert(
-      {
-        entity_type: entityType,
-        entity_id: entityId,
-        user_id: userId,
-        account_holder_name: bank.account_holder_name,
-        account_number_masked: bank.account_number.slice(-4).padStart(bank.account_number.length, "•"),
-        ifsc_code: bank.ifsc_code.toUpperCase(),
-        account_type: bank.account_type,
-        pan_number: pan,
-        gst_number: bank.gst_number?.toUpperCase() ?? null,
-        business_type: businessType,
-        contact_email: bank.contact_email,
-        contact_phone: phone,
-        address_street: bank.address_street,
-        address_city: bank.address_city,
-        address_state: bank.address_state.toUpperCase(),
-        address_postal_code: bank.address_postal_code,
-        razorpay_linked_account_id: linkedAccountId,
-        razorpay_stakeholder_id: stakeholderId,
-        razorpay_product_id: productId,
-        route_status: routeStatus,
-        route_error: routeError,
-        is_verified: routeStatus === "activated" || routeStatus === "created",
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "entity_type,entity_id" },
-    );
-    if (dbError) throw dbError;
+    // ── Update the saved row with the Razorpay onboarding results ──
+    await supabaseAdmin.from("bank_accounts").update({
+      razorpay_linked_account_id: linkedAccountId,
+      razorpay_stakeholder_id: stakeholderId,
+      razorpay_product_id: productId,
+      route_status: routeStatus,
+      route_error: routeError,
+      is_verified: routeStatus === "activated" || routeStatus === "created",
+      updated_at: new Date().toISOString(),
+    }).eq("entity_type", entityType).eq("entity_id", entityId);
 
     if (!linkedAccountId) {
-      return NextResponse.json({ success: false, error: routeError ?? "Could not create linked account" }, { status: 502 });
+      // Bank details ARE saved — surface the Razorpay issue but don't lose the row.
+      return NextResponse.json({
+        success: true,
+        saved: true,
+        routeStatus: "failed",
+        warning: routeError ?? "Bank details saved, but Razorpay linking failed. You can retry from Update Account.",
+      });
     }
 
     return NextResponse.json({
