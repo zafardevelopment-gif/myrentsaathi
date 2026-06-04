@@ -46,6 +46,18 @@ async function routeTransfer(invoiceId: string, paymentId: string, amountPaise: 
   }
 }
 
+// Sync the legacy rent_payments row (landlord Rent page + Overview read from it)
+// for a paid RENT invoice. Returns true if a row was updated.
+async function syncRentPayment(inv: { invoice_type?: string; flat_id?: string | null; billing_period?: string | null }): Promise<boolean> {
+  if (inv.invoice_type !== "rent" || !inv.flat_id || !inv.billing_period) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await supabaseAdmin.from("rent_payments")
+    .update({ status: "paid", payment_date: today, payment_method: "razorpay", updated_at: new Date().toISOString() })
+    .eq("flat_id", inv.flat_id).eq("month_year", inv.billing_period).neq("status", "paid")
+    .select("id");
+  return (data?.length ?? 0) > 0;
+}
+
 // GET/POST /api/payment/reconcile?invoice=<id>
 async function handle(invoiceId: string | null) {
   if (!invoiceId) return NextResponse.json({ error: "invoice required" }, { status: 400 });
@@ -53,7 +65,13 @@ async function handle(invoiceId: string | null) {
   const { data: inv } = await supabaseAdmin
     .from("invoices").select("id, status, total_amount, amount_paid, payment_link_id, invoice_type, flat_id, billing_period").eq("id", invoiceId).maybeSingle();
   if (!inv) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
-  if (inv.status === "paid") return NextResponse.json({ reconciled: false, status: "paid" });
+
+  // Already paid: still sync the legacy rent_payments row (it may have been
+  // missed earlier) so the landlord Rent page / Overview reflect "Paid".
+  if (inv.status === "paid") {
+    const synced = await syncRentPayment(inv);
+    return NextResponse.json({ reconciled: false, status: "paid", rent_synced: synced });
+  }
   if (!inv.payment_link_id) return NextResponse.json({ reconciled: false, reason: "no payment link" });
 
   const { keyId, keySecret } = await getRazorpayKeys();
@@ -113,14 +131,8 @@ async function handle(invoiceId: string | null) {
     updated_at: new Date().toISOString(),
   }).eq("id", invoiceId);
 
-  // Sync the legacy rent_payments row (landlord Rent page + Overview read from it)
-  // so it doesn't keep showing "Pending" after an invoice is paid.
-  if (newStatus === "paid" && inv.invoice_type === "rent" && inv.flat_id && inv.billing_period) {
-    const today = new Date().toISOString().slice(0, 10);
-    await supabaseAdmin.from("rent_payments")
-      .update({ status: "paid", payment_date: today, payment_method: "razorpay", updated_at: new Date().toISOString() })
-      .eq("flat_id", inv.flat_id).eq("month_year", inv.billing_period).neq("status", "paid");
-  }
+  // Sync the legacy rent_payments row (landlord Rent page + Overview read from it).
+  if (newStatus === "paid") await syncRentPayment(inv);
 
   // Route auto-split — best effort, only if we can resolve the capturing payment id.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
