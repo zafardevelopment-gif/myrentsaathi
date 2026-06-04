@@ -11,7 +11,7 @@ import { scopeColumn, type BillerScope } from "./scope";
 import { formatINR } from "./money";
 import { emailInvoiceOverdueReminder } from "../email";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com";
 
 function addDays(iso: string, days: number): string {
   return new Date(new Date(iso + "T00:00:00Z").getTime() + days * 86_400_000).toISOString().slice(0, 10);
@@ -83,11 +83,6 @@ async function drain(): Promise<{ sent: number; failed: number }> {
       const { data: user } = await supabaseAdmin
         .from("users").select("full_name, email, phone").eq("id", row.recipient_user_id).maybeSingle();
       const outstanding = formatINR(Number(row.payload?.outstanding ?? 0));
-      const label: Record<string, string> = {
-        reminder_before: "Payment reminder", reminder_due: "Payment due today",
-        reminder_after: "Overdue payment", month_end: "Month-end payment follow-up", invoice_generated: "New invoice",
-      };
-      const subject = `${label[row.template] ?? "Payment reminder"} — ${row.payload?.invoice_number ?? ""}`.trim();
 
       let ok = false;
       if (row.channel === "email" && user?.email) {

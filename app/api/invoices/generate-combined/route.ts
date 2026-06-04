@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Fire-and-forget: send invoice email to each newly created invoice's recipient
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com";
     for (const invoiceId of result.invoiceIds) {
       fetch(`${appUrl}/api/invoices/${invoiceId}/send`, { method: "POST" }).catch(() => {});
     }

@@ -30,7 +30,7 @@ async function sendTemplate(
     // Works from both client (relative URL) and server (absolute URL needed)
     const url = typeof window !== "undefined"
       ? "/api/whatsapp/send"
-      : `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/whatsapp/send`;
+      : `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com"}/api/whatsapp/send`;
     await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

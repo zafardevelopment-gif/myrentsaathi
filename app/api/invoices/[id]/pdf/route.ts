@@ -53,7 +53,7 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
     let qrDataUrl: string | null = null;
     const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
     if (outstanding > 0 && inv.status !== "cancelled") {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com";
       try { qrDataUrl = await QRCode.toDataURL(`${appUrl}/api/payment/redirect?invoice=${inv.id}`, { margin: 1, width: 240 }); } catch { qrDataUrl = null; }
     }
 

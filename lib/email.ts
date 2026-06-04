@@ -13,7 +13,7 @@ async function sendEmail(payload: EmailPayload): Promise<void> {
   try {
     const url = typeof window !== "undefined"
       ? "/api/email/send"
-      : `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/email/send`;
+      : `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com"}/api/email/send`;
     await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

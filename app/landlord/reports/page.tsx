@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 const inr = (n: number) => "₹" + (Number(n) || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 const pct = (a: number, b: number) => b > 0 ? `${Math.round((a / b) * 100)}%` : "0%";
+const PAGE_SIZE = 10;
 
 type Invoice = {
   id: string; invoice_number: string; invoice_type: string; billing_period: string | null;
@@ -36,10 +37,28 @@ export default function LandlordReports() {
   const { user, hydrated } = useAuth();
   const [tab, setTab] = useState<Tab>("overview");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications] = useState<Notification[]>([]);
   const [readings, setReadings] = useState<MeterReading[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterPeriod, setFilterPeriod] = useState("");
+
+  // Shared filter / search / pagination state per tab
+  const [invSearch, setInvSearch] = useState("");
+  const [invFilterPeriod, setInvFilterPeriod] = useState("");
+  const [invFilterType, setInvFilterType] = useState("all");
+  const [invFilterStatus, setInvFilterStatus] = useState("all");
+  const [invPage, setInvPage] = useState(1);
+
+  const [monthSearch, setMonthSearch] = useState("");
+  const [monthPage, setMonthPage] = useState(1);
+
+  const [elecSearch, setElecSearch] = useState("");
+  const [elecFilterPeriod, setElecFilterPeriod] = useState("");
+  const [elecPage, setElecPage] = useState(1);
+
+  // Reset pages on filter change
+  const resetInvPage = () => setInvPage(1);
+  const resetElecPage = () => setElecPage(1);
+  const resetMonthPage = () => setMonthPage(1);
 
   useEffect(() => {
     if (!hydrated || !user) return;
@@ -115,28 +134,41 @@ export default function LandlordReports() {
   }
   const monthlyRows = Object.entries(monthlyMap).sort((a, b) => b[0].localeCompare(a[0]));
 
-  // Electricity readings
-  const elecByPeriod: Record<string, { units: number; flats: string[] }> = {};
-  for (const r of readings) {
-    const p = r.billing_period;
-    elecByPeriod[p] = elecByPeriod[p] ?? { units: 0, flats: [] };
-    elecByPeriod[p].units += r.units_consumed;
-    const flatLabel = r.meter?.flat ? `${r.meter.flat.flat_number}${r.meter.flat.block ? ` (${r.meter.flat.block})` : ""}` : "—";
-    elecByPeriod[p].flats.push(flatLabel);
-  }
-  const elecRows = Object.entries(elecByPeriod).sort((a, b) => b[0].localeCompare(a[0]));
+  // Electricity total
   const totalUnits = readings.reduce((a, r) => a + r.units_consumed, 0);
 
-  // GST totals
-  const gstTotal = active.reduce((a, i) => {
-    // Approximate from total - sub_total (we don't have gst directly in invoice type here)
-    return a;
-  }, 0);
-
   // Filtered invoices
-  const filteredInv = filterPeriod
-    ? active.filter(i => (i.billing_period ?? "").startsWith(filterPeriod))
-    : active;
+  const filteredInv = active.filter(i => {
+    const flatLabel = i.flat ? `${i.flat.flat_number}${i.flat.block ? ` ${i.flat.block}` : ""}`.toLowerCase() : "";
+    const matchSearch = invSearch === "" ||
+      i.invoice_number.toLowerCase().includes(invSearch.toLowerCase()) ||
+      flatLabel.includes(invSearch.toLowerCase());
+    const matchPeriod = invFilterPeriod === "" || (i.billing_period ?? "").startsWith(invFilterPeriod);
+    const matchType = invFilterType === "all" || i.invoice_type === invFilterType;
+    const matchStatus = invFilterStatus === "all" || i.status === invFilterStatus;
+    return matchSearch && matchPeriod && matchType && matchStatus;
+  });
+  const invTotalPages = Math.max(1, Math.ceil(filteredInv.length / PAGE_SIZE));
+  const invPaged = filteredInv.slice((invPage - 1) * PAGE_SIZE, invPage * PAGE_SIZE);
+
+  // Filtered monthly rows
+  const filteredMonthly = monthlyRows.filter(([period]) =>
+    monthSearch === "" || period.toLowerCase().includes(monthSearch.toLowerCase())
+  );
+  const monthTotalPages = Math.max(1, Math.ceil(filteredMonthly.length / PAGE_SIZE));
+  const monthPaged = filteredMonthly.slice((monthPage - 1) * PAGE_SIZE, monthPage * PAGE_SIZE);
+
+  // Filtered electricity readings
+  const filteredElec = readings.filter(r => {
+    const flatLabel = r.meter?.flat ? `${r.meter.flat.flat_number}${r.meter.flat.block ? ` ${r.meter.flat.block}` : ""}`.toLowerCase() : "";
+    const matchSearch = elecSearch === "" ||
+      r.billing_period.toLowerCase().includes(elecSearch.toLowerCase()) ||
+      flatLabel.includes(elecSearch.toLowerCase());
+    const matchPeriod = elecFilterPeriod === "" || r.billing_period.startsWith(elecFilterPeriod);
+    return matchSearch && matchPeriod;
+  });
+  const elecTotalPages = Math.max(1, Math.ceil(filteredElec.length / PAGE_SIZE));
+  const elecPaged = filteredElec.slice((elecPage - 1) * PAGE_SIZE, elecPage * PAGE_SIZE);
 
   const card = (label: string, value: string, sub?: string, color?: string) => (
     <div className="rounded-[14px] border border-border-default bg-white p-4">
@@ -202,20 +234,9 @@ export default function LandlordReports() {
       {/* ── INVOICES ── */}
       {tab === "invoices" && (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <input type="month" value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)}
-              className="rounded-lg border border-border-default bg-warm-50 px-2.5 py-1.5 text-xs text-ink focus:outline-none" />
-            {filterPeriod && <button onClick={() => setFilterPeriod("")} className="text-xs text-ink-muted hover:text-red-500 cursor-pointer">Clear</button>}
-            <span className="ml-auto text-[11px] text-ink-muted self-center">{filteredInv.length} invoices</span>
-          </div>
-
-          {/* By type summary */}
+          {/* Type summary cards */}
           <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "Rent", invoices: rentInv },
-              { label: "Maintenance", invoices: maintInv },
-              { label: "Electricity", invoices: elecInv },
-            ].map(t => {
+            {[{ label: "Rent", invoices: rentInv }, { label: "Maintenance", invoices: maintInv }, { label: "Electricity", invoices: elecInv }].map(t => {
               const billed = t.invoices.reduce((a, i) => a + Number(i.total_amount), 0);
               const collected = t.invoices.reduce((a, i) => a + Number(i.amount_paid), 0);
               return (
@@ -229,8 +250,35 @@ export default function LandlordReports() {
             })}
           </div>
 
-          {/* Invoice table */}
+          {/* Filters */}
           <div className="overflow-hidden rounded-[14px] border border-border-default bg-white">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border-default px-3 py-2.5">
+              <input type="text" placeholder="Search invoice # or flat…" value={invSearch}
+                onChange={e => { setInvSearch(e.target.value); resetInvPage(); }}
+                className="rounded-lg border border-border-default bg-warm-50 px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-brand-500 w-44" />
+              <select value={invFilterType} onChange={e => { setInvFilterType(e.target.value); resetInvPage(); }}
+                className="rounded-lg border border-border-default bg-warm-50 px-2 py-1.5 text-xs text-ink focus:outline-none">
+                <option value="all">All Types</option>
+                <option value="rent">Rent</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="electricity">Electricity</option>
+              </select>
+              <select value={invFilterStatus} onChange={e => { setInvFilterStatus(e.target.value); resetInvPage(); }}
+                className="rounded-lg border border-border-default bg-warm-50 px-2 py-1.5 text-xs text-ink focus:outline-none">
+                <option value="all">All Status</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="paid">Paid</option>
+                <option value="overdue">Overdue</option>
+                <option value="partially_paid">Partially Paid</option>
+              </select>
+              <input type="month" value={invFilterPeriod} onChange={e => { setInvFilterPeriod(e.target.value); resetInvPage(); }}
+                className="rounded-lg border border-border-default bg-warm-50 px-2 py-1.5 text-xs text-ink focus:outline-none" />
+              {(invSearch || invFilterType !== "all" || invFilterStatus !== "all" || invFilterPeriod) && (
+                <button onClick={() => { setInvSearch(""); setInvFilterType("all"); setInvFilterStatus("all"); setInvFilterPeriod(""); resetInvPage(); }}
+                  className="text-xs text-ink-muted hover:text-red-500 cursor-pointer">Clear</button>
+              )}
+              <span className="ml-auto text-[11px] text-ink-muted">{filteredInv.length} invoices</span>
+            </div>
             <table className="w-full text-xs">
               <thead className="bg-warm-50 text-left text-ink-muted">
                 <tr>
@@ -245,8 +293,8 @@ export default function LandlordReports() {
                 </tr>
               </thead>
               <tbody>
-                {filteredInv.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-ink-muted">No invoices found.</td></tr>}
-                {filteredInv.map(i => (
+                {invPaged.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-ink-muted">No invoices found.</td></tr>}
+                {invPaged.map(i => (
                   <tr key={i.id} className="border-t border-border-default">
                     <td className="px-3 py-2 font-mono text-ink">{i.invoice_number}</td>
                     <td className="px-3 py-2 text-ink-muted">{i.flat ? `${i.flat.flat_number}${i.flat.block ? ` (${i.flat.block})` : ""}` : "—"}</td>
@@ -260,6 +308,7 @@ export default function LandlordReports() {
                 ))}
               </tbody>
             </table>
+            {invTotalPages > 1 && <Pagination page={invPage} total={invTotalPages} onChange={setInvPage} />}
           </div>
         </div>
       )}
@@ -274,6 +323,13 @@ export default function LandlordReports() {
           </div>
 
           <div className="overflow-hidden rounded-[14px] border border-border-default bg-white">
+            <div className="flex items-center gap-2 border-b border-border-default px-3 py-2.5">
+              <input type="text" placeholder="Search period (e.g. 2026-06)…" value={monthSearch}
+                onChange={e => { setMonthSearch(e.target.value); resetMonthPage(); }}
+                className="rounded-lg border border-border-default bg-warm-50 px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-brand-500 w-48" />
+              {monthSearch && <button onClick={() => { setMonthSearch(""); resetMonthPage(); }} className="text-xs text-ink-muted hover:text-red-500 cursor-pointer">Clear</button>}
+              <span className="ml-auto text-[11px] text-ink-muted">{filteredMonthly.length} periods</span>
+            </div>
             <table className="w-full text-sm">
               <thead className="bg-warm-50 text-left text-ink-muted">
                 <tr>
@@ -285,8 +341,8 @@ export default function LandlordReports() {
                 </tr>
               </thead>
               <tbody>
-                {monthlyRows.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-ink-muted text-sm">No data yet.</td></tr>}
-                {monthlyRows.map(([period, data]) => (
+                {monthPaged.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-ink-muted text-sm">No data yet.</td></tr>}
+                {monthPaged.map(([period, data]) => (
                   <tr key={period} className="border-t border-border-default">
                     <td className="px-4 py-2.5 font-semibold text-ink">{period}</td>
                     <td className="px-4 py-2.5 text-right text-ink">{inr(data.billed)}</td>
@@ -304,6 +360,7 @@ export default function LandlordReports() {
                 ))}
               </tbody>
             </table>
+            {monthTotalPages > 1 && <Pagination page={monthPage} total={monthTotalPages} onChange={setMonthPage} />}
           </div>
         </div>
       )}
@@ -312,7 +369,7 @@ export default function LandlordReports() {
       {tab === "electricity" && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {card("Total Units Consumed", `${totalUnits} units`)}
+            {card("Total Units Consumed", `${filteredElec.reduce((a, r) => a + r.units_consumed, 0)} units`, `${readings.length} readings total`)}
             {card("Electricity Billed", inr(elecInv.reduce((a, i) => a + Number(i.total_amount), 0)))}
             {card("Electricity Collected", inr(elecCollected), undefined, "text-green-700")}
           </div>
@@ -323,6 +380,18 @@ export default function LandlordReports() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-[14px] border border-border-default bg-white">
+              <div className="flex flex-wrap items-center gap-2 border-b border-border-default px-3 py-2.5">
+                <input type="text" placeholder="Search flat or period…" value={elecSearch}
+                  onChange={e => { setElecSearch(e.target.value); resetElecPage(); }}
+                  className="rounded-lg border border-border-default bg-warm-50 px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-brand-500 w-44" />
+                <input type="month" value={elecFilterPeriod} onChange={e => { setElecFilterPeriod(e.target.value); resetElecPage(); }}
+                  className="rounded-lg border border-border-default bg-warm-50 px-2 py-1.5 text-xs text-ink focus:outline-none" />
+                {(elecSearch || elecFilterPeriod) && (
+                  <button onClick={() => { setElecSearch(""); setElecFilterPeriod(""); resetElecPage(); }}
+                    className="text-xs text-ink-muted hover:text-red-500 cursor-pointer">Clear</button>
+                )}
+                <span className="ml-auto text-[11px] text-ink-muted">{filteredElec.length} readings</span>
+              </div>
               <table className="w-full text-sm">
                 <thead className="bg-warm-50 text-left text-ink-muted">
                   <tr>
@@ -332,7 +401,8 @@ export default function LandlordReports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {readings.map((r, i) => {
+                  {elecPaged.length === 0 && <tr><td colSpan={3} className="px-4 py-8 text-center text-ink-muted">No readings found.</td></tr>}
+                  {elecPaged.map((r, i) => {
                     const flatLabel = r.meter?.flat ? `${r.meter.flat.flat_number}${r.meter.flat.block ? ` (${r.meter.flat.block})` : ""}` : "—";
                     return (
                       <tr key={i} className="border-t border-border-default">
@@ -343,11 +413,16 @@ export default function LandlordReports() {
                     );
                   })}
                   <tr className="border-t-2 border-brand-200 bg-warm-50">
-                    <td colSpan={2} className="px-4 py-2.5 font-extrabold text-ink">Total</td>
-                    <td className="px-4 py-2.5 text-right font-extrabold text-brand-500">{totalUnits} units</td>
+                    <td colSpan={2} className="px-4 py-2.5 font-extrabold text-ink">
+                      {filteredElec.length < readings.length ? `Filtered Total (${filteredElec.length} readings)` : "Total"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-extrabold text-brand-500">
+                      {filteredElec.reduce((a, r) => a + r.units_consumed, 0)} units
+                    </td>
                   </tr>
                 </tbody>
               </table>
+              {elecTotalPages > 1 && <Pagination page={elecPage} total={elecTotalPages} onChange={setElecPage} />}
             </div>
           )}
         </div>
@@ -436,23 +511,14 @@ export default function LandlordReports() {
               </thead>
               <tbody>
                 {monthlyRows.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-ink-muted text-sm">No data yet.</td></tr>}
-                {monthlyRows.map(([period, data]) => {
-                  const periodInv = active.filter(i => (i.billing_period ?? "") === period);
-                  const billed = data.billed;
-                  // Approximate sub_total from invoices (we track gst_amount via total)
-                  const gstApprox = periodInv.reduce((a, i) => {
-                    // gst = total - sub_total, but we don't have sub_total here; use rough estimate
-                    return a;
-                  }, 0);
-                  return (
-                    <tr key={period} className="border-t border-border-default">
-                      <td className="px-4 py-2.5 font-semibold text-ink">{period}</td>
-                      <td className="px-4 py-2.5 text-right text-ink-muted">—</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-ink">{inr(billed)}</td>
-                      <td className="px-4 py-2.5 text-right text-ink-muted">—</td>
-                    </tr>
-                  );
-                })}
+                {monthlyRows.map(([period, data]) => (
+                  <tr key={period} className="border-t border-border-default">
+                    <td className="px-4 py-2.5 font-semibold text-ink">{period}</td>
+                    <td className="px-4 py-2.5 text-right text-ink-muted">—</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-ink">{inr(data.billed)}</td>
+                    <td className="px-4 py-2.5 text-right text-ink-muted">—</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -465,22 +531,49 @@ export default function LandlordReports() {
   );
 }
 
+function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
+  return (
+    <div className="flex items-center justify-between border-t border-border-default px-3 py-2">
+      <button disabled={page === 1} onClick={() => onChange(page - 1)}
+        className="rounded-lg border border-border-default px-3 py-1 text-xs text-ink disabled:opacity-40 cursor-pointer hover:bg-warm-50">← Prev</button>
+      <div className="flex gap-1">
+        {Array.from({ length: total }, (_, i) => i + 1)
+          .filter(p => p === 1 || p === total || Math.abs(p - page) <= 1)
+          .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+            if (idx > 0 && typeof arr[idx - 1] === "number" && (p as number) - (arr[idx - 1] as number) > 1) acc.push("…");
+            acc.push(p);
+            return acc;
+          }, [])
+          .map((p, i) => p === "…"
+            ? <span key={`e${i}`} className="px-1.5 py-1 text-xs text-ink-muted">…</span>
+            : <button key={p} onClick={() => onChange(p as number)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold cursor-pointer ${p === page ? "bg-brand-500 text-white" : "border border-border-default text-ink hover:bg-warm-50"}`}>{p}</button>
+          )}
+      </div>
+      <button disabled={page === total} onClick={() => onChange(page + 1)}
+        className="rounded-lg border border-border-default px-3 py-1 text-xs text-ink disabled:opacity-40 cursor-pointer hover:bg-warm-50">Next →</button>
+    </div>
+  );
+}
+
 function GstDetailSection({ userId, role }: { userId: string; role: string }) {
   const [data, setData] = useState<{ period: string; taxable_outward: number; cgst: number; sgst: number; igst: number; total_tax: number } | null>(null);
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/billing/gst-rates?userId=${userId}&role=${role}&period=${period}`).then(r => r.json()).catch(() => null);
-      // Try the billing reports API
-      const res2 = await fetch(`/api/reports/gst?userId=${userId}&role=${role}&period=${period}`).then(r => r.json()).catch(() => null);
-      if (res2 && !res2.error) setData(res2);
-    } finally { setLoading(false); }
-  };
-
-  useEffect(() => { load(); }, [period]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/reports/gst?userId=${userId}&role=${role}&period=${period}`).then(r => r.json()).catch(() => null);
+        if (!cancelled && res && !res.error) setData(res);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [period, userId, role]);
 
   return (
     <div className="rounded-[14px] border border-border-default bg-white p-4">

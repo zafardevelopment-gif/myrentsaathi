@@ -11,11 +11,20 @@ export const runtime = "nodejs";
 function verifyWebhook(body: string, signature: string): boolean {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret) {
-    console.warn("[payment/webhook] RAZORPAY_WEBHOOK_SECRET not set — skipping verification");
-    return true; // allow without verification if not configured (development only)
+    // SECURITY: never skip verification in production — an unsigned webhook could
+    // mark invoices paid. Only allow the bypass in local development.
+    if (process.env.NODE_ENV === "production") {
+      console.error("[payment/webhook] RAZORPAY_WEBHOOK_SECRET not set — rejecting in production");
+      return false;
+    }
+    console.warn("[payment/webhook] RAZORPAY_WEBHOOK_SECRET not set — skipping verification (dev only)");
+    return true;
   }
   const expected = crypto.createHmac("sha256", secret).update(body).digest("hex");
-  return expected === signature;
+  // Constant-time comparison to avoid timing attacks.
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 function getSupabaseAdmin() {
