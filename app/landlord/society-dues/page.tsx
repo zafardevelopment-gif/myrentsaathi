@@ -6,17 +6,7 @@ import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getLandlordFlats, getLandlordUserId, type LandlordFlat } from "@/lib/landlord-data";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
-
-function loadRazorpayScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window !== "undefined" && window.Razorpay) { resolve(true); return; }
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
+import PaymentModal, { type PaymentTarget } from "@/components/payments/PaymentModal";
 
 type SocietyExpense = {
   id: string;
@@ -37,6 +27,10 @@ type DuePayment = {
   amount: number;
   paid_at: string;
   month_year: string;
+  paid_amount?: number | null;
+  expected_amount?: number | null;
+  status?: string | null;
+  receipt_status?: string | null;
 };
 
 const CATEGORY_ICON: Record<string, string> = {
@@ -64,9 +58,9 @@ export default function LandlordSocietyDues() {
   const [activeFlatsCount, setActiveFlatsCount] = useState<number>(0);
   const [duePayments, setDuePayments] = useState<DuePayment[]>([]);
   const [loading, setLoading] = useState(true);
-  // paying = "flatId:expenseId"
-  const [paying, setPaying] = useState<string | null>(null);
   const [tab, setTab] = useState<"dues" | "expenses">("dues");
+  // Payment modal context (one expense for one flat)
+  const [payCtx, setPayCtx] = useState<{ flat: LandlordFlat; expense: SocietyExpense; share: number } | null>(null);
 
   async function loadAll(email: string) {
     const [f, lid] = await Promise.all([
@@ -104,7 +98,7 @@ export default function LandlordSocietyDues() {
         const flatIds = f.map((fl: LandlordFlat) => fl.id);
         const { data: dp } = await supabase
           .from("society_due_payments")
-          .select("id, expense_id, flat_id, amount, paid_at, month_year")
+          .select("id, expense_id, flat_id, amount, paid_at, month_year, paid_amount, expected_amount, status, receipt_status")
           .in("flat_id", flatIds)
           .eq("month_year", currentMonthStr);
         setDuePayments((dp ?? []) as DuePayment[]);
@@ -122,78 +116,54 @@ export default function LandlordSocietyDues() {
     const flatIds = flats.map(fl => fl.id);
     const { data: dp } = await supabase
       .from("society_due_payments")
-      .select("id, expense_id, flat_id, amount, paid_at, month_year")
+      .select("id, expense_id, flat_id, amount, paid_at, month_year, paid_amount, expected_amount, status, receipt_status")
       .in("flat_id", flatIds)
       .eq("month_year", currentMonthStr);
     setDuePayments((dp ?? []) as DuePayment[]);
   }
 
-  // Mark one expense as paid for one flat (via Razorpay)
-  async function handlePayExpense(flat: LandlordFlat, expense: SocietyExpense, shareAmount: number) {
-    if (!landlordId) return;
-    const key = `${flat.id}:${expense.id}`;
-    setPaying(key);
-    try {
-      const loaded = await loadRazorpayScript();
-      if (!loaded) throw new Error("Payment gateway could not be loaded");
+  // Open the unified Gateway / Receipt / Partial modal for one expense+flat.
+  function openPayModal(flat: LandlordFlat, expense: SocietyExpense, shareAmount: number) {
+    if (!landlordId) { toast.error("Could not identify landlord."); return; }
+    setPayCtx({ flat, expense, share: shareAmount });
+  }
 
-      // Create order
-      const orderRes = await fetch("/api/payment/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: shareAmount,
-          flatId: flat.id,
-          type: "maintenance",
-          description: `${expense.description} — Flat ${flat.flat_number}`,
-        }),
-      });
-      const orderData = await orderRes.json() as { orderId?: string; amount?: number; currency?: string; keyId?: string; error?: string };
-      if (!orderRes.ok || orderData.error) throw new Error(orderData.error ?? "Order creation failed");
-
-      await new Promise<void>((resolve, reject) => {
-        const rzp = new window.Razorpay({
-          key: orderData.keyId ?? "",
-          amount: orderData.amount ?? 0,
-          currency: orderData.currency ?? "INR",
-          name: "MyRentSaathi",
-          description: `${expense.description} — Flat ${flat.flat_number}`,
-          order_id: orderData.orderId ?? "",
-          theme: { color: "#6366f1" },
-          handler: async (response: RazorpayPaymentResponse) => {
-            try {
-              const verifyRes = await fetch("/api/payment/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  type: "maintenance",
-                  flatId: flat.id,
-                  expenseId: expense.id,
-                  landlordId,
-                  shareAmount,
-                }),
-              });
-              const verifyData = await verifyRes.json() as { success?: boolean; error?: string };
-              if (!verifyRes.ok || verifyData.error) throw new Error(verifyData.error ?? "Verification failed");
-              resolve();
-            } catch (e) { reject(e); }
-          },
-          modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
-        });
-        rzp.open();
-      });
-
-      toast.success(`Paid: ${expense.description} — Flat ${flat.flat_number} ✓`);
-      await refreshDuePayments();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Payment failed";
-      if (msg !== "Payment cancelled") toast.error(msg);
-    } finally {
-      setPaying(null);
-    }
+  // Build the PaymentModal target for the currently-open expense+flat.
+  function buildPayTarget(flat: LandlordFlat, expense: SocietyExpense): PaymentTarget {
+    const existing = duePayments.find(p => p.flat_id === flat.id && p.expense_id === expense.id);
+    return {
+      kind: "maintenance",
+      storagePrefix: `receipts/maintenance/${flat.id}`,
+      existingPaymentId: existing?.id ?? null,
+      orderFields: { flatId: flat.id, expenseId: expense.id, landlordId },
+      // shareAmount = full per-flat share so the verify route knows the target total.
+      verifyFields: { flatId: flat.id, expenseId: expense.id, landlordId, shareAmount: payCtx?.share ?? 0 },
+      saveManual: async ({ paidNow, isPartial, receiptUrl, receiptName }) => {
+        const prior = existing?.paid_amount ?? existing?.amount ?? 0;
+        const cumulative = prior + paidNow;
+        const { error } = await supabase
+          .from("society_due_payments")
+          .upsert({
+            ...(existing ? { id: existing.id } : {}),
+            expense_id: expense.id,
+            flat_id: flat.id,
+            landlord_id: landlordId,
+            month_year: currentMonthStr,
+            amount: cumulative,
+            expected_amount: payCtx?.share ?? 0,
+            paid_amount: cumulative,
+            // Manual/offline payments are "pending" until the society/admin verifies.
+            status: "pending",
+            receipt_url: receiptUrl,
+            receipt_name: receiptName,
+            receipt_status: "pending_verification",
+            paid_at: new Date().toISOString(),
+            payment_method: "manual",
+          }, { onConflict: "expense_id,flat_id,month_year" });
+        if (error) throw error;
+        void isPartial;
+      },
+    };
   }
 
   if (loading) {
@@ -222,20 +192,31 @@ export default function LandlordSocietyDues() {
   const totalPerFlat = expenseShares.reduce((s, x) => s + x.sharePerFlat, 0);
   const landlordTotalDue = totalPerFlat * flats.length;
 
-  // Check if a specific expense is paid for a specific flat
+  function getDue(flatId: string, expenseId: string) {
+    return duePayments.find(p => p.flat_id === flatId && p.expense_id === expenseId) ?? null;
+  }
+
+  // Fully paid = a record exists AND it's not a partial/pending one.
   function isPaid(flatId: string, expenseId: string) {
-    return duePayments.some(p => p.flat_id === flatId && p.expense_id === expenseId);
+    const d = getDue(flatId, expenseId);
+    return !!d && (d.status ?? "paid") === "paid";
+  }
+
+  // A receipt/partial submitted but not yet a completed full payment.
+  function isPending(flatId: string, expenseId: string) {
+    const d = getDue(flatId, expenseId);
+    return !!d && (d.status ?? "paid") !== "paid";
   }
 
   function getPaidAt(flatId: string, expenseId: string) {
-    return duePayments.find(p => p.flat_id === flatId && p.expense_id === expenseId)?.paid_at ?? null;
+    return getDue(flatId, expenseId)?.paid_at ?? null;
   }
 
-  // Overall paid amount for a flat
+  // Overall paid amount for a flat (counts partial paid_amount too)
   function flatPaidAmount(flatId: string) {
     return duePayments
       .filter(p => p.flat_id === flatId)
-      .reduce((s, p) => s + p.amount, 0);
+      .reduce((s, p) => s + (p.paid_amount ?? p.amount ?? 0), 0);
   }
 
   function flatFullyPaid(flatId: string) {
@@ -358,9 +339,10 @@ export default function LandlordSocietyDues() {
                     <div className="divide-y divide-border-default">
                       {expenseShares.map(({ expense, sharePerFlat }) => {
                         const paid = isPaid(flat.id, expense.id);
+                        const pending = isPending(flat.id, expense.id);
+                        const due = getDue(flat.id, expense.id);
                         const paidAt = getPaidAt(flat.id, expense.id);
-                        const key = `${flat.id}:${expense.id}`;
-                        const isPayingThis = paying === key;
+                        const duePaid = due?.paid_amount ?? due?.amount ?? 0;
                         return (
                           <div key={expense.id} className="flex items-center gap-3 px-4 py-3">
                             <div className="w-7 h-7 rounded-lg bg-warm-100 flex items-center justify-center text-sm flex-shrink-0">
@@ -381,6 +363,13 @@ export default function LandlordSocietyDues() {
                                   ✓ Paid {new Date(paidAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                                 </div>
                               )}
+                              {pending && (
+                                <div className="text-[10px] text-yellow-600 mt-0.5">
+                                  {due?.receipt_status === "pending_verification"
+                                    ? <>🕐 Receipt awaiting verification{duePaid < sharePerFlat ? ` · ${formatCurrency(duePaid)} of ${formatCurrency(sharePerFlat)}` : ""}</>
+                                    : <>⚡ Partial: {formatCurrency(duePaid)} paid · {formatCurrency(sharePerFlat - duePaid)} remaining</>}
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <span className="text-sm font-extrabold text-ink">{formatCurrency(sharePerFlat)}</span>
@@ -388,11 +377,10 @@ export default function LandlordSocietyDues() {
                                 <span className="px-2.5 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-[10px] font-bold">✓ Paid</span>
                               ) : (
                                 <button
-                                  onClick={() => handlePayExpense(flat, expense, sharePerFlat)}
-                                  disabled={isPayingThis}
+                                  onClick={() => openPayModal(flat, expense, sharePerFlat)}
                                   className="px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-[11px] font-bold cursor-pointer disabled:opacity-60 transition-colors"
                                 >
-                                  {isPayingThis ? "…" : "Pay Now"}
+                                  {pending ? "Pay Rest" : "Pay Now"}
                                 </button>
                               )}
                             </div>
@@ -408,17 +396,13 @@ export default function LandlordSocietyDues() {
                           {expenseShares.length - expenseShares.filter(x => isPaid(flat.id, x.expense.id)).length} pending · {formatCurrency(totalPerFlat - paidAmt)} remaining
                         </span>
                         <button
-                          onClick={async () => {
-                            for (const { expense, sharePerFlat } of expenseShares) {
-                              if (!isPaid(flat.id, expense.id)) {
-                                await handlePayExpense(flat, expense, sharePerFlat);
-                              }
-                            }
+                          onClick={() => {
+                            const next = expenseShares.find(x => !isPaid(flat.id, x.expense.id));
+                            if (next) openPayModal(flat, next.expense, next.sharePerFlat);
                           }}
-                          disabled={paying !== null}
                           className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold cursor-pointer disabled:opacity-60 transition-colors"
                         >
-                          Pay All Pending
+                          Pay Next Pending
                         </button>
                       </div>
                     )}
@@ -473,6 +457,21 @@ export default function LandlordSocietyDues() {
             ))
           )}
         </div>
+      )}
+
+      {/* Unified Gateway / Receipt / Partial payment modal */}
+      {payCtx && (
+        <PaymentModal
+          title="Pay Maintenance"
+          periodLabel={`${payCtx.expense.description} — Flat ${payCtx.flat.flat_number}`}
+          amount={payCtx.share}
+          alreadyPaid={getDue(payCtx.flat.id, payCtx.expense.id)?.paid_amount ?? getDue(payCtx.flat.id, payCtx.expense.id)?.amount ?? 0}
+          target={buildPayTarget(payCtx.flat, payCtx.expense)}
+          userName={user?.name}
+          userEmail={user?.email}
+          onClose={() => setPayCtx(null)}
+          onSuccess={async () => { setPayCtx(null); await refreshDuePayments(); }}
+        />
       )}
     </div>
   );

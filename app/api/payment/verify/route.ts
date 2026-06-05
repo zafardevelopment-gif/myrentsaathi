@@ -35,6 +35,10 @@ export async function POST(request: NextRequest) {
       monthYear?: string;
       amount?: number;
       existingPaymentId?: string;
+      // Partial-payment context (gateway can now pay a portion)
+      expectedAmount?: number;
+      alreadyPaid?: number;
+      isPartial?: boolean;
       // For route transfer target
       landlordId?: string;
       societyId?: string;
@@ -47,6 +51,7 @@ export async function POST(request: NextRequest) {
     const {
       razorpay_order_id, razorpay_payment_id, razorpay_signature,
       type, tenantId, monthYear, amount, existingPaymentId,
+      expectedAmount, alreadyPaid, isPartial,
       flatId, expenseId, landlordId, shareAmount,
     } = body;
 
@@ -69,16 +74,40 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Missing rent payment details" }, { status: 400 });
       }
 
+      // Resolve full expected vs cumulative paid so a partial gateway payment
+      // leaves status "pending" with paid_amount tracking the carry-over.
+      const fullExpected = expectedAmount ?? amount;
+      const cumulativePaid = (alreadyPaid ?? 0) + amount;
+      const fullyPaid = !isPartial && cumulativePaid >= fullExpected;
+      const rentStatus = fullyPaid ? "paid" : "pending";
+
       if (existingPaymentId) {
+        const update: Record<string, unknown> = {
+          status: rentStatus,
+          paid_amount: cumulativePaid,
+          payment_method: "razorpay",
+          payment_id: razorpay_payment_id,
+        };
+        if (fullyPaid) update.payment_date = today;
         const { error } = await supabase
           .from("rent_payments")
-          .update({ status: "paid", payment_date: today, payment_method: "razorpay", payment_id: razorpay_payment_id })
+          .update(update)
           .eq("id", existingPaymentId);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("rent_payments")
-          .insert({ tenant_id: tenantId, month_year: monthYear, amount, expected_amount: amount, status: "paid", payment_date: today, payment_method: "razorpay", payment_id: razorpay_payment_id });
+          .insert({
+            tenant_id: tenantId,
+            month_year: monthYear,
+            amount: fullyPaid ? fullExpected : amount,
+            expected_amount: fullExpected,
+            paid_amount: cumulativePaid,
+            status: rentStatus,
+            payment_date: fullyPaid ? today : null,
+            payment_method: "razorpay",
+            payment_id: razorpay_payment_id,
+          });
         if (error) throw error;
       }
 
@@ -90,13 +119,33 @@ export async function POST(request: NextRequest) {
       }
 
       const currentMonthStr = new Date().toISOString().slice(0, 7);
+      // shareAmount is the FULL per-flat share for this expense; `amount` is what
+      // was actually charged now (may be a partial portion of the share).
+      const dueExpected = shareAmount;
+      const paidNow = amount ?? shareAmount;
+
+      // Accumulate against any existing partial payment for this expense+flat+month.
+      const { data: existingDue } = await supabase
+        .from("society_due_payments")
+        .select("amount, paid_amount")
+        .eq("expense_id", expenseId)
+        .eq("flat_id", flatId)
+        .eq("month_year", currentMonthStr)
+        .maybeSingle();
+      const priorPaid = existingDue?.paid_amount ?? existingDue?.amount ?? 0;
+      const cumulativePaid = priorPaid + paidNow;
+      const dueFullyPaid = !isPartial && cumulativePaid >= dueExpected;
+
       const { error } = await supabase
         .from("society_due_payments")
         .upsert({
           expense_id: expenseId,
           flat_id: flatId,
           landlord_id: landlordId ?? null,
-          amount: shareAmount,
+          amount: cumulativePaid,
+          expected_amount: dueExpected,
+          paid_amount: cumulativePaid,
+          status: dueFullyPaid ? "paid" : "pending",
           month_year: currentMonthStr,
           paid_at: now,
           payment_method: "razorpay",
