@@ -84,6 +84,10 @@ export async function POST(request: NextRequest) {
       if (existingPaymentId) {
         const update: Record<string, unknown> = {
           status: rentStatus,
+          // `amount` = the actually-collected value (full or cumulative partial).
+          // Must be set here — the old code only touched `status`, which left
+          // pre-existing pending rows at amount=0 and showed ₹0 after paying.
+          amount: fullyPaid ? fullExpected : cumulativePaid,
           paid_amount: cumulativePaid,
           payment_method: "razorpay",
           payment_id: razorpay_payment_id,
