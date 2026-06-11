@@ -61,22 +61,24 @@ function BarChart({ data }: { data: DailyVisit[] }) {
     );
   }
   const max = Math.max(...data.map((d) => d.visits), 1);
+  const BAR_AREA = 96; // px — tallest bar height; percentage heights collapse inside auto-height flex columns
   return (
-    <div className="flex items-end gap-1 h-32 w-full">
-      {data.map((d) => {
-        const pct = Math.max(4, Math.round((d.visits / max) * 100));
-        const label = d.date.slice(5); // "MM-DD"
+    <div className="flex items-end justify-center gap-1 w-full">
+      {data.map((d, i) => {
+        const h = Math.max(4, Math.round((d.visits / max) * BAR_AREA));
+        // With many bars the labels overlap — show every 4th date instead
+        const label = data.length > 10 && i % 4 !== 0 ? " " : d.date.slice(5); // "MM-DD"
         return (
-          <div key={d.date} className="flex flex-col items-center flex-1 gap-1 group">
+          <div key={d.date} className="flex flex-col items-center flex-1 max-w-16 gap-1 group">
             <div className="text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
               {d.visits}
             </div>
             <div
               className="w-full bg-amber-400 rounded-t hover:bg-amber-500 transition-colors"
-              style={{ height: `${pct}%` }}
+              style={{ height: `${h}px` }}
               title={`${d.date}: ${d.visits} visits`}
             />
-            <div className="text-[9px] text-gray-400 rotate-45 origin-left whitespace-nowrap">
+            <div className="text-[9px] text-gray-400 whitespace-nowrap">
               {label}
             </div>
           </div>
