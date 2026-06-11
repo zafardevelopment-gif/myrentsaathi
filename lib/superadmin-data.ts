@@ -157,6 +157,35 @@ export async function getSocietyFlats(societyId?: string) {
   return data;
 }
 
+// ─── CONTACT INQUIRIES ───────────────────────────────────────
+
+export type ContactInquiry = {
+  id: string;
+  name: string;
+  contact: string;
+  user_type: string;
+  message: string;
+  status: "new" | "read" | "resolved";
+  created_at: string;
+};
+
+export async function getContactInquiries() {
+  const { data, error } = await supabase
+    .from("contact_inquiries")
+    .select("id, name, contact, user_type, message, status, created_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ContactInquiry[];
+}
+
+export async function updateInquiryStatus(id: string, status: ContactInquiry["status"]) {
+  const { error } = await supabase
+    .from("contact_inquiries")
+    .update({ status })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 // ─── TICKETS ─────────────────────────────────────────────────
 
 export async function getAllTickets() {
