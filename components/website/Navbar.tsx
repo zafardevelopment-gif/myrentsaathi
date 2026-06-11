@@ -35,12 +35,13 @@ export default function Navbar({ onLoginClick }: NavbarProps) {
     >
       <div className="max-w-[1140px] mx-auto px-6 flex justify-between items-center h-16">
         {/* Logo */}
-        <a href="#" className="flex items-center gap-2">
-          <span className="text-[26px]">🏠</span>
+        <Link href="/" className="flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="MyRentSaathi logo" width={36} height={36} className="rounded-[9px]" />
           <span className="font-serif text-[22px] font-extrabold text-ink">
             MyRent<span className="text-brand-500">Saathi</span>
           </span>
-        </a>
+        </Link>
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">

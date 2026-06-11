@@ -2,6 +2,7 @@ import HomePageClient from "@/components/website/HomePageClient";
 import PageTracker from "@/components/website/PageTracker";
 import Hero from "@/components/website/Hero";
 import ProblemSolution from "@/components/website/ProblemSolution";
+import Personas from "@/components/website/Personas";
 import Features from "@/components/website/Features";
 import HowItWorks from "@/components/website/HowItWorks";
 import Testimonials from "@/components/website/Testimonials";
@@ -37,6 +38,7 @@ export default function HomePage() {
       {/* Server-rendered sections */}
       <Hero />
       <ProblemSolution />
+      <Personas />
       <Features />
       <HowItWorks />
       <Testimonials />

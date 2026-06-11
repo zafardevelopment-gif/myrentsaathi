@@ -1,0 +1,22 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e89b3d"/>
+      <stop offset="1" stop-color="#b85c07"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+  <!-- house silhouette -->
+  <path d="M243 102 Q256 91 269 102 L424 238 Q432 245 432 256 V388 Q432 418 402 418 H110 Q80 418 80 388 V256 Q80 245 88 238 Z" fill="#ffffff"/>
+  <!-- rupee glyph -->
+  <g stroke="#b85c07" stroke-width="19" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M210 234 H302"/>
+    <path d="M210 268 H302"/>
+    <path d="M252 234 C 306 234, 306 312, 244 312"/>
+    <path d="M244 312 L214 312"/>
+    <path d="M222 312 L290 386"/>
+  </g>
+  <!-- green check dot -->
+  <circle cx="396" cy="116" r="58" fill="#1b5e3b"/>
+  <path d="M370 116 L389 135 L424 98" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

@@ -46,8 +46,9 @@ export default async function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-10 mb-10">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[22px]">🏠</span>
+            <div className="flex items-center gap-2.5 mb-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.svg" alt="MyRentSaathi logo" width={32} height={32} className="rounded-lg" />
               <Link href="/" className="font-serif text-xl font-extrabold text-white">
                 MyRent<span className="text-brand-500">Saathi</span>
               </Link>

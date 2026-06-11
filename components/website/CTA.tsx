@@ -11,12 +11,18 @@ export default function CTA() {
           14-day free trial. No credit card. 5 minute setup.
         </p>
         <div className="flex gap-3.5 justify-center mt-7 flex-wrap">
-          <button className="hover-lift px-9 py-4 rounded-[14px] bg-white text-brand-600 text-base font-extrabold cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.2)]">
+          <a
+            href="/signup"
+            className="hover-lift px-9 py-4 rounded-[14px] bg-white text-brand-600 text-base font-extrabold cursor-pointer shadow-[0_8px_30px_rgba(0,0,0,0.2)]"
+          >
             Start Free Trial →
-          </button>
-          <button className="hover-lift px-9 py-4 rounded-[14px] border-2 border-white bg-transparent text-white text-base font-bold cursor-pointer">
+          </a>
+          <a
+            href="/contact"
+            className="hover-lift px-9 py-4 rounded-[14px] border-2 border-white bg-transparent text-white text-base font-bold cursor-pointer"
+          >
             Schedule Demo
-          </button>
+          </a>
         </div>
       </div>
     </section>
