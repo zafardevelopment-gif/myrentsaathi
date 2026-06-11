@@ -13,6 +13,7 @@ const NAV_LINKS = [
   { label: "How It Works", href: "#how" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
+  { label: "Contact", href: "/contact" },
 ];
 
 export default function Navbar({ onLoginClick }: NavbarProps) {

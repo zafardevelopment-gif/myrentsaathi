@@ -58,8 +58,29 @@ export default async function Footer() {
               management without the hassle.
             </p>
             <div className="text-[12px] space-y-1">
-              <div>📧 support@myrentsaathi.com</div>
-              <div>💬 WhatsApp Support</div>
+              <div>
+                📧{" "}
+                <a href="mailto:support@myrentsaathi.com" className="hover:text-white transition-colors">
+                  support@myrentsaathi.com
+                </a>
+              </div>
+              <div>
+                💬{" "}
+                <a
+                  href="https://wa.me/919204298771"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-white transition-colors"
+                >
+                  WhatsApp: +91 92042 98771
+                </a>
+              </div>
+              <div>
+                📞{" "}
+                <a href="tel:+919204298771" className="hover:text-white transition-colors">
+                  +91 92042 98771
+                </a>
+              </div>
             </div>
           </div>
 
