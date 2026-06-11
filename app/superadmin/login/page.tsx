@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { superAdminLogin } from "@/lib/auth-db";
-import { trackPageVisit } from "@/lib/analytics";
 import toast, { Toaster } from "react-hot-toast";
 
 export default function SuperAdminLogin() {
@@ -14,11 +13,6 @@ export default function SuperAdminLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Track page visit
-  useEffect(() => {
-    trackPageVisit("/superadmin/login");
-  }, []);
 
   // If already logged in as superadmin, redirect to dashboard
   useEffect(() => {

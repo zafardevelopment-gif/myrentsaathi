@@ -5,13 +5,25 @@ import {
   getAnalyticsSummary,
   getDailyVisits,
   getTopPages,
+  getSectionVisits,
   type AnalyticsSummary,
   type DailyVisit,
   type PageCount,
+  type SectionCount,
   type DateFilter,
 } from "@/lib/analytics";
 
 // ─── HELPERS ────────────────────────────────────────────────
+
+function downloadCSV(filename: string, rows: string[][]): void {
+  const escape = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = rows.map((r) => r.map(escape).join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 
 function StatCard({
   label,
@@ -91,10 +103,11 @@ function BarChart({ data }: { data: DailyVisit[] }) {
 // ─── MAIN PAGE ───────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-  const [filter, setFilter] = useState<DateFilter>("7d");
+  const [filter, setFilter] = useState<DateFilter>("today");
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [dailyVisits, setDailyVisits] = useState<DailyVisit[]>([]);
   const [topPages, setTopPages] = useState<PageCount[]>([]);
+  const [sections, setSections] = useState<SectionCount[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -103,11 +116,13 @@ export default function AnalyticsPage() {
       getAnalyticsSummary(filter),
       getDailyVisits(filter),
       getTopPages(filter, 8),
+      getSectionVisits(filter),
     ])
-      .then(([s, dv, tp]) => {
+      .then(([s, dv, tp, sec]) => {
         setSummary(s);
         setDailyVisits(dv);
         setTopPages(tp);
+        setSections(sec);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -119,6 +134,42 @@ export default function AnalyticsPage() {
     "30d": "Last 30 Days",
   };
 
+  function handleDownloadReport() {
+    if (!summary) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const rows: string[][] = [
+      ["MyRentSaathi — Analytics Report"],
+      ["Period", filterLabels[filter]],
+      ["Generated", today],
+      [],
+      ["PAGE VISITS"],
+      ["Total Visits", String(summary.totalVisits)],
+      ["Home (/)", String(summary.homeVisits)],
+      ["Pricing (/pricing)", String(summary.pricingVisits)],
+      ["Login Pages", String(summary.loginVisits)],
+      [],
+      ["LOGINS BY ROLE"],
+      ["Total Logins", String(summary.totalLogins)],
+      ["Society (admin/board)", String(summary.societyLogins)],
+      ["Landlord", String(summary.landlordLogins)],
+      ["Tenant", String(summary.tenantLogins)],
+      ["Superadmin", String(summary.superadminLogins)],
+      [],
+      ["APP SECTIONS VISITED"],
+      ["Section", "Visits"],
+      ...sections.map((s) => [s.section, String(s.visits)]),
+      [],
+      ["DAILY VISITS"],
+      ["Date", "Visits"],
+      ...dailyVisits.map((d) => [d.date, String(d.visits)]),
+      [],
+      ["TOP PAGES"],
+      ["Page", "Visits"],
+      ...topPages.map((p) => [p.page, String(p.visits)]),
+    ];
+    downloadCSV(`analytics_report_${filter}_${today}.csv`, rows);
+  }
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -128,21 +179,32 @@ export default function AnalyticsPage() {
           <p className="text-sm text-ink-muted mt-0.5">Platform traffic and login activity</p>
         </div>
 
-        {/* Date Filter Tabs */}
-        <div className="flex gap-1 bg-warm-100 rounded-xl p-1 border border-border-default">
-          {(["today", "7d", "30d"] as DateFilter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                filter === f
-                  ? "bg-amber-600 text-white shadow"
-                  : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              {filterLabels[f]}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Date Filter Tabs */}
+          <div className="flex gap-1 bg-warm-100 rounded-xl p-1 border border-border-default">
+            {(["today", "7d", "30d"] as DateFilter[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  filter === f
+                    ? "bg-amber-600 text-white shadow"
+                    : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                {filterLabels[f]}
+              </button>
+            ))}
+          </div>
+
+          {/* Download Report */}
+          <button
+            onClick={handleDownloadReport}
+            disabled={loading || !summary}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-white border border-border-default text-ink hover:bg-amber-50 hover:border-amber-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ⬇️ Download Report
+          </button>
         </div>
       </div>
 
@@ -226,6 +288,47 @@ export default function AnalyticsPage() {
                 color="rose"
               />
             </div>
+          </section>
+
+          {/* App Sections */}
+          <section className="bg-white rounded-xl border border-border-default p-5 shadow-sm">
+            <h2 className="text-sm font-bold text-ink mb-4">🧭 App Sections Visited</h2>
+            {sections.length === 0 ? (
+              <p className="text-sm text-gray-400">No section data for this period.</p>
+            ) : (
+              <div className="space-y-2">
+                {sections.map((s) => {
+                  const max = sections[0]?.visits ?? 1;
+                  const pct = Math.round((s.visits / max) * 100);
+                  const icons: Record<string, string> = {
+                    Website: "🌐",
+                    "Society Admin": "🏢",
+                    "Board Member": "📋",
+                    Landlord: "🔑",
+                    Tenant: "👤",
+                    Guard: "🛡️",
+                    Superadmin: "⚡",
+                  };
+                  return (
+                    <div key={s.section} className="flex items-center gap-3">
+                      <span className="text-base w-6 text-center">{icons[s.section] ?? "📄"}</span>
+                      <div className="flex-1">
+                        <div className="flex justify-between text-xs mb-0.5">
+                          <span className="font-semibold text-ink">{s.section}</span>
+                          <span className="text-amber-700 font-bold">{s.visits}</span>
+                        </div>
+                        <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-amber-500 rounded-full"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           {/* Daily Visits Chart */}

@@ -13,7 +13,8 @@ export type VisitRole =
   | "board"
   | "landlord"
   | "tenant"
-  | "superadmin";
+  | "superadmin"
+  | "guard";
 
 // ─── PAGE VISIT TRACKING ────────────────────────────────────
 
@@ -151,6 +152,48 @@ export async function getDailyVisits(
   return Object.entries(counts)
     .map(([date, visits]) => ({ date, visits }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ─── SECTION BREAKDOWN ──────────────────────────────────────
+
+export type SectionCount = { section: string; visits: number };
+
+// First path segment → app section label; anything else is the public website
+const SECTION_LABELS: Record<string, string> = {
+  admin: "Society Admin",
+  board: "Board Member",
+  landlord: "Landlord",
+  tenant: "Tenant",
+  guard: "Guard",
+  superadmin: "Superadmin",
+};
+
+export function pageSection(page: string): string {
+  const seg = page.split("/")[1] ?? "";
+  return SECTION_LABELS[seg] ?? "Website";
+}
+
+export async function getSectionVisits(
+  filter: DateFilter = "7d"
+): Promise<SectionCount[]> {
+  const from = getDateFrom(filter);
+
+  const { data } = await supabase
+    .from("page_visits")
+    .select("page")
+    .gte("created_at", from);
+
+  if (!data || data.length === 0) return [];
+
+  const counts: Record<string, number> = {};
+  for (const row of data) {
+    const section = pageSection(row.page);
+    counts[section] = (counts[section] ?? 0) + 1;
+  }
+
+  return Object.entries(counts)
+    .map(([section, visits]) => ({ section, visits }))
+    .sort((a, b) => b.visits - a.visits);
 }
 
 export type PageCount = { page: string; visits: number };

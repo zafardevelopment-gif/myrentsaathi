@@ -1,5 +1,4 @@
 import HomePageClient from "@/components/website/HomePageClient";
-import PageTracker from "@/components/website/PageTracker";
 import Hero from "@/components/website/Hero";
 import ProblemSolution from "@/components/website/ProblemSolution";
 import Personas from "@/components/website/Personas";
@@ -30,8 +29,6 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c") }}
       />
-      {/* Fire-and-forget analytics — renders nothing */}
-      <PageTracker page="/" />
       {/* Client shell: Navbar + LoginModal (needs useState) */}
       <HomePageClient />
 
