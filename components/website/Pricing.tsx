@@ -5,6 +5,7 @@
  */
 
 import PricingCards from "./PricingCards";
+import LeadCapture from "./LeadCapture";
 import { getActivePricingPlans } from "@/lib/pricing-data";
 import type { PricingPlan } from "@/lib/pricing-data";
 import { getFreeTiralDays } from "@/lib/subscription";
@@ -141,6 +142,9 @@ export default async function Pricing() {
 
         {/* Dynamic Cards (client component for tab interaction) */}
         <PricingCards societyPlans={societyPlans} landlordPlans={landlordPlans} freeTrialDays={freeTrialDays} />
+
+        {/* Lead capture — callback / WhatsApp demo */}
+        <LeadCapture />
       </div>
     </section>
   );

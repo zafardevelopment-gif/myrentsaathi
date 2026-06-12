@@ -196,6 +196,114 @@ export async function getSectionVisits(
     .sort((a, b) => b.visits - a.visits);
 }
 
+// ─── DETAIL DRILL-DOWNS (clickable dashboard cards) ─────────
+
+export type VisitorInfo = {
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+export type VisitDetail = {
+  id: string;
+  page: string;
+  role: string;
+  created_at: string;
+  user_agent: string | null;
+  user: VisitorInfo | null;
+};
+
+export type VisitKind = "total" | "home" | "pricing" | "login";
+
+async function fetchUsersByIds(
+  ids: string[]
+): Promise<Record<string, VisitorInfo>> {
+  if (ids.length === 0) return {};
+  const { data } = await supabase
+    .from("users")
+    .select("id, full_name, email, phone")
+    .in("id", ids);
+  const map: Record<string, VisitorInfo> = {};
+  for (const u of data ?? []) {
+    map[u.id] = { full_name: u.full_name, email: u.email, phone: u.phone };
+  }
+  return map;
+}
+
+/** Individual visit rows behind a Page Visits card, newest first. */
+export async function getVisitDetails(
+  filter: DateFilter,
+  kind: VisitKind,
+  limit = 200
+): Promise<VisitDetail[]> {
+  const from = getDateFrom(filter);
+  let query = supabase
+    .from("page_visits")
+    .select("id, page, role, created_at, user_agent, user_id")
+    .gte("created_at", from)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (kind === "home") query = query.eq("page", "/");
+  else if (kind === "pricing") query = query.in("page", ["/pricing", "/#pricing"]);
+  else if (kind === "login") query = query.ilike("page", "%login%");
+
+  const { data } = await query;
+  if (!data || data.length === 0) return [];
+
+  const ids = [...new Set(data.map((r) => r.user_id).filter(Boolean))] as string[];
+  const users = await fetchUsersByIds(ids);
+
+  return data.map((r) => ({
+    id: r.id,
+    page: r.page,
+    role: r.role,
+    created_at: r.created_at,
+    user_agent: r.user_agent,
+    user: r.user_id ? users[r.user_id] ?? null : null,
+  }));
+}
+
+export type LoginDetail = {
+  id: string;
+  role: string;
+  login_time: string;
+  user: VisitorInfo | null;
+};
+
+export type LoginKind = "total" | "society" | "landlord" | "tenant" | "superadmin";
+
+/** Individual login rows behind a Logins by Role card, newest first. */
+export async function getLoginDetails(
+  filter: DateFilter,
+  kind: LoginKind,
+  limit = 200
+): Promise<LoginDetail[]> {
+  const from = getDateFrom(filter);
+  let query = supabase
+    .from("user_logins")
+    .select("id, user_id, role, login_time")
+    .gte("login_time", from)
+    .order("login_time", { ascending: false })
+    .limit(limit);
+
+  if (kind === "society") query = query.in("role", ["admin", "society_admin"]);
+  else if (kind !== "total") query = query.eq("role", kind);
+
+  const { data } = await query;
+  if (!data || data.length === 0) return [];
+
+  const ids = [...new Set(data.map((r) => r.user_id).filter(Boolean))];
+  const users = await fetchUsersByIds(ids);
+
+  return data.map((r) => ({
+    id: r.id,
+    role: r.role,
+    login_time: r.login_time,
+    user: users[r.user_id] ?? null,
+  }));
+}
+
 export type PageCount = { page: string; visits: number };
 
 export async function getTopPages(

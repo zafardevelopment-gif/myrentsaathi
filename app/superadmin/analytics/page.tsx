@@ -6,11 +6,17 @@ import {
   getDailyVisits,
   getTopPages,
   getSectionVisits,
+  getVisitDetails,
+  getLoginDetails,
   type AnalyticsSummary,
   type DailyVisit,
   type PageCount,
   type SectionCount,
   type DateFilter,
+  type VisitDetail,
+  type VisitKind,
+  type LoginDetail,
+  type LoginKind,
 } from "@/lib/analytics";
 
 // ─── HELPERS ────────────────────────────────────────────────
@@ -25,18 +31,56 @@ function downloadCSV(filename: string, rows: string[][]): void {
   URL.revokeObjectURL(url);
 }
 
+/** Short device/browser label from a raw user-agent string. */
+function deviceLabel(ua: string | null): string {
+  if (!ua) return "Unknown device";
+  const os = /Android/i.test(ua)
+    ? "Android"
+    : /iPhone|iPad|iPod/i.test(ua)
+    ? "iOS"
+    : /Windows/i.test(ua)
+    ? "Windows"
+    : /Mac OS/i.test(ua)
+    ? "Mac"
+    : /Linux/i.test(ua)
+    ? "Linux"
+    : "Other";
+  const browser = /Edg\//i.test(ua)
+    ? "Edge"
+    : /Firefox\//i.test(ua)
+    ? "Firefox"
+    : /Chrome\//i.test(ua)
+    ? "Chrome"
+    : /Safari\//i.test(ua)
+    ? "Safari"
+    : "Browser";
+  return `${browser} · ${os}`;
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 function StatCard({
   label,
   value,
   icon,
   sub,
   color = "amber",
+  onClick,
 }: {
   label: string;
   value: number | string;
   icon: string;
   sub?: string;
   color?: "amber" | "blue" | "green" | "purple" | "rose";
+  onClick?: () => void;
 }) {
   const bg: Record<string, string> = {
     amber: "bg-amber-50 border-amber-200",
@@ -53,13 +97,176 @@ function StatCard({
     rose: "text-rose-700",
   };
   return (
-    <div className={`rounded-xl border p-4 ${bg[color]}`}>
+    <div
+      onClick={onClick}
+      className={`rounded-xl border p-4 ${bg[color]} ${
+        onClick
+          ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all"
+          : ""
+      }`}
+    >
       <div className="flex items-center gap-2 mb-1">
         <span className="text-xl">{icon}</span>
         <span className={`text-xs font-semibold uppercase tracking-wide ${text[color]}`}>{label}</span>
       </div>
       <div className={`text-3xl font-extrabold ${text[color]}`}>{value}</div>
       {sub && <div className="text-xs text-gray-500 mt-0.5">{sub}</div>}
+      {onClick && (
+        <div className="text-[10px] text-gray-400 mt-1">click for details →</div>
+      )}
+    </div>
+  );
+}
+
+// ─── DETAIL MODAL ────────────────────────────────────────────
+
+type DetailTarget =
+  | { type: "visits"; kind: VisitKind; title: string }
+  | { type: "logins"; kind: LoginKind; title: string };
+
+const ROLE_BADGE: Record<string, string> = {
+  guest: "bg-gray-100 text-gray-600",
+  admin: "bg-blue-100 text-blue-700",
+  society_admin: "bg-blue-100 text-blue-700",
+  board: "bg-sky-100 text-sky-700",
+  landlord: "bg-green-100 text-green-700",
+  tenant: "bg-purple-100 text-purple-700",
+  superadmin: "bg-rose-100 text-rose-700",
+  guard: "bg-amber-100 text-amber-700",
+};
+
+function VisitorCell({
+  user,
+  userAgent,
+}: {
+  user: { full_name: string | null; email: string | null; phone: string | null } | null;
+  userAgent?: string | null;
+}) {
+  if (!user) {
+    return (
+      <div>
+        <div className="text-sm font-semibold text-gray-500">Guest visitor</div>
+        <div className="text-xs text-gray-400">{deviceLabel(userAgent ?? null)}</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="text-sm font-semibold text-ink">{user.full_name ?? "—"}</div>
+      <div className="text-xs text-gray-500">
+        {[user.email, user.phone].filter(Boolean).join(" · ") || "no contact info"}
+      </div>
+    </div>
+  );
+}
+
+function DetailModal({
+  target,
+  filter,
+  filterLabel,
+  onClose,
+}: {
+  target: DetailTarget;
+  filter: DateFilter;
+  filterLabel: string;
+  onClose: () => void;
+}) {
+  const [visitRows, setVisitRows] = useState<VisitDetail[]>([]);
+  const [loginRows, setLoginRows] = useState<LoginDetail[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const load =
+      target.type === "visits"
+        ? getVisitDetails(filter, target.kind).then(setVisitRows)
+        : getLoginDetails(filter, target.kind).then(setLoginRows);
+    load.catch(() => {}).finally(() => setLoading(false));
+  }, [target, filter]);
+
+  const count = target.type === "visits" ? visitRows.length : loginRows.length;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="text-base font-extrabold text-ink">{target.title}</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {filterLabel} · {loading ? "loading…" : `${count} record${count === 1 ? "" : "s"}`}
+              {count >= 200 && " (latest 200 shown)"}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500 font-bold cursor-pointer"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto px-5 py-3">
+          {loading ? (
+            <div className="py-12 text-center text-amber-600 font-bold animate-pulse">
+              Loading details...
+            </div>
+          ) : count === 0 ? (
+            <div className="py-12 text-center text-sm text-gray-400">
+              No records for this period.
+            </div>
+          ) : target.type === "visits" ? (
+            <div className="divide-y divide-gray-50">
+              {visitRows.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <VisitorCell user={r.user} userAgent={r.user_agent} />
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                      ROLE_BADGE[r.role] ?? "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {r.role}
+                  </span>
+                  <div className="text-right shrink-0">
+                    <div className="text-xs font-mono text-ink truncate max-w-[140px]">{r.page}</div>
+                    <div className="text-[11px] text-gray-400">{formatTime(r.created_at)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {loginRows.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <VisitorCell user={r.user} />
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                      ROLE_BADGE[r.role] ?? "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {r.role}
+                  </span>
+                  <div className="text-[11px] text-gray-400 shrink-0">
+                    {formatTime(r.login_time)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -109,6 +316,7 @@ export default function AnalyticsPage() {
   const [topPages, setTopPages] = useState<PageCount[]>([]);
   const [sections, setSections] = useState<SectionCount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState<DetailTarget | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -225,6 +433,7 @@ export default function AnalyticsPage() {
                 value={summary?.totalVisits ?? 0}
                 icon="👁️"
                 color="amber"
+                onClick={() => setDetail({ type: "visits", kind: "total", title: "👁️ All Page Visits" })}
               />
               <StatCard
                 label="Home"
@@ -232,6 +441,7 @@ export default function AnalyticsPage() {
                 icon="🏠"
                 color="blue"
                 sub="/"
+                onClick={() => setDetail({ type: "visits", kind: "home", title: "🏠 Home Page Visits" })}
               />
               <StatCard
                 label="Pricing"
@@ -239,6 +449,7 @@ export default function AnalyticsPage() {
                 icon="💎"
                 color="purple"
                 sub="/pricing"
+                onClick={() => setDetail({ type: "visits", kind: "pricing", title: "💎 Pricing Page Visits" })}
               />
               <StatCard
                 label="Login Pages"
@@ -246,6 +457,7 @@ export default function AnalyticsPage() {
                 icon="🔑"
                 color="green"
                 sub="all login routes"
+                onClick={() => setDetail({ type: "visits", kind: "login", title: "🔑 Login Page Visits" })}
               />
             </div>
           </section>
@@ -261,6 +473,7 @@ export default function AnalyticsPage() {
                 value={summary?.totalLogins ?? 0}
                 icon="🚀"
                 color="amber"
+                onClick={() => setDetail({ type: "logins", kind: "total", title: "🚀 All Logins" })}
               />
               <StatCard
                 label="Society"
@@ -268,24 +481,28 @@ export default function AnalyticsPage() {
                 icon="🏢"
                 color="blue"
                 sub="admin / board"
+                onClick={() => setDetail({ type: "logins", kind: "society", title: "🏢 Society Logins" })}
               />
               <StatCard
                 label="Landlord"
                 value={summary?.landlordLogins ?? 0}
                 icon="🔑"
                 color="green"
+                onClick={() => setDetail({ type: "logins", kind: "landlord", title: "🔑 Landlord Logins" })}
               />
               <StatCard
                 label="Tenant"
                 value={summary?.tenantLogins ?? 0}
                 icon="👤"
                 color="purple"
+                onClick={() => setDetail({ type: "logins", kind: "tenant", title: "👤 Tenant Logins" })}
               />
               <StatCard
                 label="Superadmin"
                 value={summary?.superadminLogins ?? 0}
                 icon="⚡"
                 color="rose"
+                onClick={() => setDetail({ type: "logins", kind: "superadmin", title: "⚡ Superadmin Logins" })}
               />
             </div>
           </section>
@@ -371,6 +588,16 @@ export default function AnalyticsPage() {
             )}
           </section>
         </>
+      )}
+
+      {/* Drill-down detail modal */}
+      {detail && (
+        <DetailModal
+          target={detail}
+          filter={filter}
+          filterLabel={filterLabels[filter]}
+          onClose={() => setDetail(null)}
+        />
       )}
     </div>
   );
