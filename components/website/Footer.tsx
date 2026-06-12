@@ -179,7 +179,8 @@ export default async function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-white/[0.08] pt-5 flex flex-col md:flex-row justify-between items-center gap-2">
           <div className="text-xs">
-            © 2026 MyRentSaathi.com — All Rights Reserved
+            © 2026 MyRentSaathi.com — A product of{" "}
+            <span className="font-bold text-white/80">AIVEXA</span> — All Rights Reserved
           </div>
           <div className="text-xs">Made with ❤️ in India</div>
         </div>
