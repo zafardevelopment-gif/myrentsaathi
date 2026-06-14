@@ -18,6 +18,7 @@ import {
   type LoginDetail,
   type LoginKind,
 } from "@/lib/analytics";
+import { getContactInquiries, type ContactInquiry } from "@/lib/superadmin-data";
 
 // ─── HELPERS ────────────────────────────────────────────────
 
@@ -317,6 +318,7 @@ export default function AnalyticsPage() {
   const [sections, setSections] = useState<SectionCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<DetailTarget | null>(null);
+  const [inquiries, setInquiries] = useState<ContactInquiry[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -335,6 +337,14 @@ export default function AnalyticsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [filter]);
+
+  useEffect(() => {
+    getContactInquiries().then(setInquiries).catch(() => {});
+  }, []);
+
+  const inquiryNew = inquiries.filter((i) => i.status === "new").length;
+  const inquiryRead = inquiries.filter((i) => i.status === "read").length;
+  const inquiryResolved = inquiries.filter((i) => i.status === "resolved").length;
 
   const filterLabels: Record<DateFilter, string> = {
     today: "Today",
@@ -374,6 +384,12 @@ export default function AnalyticsPage() {
       ["TOP PAGES"],
       ["Page", "Visits"],
       ...topPages.map((p) => [p.page, String(p.visits)]),
+      [],
+      ["CONTACT INQUIRIES"],
+      ["New", String(inquiryNew)],
+      ["Read", String(inquiryRead)],
+      ["Resolved", String(inquiryResolved)],
+      ["Total", String(inquiries.length)],
     ];
     downloadCSV(`analytics_report_${filter}_${today}.csv`, rows);
   }
@@ -584,6 +600,69 @@ export default function AnalyticsPage() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </section>
+
+          {/* Contact Inquiries Summary */}
+          <section>
+            <h2 className="text-xs font-bold text-ink-muted uppercase tracking-widest mb-3">
+              Contact Inquiries
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCard
+                label="New"
+                value={inquiryNew}
+                icon="🆕"
+                color="rose"
+              />
+              <StatCard
+                label="Read"
+                value={inquiryRead}
+                icon="👁️"
+                color="amber"
+              />
+              <StatCard
+                label="Resolved"
+                value={inquiryResolved}
+                icon="✅"
+                color="green"
+              />
+              <StatCard
+                label="Total"
+                value={inquiries.length}
+                icon="📊"
+                color="blue"
+              />
+            </div>
+            {inquiries.length > 0 && (
+              <div className="mt-3 bg-white rounded-xl border border-border-default p-4 shadow-sm">
+                <div className="space-y-2">
+                  {inquiries.slice(0, 5).map((inq) => (
+                    <div key={inq.id} className="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
+                        inq.status === "new" ? "bg-red-100 text-red-700" :
+                        inq.status === "read" ? "bg-yellow-100 text-yellow-700" :
+                        "bg-green-100 text-green-700"
+                      }`}>
+                        {inq.status}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 text-blue-700 shrink-0">
+                        {inq.user_type}
+                      </span>
+                      <span className="text-sm font-semibold text-ink truncate">{inq.name}</span>
+                      <span className="text-xs text-gray-400 truncate flex-1">{inq.message.slice(0, 50)}{inq.message.length > 50 ? "…" : ""}</span>
+                      <span className="text-[11px] text-gray-400 shrink-0">{new Date(inq.created_at).toLocaleDateString("en-IN")}</span>
+                    </div>
+                  ))}
+                </div>
+                {inquiries.length > 5 && (
+                  <div className="mt-2 text-center">
+                    <a href="/superadmin/support" className="text-xs text-amber-600 font-bold hover:underline">
+                      View all {inquiries.length} inquiries →
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </section>
