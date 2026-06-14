@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     await transporter.sendMail({
       from: `"${smtp.fromName || "MyRentSaathi"}" <${smtp.fromEmail || smtp.user}>`,
-      to,
+      to: `"${name}" <${to}>`,
       subject: `🔑 Your MyRentSaathi Login Credentials`,
       html: `
         <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;background:#fff;border-radius:12px">
