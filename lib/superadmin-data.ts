@@ -156,38 +156,74 @@ export async function getAllUsers() {
 
 export type UserDetail = User & {
   flats_count: number;
-  tenants_count: number;
+  tenants_count: number;   // landlord: tenants in their flats | society_admin: total tenants in society
+  landlords_count: number; // society_admin: total landlords in society
   payments_count: number;
-  societies: { id: string; name: string; city: string }[];
+  societies: { id: string; name: string; city: string; total_flats?: number; total_landlords?: number; total_tenants?: number }[];
 };
 
 export async function getUserDetail(id: string): Promise<UserDetail | null> {
-  const [userRes, flatsRes, tenantsRes, paymentsRes, societyAdminRes] = await Promise.all([
+  const [userRes, societyMemberRes] = await Promise.all([
     supabase
       .from("users")
       .select("id, full_name, email, phone, role, is_active, created_at, last_login")
       .eq("id", id)
       .maybeSingle(),
-    supabase.from("flats").select("id, flat_number, block, status, monthly_rent, society:societies(name,city)").eq("owner_id", id),
-    supabase.from("tenants").select("id").eq("user_id", id),
-    supabase.from("rent_payments").select("id").eq("landlord_id", id),
-    supabase.from("society_members").select("society:societies(id, name, city)").eq("user_id", id),
+    supabase.from("society_members").select("society:societies(id, name, city, total_flats)").eq("user_id", id),
   ]);
 
   if (!userRes.data) return null;
+  const role = userRes.data.role;
 
-  const subRes = await supabase
-    .from("subscriptions")
-    .select("plan_name, plan_type, status, expires_at, plan_price, starts_at, trial_days")
-    .eq("user_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const societies = (societyAdminRes.data ?? [])
-    .flatMap((m: { society: { id: string; name: string; city: string }[] }) =>
+  const rawSocieties = (societyMemberRes.data ?? [])
+    .flatMap((m: { society: { id: string; name: string; city: string; total_flats?: number }[] }) =>
       Array.isArray(m.society) ? m.society : (m.society ? [m.society] : [])
-    ) as { id: string; name: string; city: string }[];
+    ) as { id: string; name: string; city: string; total_flats?: number }[];
+
+  // Fetch role-specific counts in parallel
+  const [subRes, flatsRes, paymentsRes, ...roleCountsRes] = await Promise.all([
+    supabase
+      .from("subscriptions")
+      .select("plan_name, plan_type, status, expires_at, plan_price")
+      .eq("user_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+
+    // Landlord: flats they own
+    supabase.from("flats").select("id, current_tenant_id").eq("owner_id", id),
+
+    // Landlord: rent payments made to them
+    supabase.from("rent_payments").select("id").eq("landlord_id", id),
+
+    // Society admin: landlords in their societies
+    rawSocieties.length > 0 && (role === "society_admin" || role === "board_member")
+      ? supabase.from("society_members").select("id").eq("role", "landlord").in("society_id", rawSocieties.map((s) => s.id))
+      : Promise.resolve({ data: [] }),
+
+    // Society admin: tenants in their societies
+    rawSocieties.length > 0 && (role === "society_admin" || role === "board_member")
+      ? supabase.from("society_members").select("id").eq("role", "tenant").in("society_id", rawSocieties.map((s) => s.id))
+      : Promise.resolve({ data: [] }),
+
+    // Tenant: their own tenant record
+    role === "tenant"
+      ? supabase.from("tenants").select("id").eq("user_id", id)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const societyLandlordsRes = roleCountsRes[0] as { data: { id: string }[] | null };
+  const societyTenantsRes   = roleCountsRes[1] as { data: { id: string }[] | null };
+
+  const flats = flatsRes.data ?? [];
+  // Landlord tenants = flats that have an active tenant
+  const landlordTenantCount = flats.filter((f: { current_tenant_id: string | null }) => f.current_tenant_id).length;
+
+  const societies = rawSocieties.map((s) => ({
+    ...s,
+    total_landlords: societyLandlordsRes.data?.length ?? 0,
+    total_tenants: societyTenantsRes.data?.length ?? 0,
+  }));
 
   return {
     ...userRes.data,
@@ -200,8 +236,11 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
           plan_price: subRes.data.plan_price,
         }
       : null,
-    flats_count: flatsRes.data?.length ?? 0,
-    tenants_count: tenantsRes.data?.length ?? 0,
+    flats_count: flats.length,
+    tenants_count: role === "society_admin" || role === "board_member"
+      ? (societyTenantsRes.data?.length ?? 0)
+      : landlordTenantCount,
+    landlords_count: societyLandlordsRes.data?.length ?? 0,
     payments_count: paymentsRes.data?.length ?? 0,
     societies,
   } as UserDetail;

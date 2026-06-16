@@ -136,23 +136,51 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
               )}
             </div>
 
-            {/* Activity Stats */}
+            {/* Activity Stats — role-specific */}
             <div>
               <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">Activity</div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
-                  <div className="text-[18px] font-extrabold text-ink">{detail.flats_count}</div>
-                  <div className="text-[9px] text-ink-muted">Flats</div>
+              {(detail.role === "society_admin" || detail.role === "board_member") ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                    <div className="text-[18px] font-extrabold text-green-600">{detail.landlords_count}</div>
+                    <div className="text-[9px] text-ink-muted">Landlords</div>
+                  </div>
+                  <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                    <div className="text-[18px] font-extrabold text-blue-600">{detail.tenants_count}</div>
+                    <div className="text-[9px] text-ink-muted">Tenants</div>
+                  </div>
+                  <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                    <div className="text-[18px] font-extrabold text-ink">{detail.societies[0]?.total_flats ?? 0}</div>
+                    <div className="text-[9px] text-ink-muted">Total Flats</div>
+                  </div>
                 </div>
-                <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
-                  <div className="text-[18px] font-extrabold text-ink">{detail.tenants_count}</div>
-                  <div className="text-[9px] text-ink-muted">Tenants</div>
+              ) : detail.role === "landlord" ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                    <div className="text-[18px] font-extrabold text-ink">{detail.flats_count}</div>
+                    <div className="text-[9px] text-ink-muted">Flats Owned</div>
+                  </div>
+                  <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                    <div className="text-[18px] font-extrabold text-blue-600">{detail.tenants_count}</div>
+                    <div className="text-[9px] text-ink-muted">Active Tenants</div>
+                  </div>
+                  <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                    <div className="text-[18px] font-extrabold text-ink">{detail.payments_count}</div>
+                    <div className="text-[9px] text-ink-muted">Payments</div>
+                  </div>
                 </div>
-                <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
-                  <div className="text-[18px] font-extrabold text-ink">{detail.payments_count}</div>
-                  <div className="text-[9px] text-ink-muted">Payments</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                    <div className="text-[18px] font-extrabold text-ink">{detail.flats_count}</div>
+                    <div className="text-[9px] text-ink-muted">Flats</div>
+                  </div>
+                  <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                    <div className="text-[18px] font-extrabold text-ink">{detail.payments_count}</div>
+                    <div className="text-[9px] text-ink-muted">Payments</div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Societies */}
