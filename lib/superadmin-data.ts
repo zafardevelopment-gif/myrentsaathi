@@ -185,8 +185,9 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
     .maybeSingle();
 
   const societies = (societyAdminRes.data ?? [])
-    .map((m: { society: { id: string; name: string; city: string } | null }) => m.society)
-    .filter(Boolean) as { id: string; name: string; city: string }[];
+    .flatMap((m: { society: { id: string; name: string; city: string }[] }) =>
+      Array.isArray(m.society) ? m.society : (m.society ? [m.society] : [])
+    ) as { id: string; name: string; city: string }[];
 
   return {
     ...userRes.data,
