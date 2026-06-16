@@ -32,6 +32,14 @@ export type User = {
   is_active: boolean;
   created_at: string;
   last_login: string | null;
+  // joined from subscriptions
+  subscription?: {
+    plan_name: string;
+    plan_type: string;
+    status: string;
+    expires_at: string;
+    plan_price: number;
+  } | null;
 };
 
 export type Ticket = {
@@ -122,12 +130,80 @@ export async function updateSocietyStatus(id: string, is_active: boolean) {
 // ─── USERS ───────────────────────────────────────────────────
 
 export async function getAllUsers() {
-  const { data, error } = await supabase
-    .from("users")
-    .select("id, full_name, email, phone, role, is_active, created_at, last_login")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data as User[];
+  const [usersRes, subsRes] = await Promise.all([
+    supabase
+      .from("users")
+      .select("id, full_name, email, phone, role, is_active, created_at, last_login")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("subscriptions")
+      .select("user_id, plan_name, plan_type, status, expires_at, plan_price")
+      .order("created_at", { ascending: false }),
+  ]);
+  if (usersRes.error) throw usersRes.error;
+
+  type SubRow = { user_id: string; plan_name: string; plan_type: string; status: string; expires_at: string; plan_price: number };
+  const subsByUser: Record<string, SubRow> = {};
+  for (const s of (subsRes.data ?? []) as SubRow[]) {
+    if (!subsByUser[s.user_id]) subsByUser[s.user_id] = s;
+  }
+
+  return (usersRes.data ?? []).map((u) => ({
+    ...u,
+    subscription: subsByUser[u.id] ?? null,
+  })) as User[];
+}
+
+export type UserDetail = User & {
+  flats_count: number;
+  tenants_count: number;
+  payments_count: number;
+  societies: { id: string; name: string; city: string }[];
+};
+
+export async function getUserDetail(id: string): Promise<UserDetail | null> {
+  const [userRes, flatsRes, tenantsRes, paymentsRes, societyAdminRes] = await Promise.all([
+    supabase
+      .from("users")
+      .select("id, full_name, email, phone, role, is_active, created_at, last_login")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase.from("flats").select("id, flat_number, block, status, monthly_rent, society:societies(name,city)").eq("owner_id", id),
+    supabase.from("tenants").select("id").eq("user_id", id),
+    supabase.from("rent_payments").select("id").eq("landlord_id", id),
+    supabase.from("society_members").select("society:societies(id, name, city)").eq("user_id", id),
+  ]);
+
+  if (!userRes.data) return null;
+
+  const subRes = await supabase
+    .from("subscriptions")
+    .select("plan_name, plan_type, status, expires_at, plan_price, starts_at, trial_days")
+    .eq("user_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const societies = (societyAdminRes.data ?? [])
+    .map((m: { society: { id: string; name: string; city: string } | null }) => m.society)
+    .filter(Boolean) as { id: string; name: string; city: string }[];
+
+  return {
+    ...userRes.data,
+    subscription: subRes.data
+      ? {
+          plan_name: subRes.data.plan_name,
+          plan_type: subRes.data.plan_type,
+          status: subRes.data.status,
+          expires_at: subRes.data.expires_at,
+          plan_price: subRes.data.plan_price,
+        }
+      : null,
+    flats_count: flatsRes.data?.length ?? 0,
+    tenants_count: tenantsRes.data?.length ?? 0,
+    payments_count: paymentsRes.data?.length ?? 0,
+    societies,
+  } as UserDetail;
 }
 
 export async function updateUserStatus(id: string, is_active: boolean) {

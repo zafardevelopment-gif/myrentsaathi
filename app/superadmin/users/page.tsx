@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
 import toast from "react-hot-toast";
-import { getAllUsers, updateUserStatus, deleteUser, type User } from "@/lib/superadmin-data";
+import { getAllUsers, updateUserStatus, deleteUser, getUserDetail, type User, type UserDetail } from "@/lib/superadmin-data";
 
 const PAGE_SIZE = 15;
 
@@ -31,6 +31,170 @@ const ROLE_LABEL: Record<string, string> = {
   superadmin:    "SuperAdmin",
 };
 
+const PLAN_BADGE: Record<string, string> = {
+  trial:     "bg-yellow-100 text-yellow-700",
+  active:    "bg-green-100 text-green-700",
+  expired:   "bg-red-100 text-red-600",
+  cancelled: "bg-gray-100 text-gray-500",
+};
+
+function PlanBadge({ sub }: { sub: User["subscription"] }) {
+  if (!sub) return <span className="text-[9px] text-ink-muted">No plan</span>;
+  const badge = PLAN_BADGE[sub.status] ?? "bg-gray-100 text-gray-500";
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${badge}`}>
+        {sub.plan_name}
+      </span>
+      <span className="text-[8px] text-ink-muted capitalize">{sub.status}</span>
+    </div>
+  );
+}
+
+function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => void }) {
+  const [detail, setDetail] = useState<UserDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getUserDetail(userId).then((d) => { setDetail(d); setLoading(false); });
+  }, [userId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-[18px] bg-white overflow-hidden shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-default bg-warm-50">
+          <span className="text-[13px] font-extrabold text-ink">User Details</span>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink text-lg cursor-pointer leading-none">✕</button>
+        </div>
+
+        {loading ? (
+          <div className="p-6 space-y-2">
+            {[...Array(5)].map((_, i) => <div key={i} className="h-8 bg-warm-100 rounded-xl animate-pulse" />)}
+          </div>
+        ) : !detail ? (
+          <div className="p-6 text-center text-ink-muted text-sm">User not found.</div>
+        ) : (
+          <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            {/* Identity */}
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-warm-100 flex items-center justify-center text-2xl flex-shrink-0">
+                {ROLE_ICON[detail.role] ?? "👤"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[15px] font-extrabold text-ink">{detail.full_name}</div>
+                <div className="text-[11px] text-ink-muted">{detail.email}</div>
+                <div className="text-[11px] text-ink-muted">{detail.phone}</div>
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ROLE_BADGE[detail.role] ?? "bg-gray-100 text-gray-600"}`}>
+                    {ROLE_ICON[detail.role]} {ROLE_LABEL[detail.role] ?? detail.role}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${detail.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                    {detail.is_active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Subscription Plan */}
+            <div className="bg-warm-50 rounded-[12px] p-3.5 border border-border-default">
+              <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">Subscription Plan</div>
+              {detail.subscription ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[9px] text-ink-muted">Plan Name</div>
+                    <div className="text-[12px] font-bold text-ink">{detail.subscription.plan_name}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-ink-muted">Plan Type</div>
+                    <div className="text-[12px] font-semibold text-ink capitalize">{detail.subscription.plan_type}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-ink-muted">Status</div>
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${PLAN_BADGE[detail.subscription.status] ?? "bg-gray-100 text-gray-500"}`}>
+                      {detail.subscription.status}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-ink-muted">Price</div>
+                    <div className="text-[12px] font-bold text-ink">
+                      {detail.subscription.plan_price === 0 ? "Free" : `₹${detail.subscription.plan_price}/mo`}
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[9px] text-ink-muted">Expires At</div>
+                    <div className="text-[11px] font-semibold text-ink">
+                      {new Date(detail.subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[12px] text-ink-muted">No subscription found</div>
+              )}
+            </div>
+
+            {/* Activity Stats */}
+            <div>
+              <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">Activity</div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                  <div className="text-[18px] font-extrabold text-ink">{detail.flats_count}</div>
+                  <div className="text-[9px] text-ink-muted">Flats</div>
+                </div>
+                <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                  <div className="text-[18px] font-extrabold text-ink">{detail.tenants_count}</div>
+                  <div className="text-[9px] text-ink-muted">Tenants</div>
+                </div>
+                <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
+                  <div className="text-[18px] font-extrabold text-ink">{detail.payments_count}</div>
+                  <div className="text-[9px] text-ink-muted">Payments</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Societies */}
+            {detail.societies.length > 0 && (
+              <div>
+                <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">Societies</div>
+                <div className="space-y-1.5">
+                  {detail.societies.map((s) => (
+                    <div key={s.id} className="flex items-center gap-2 bg-warm-50 rounded-xl px-3 py-2 border border-border-default">
+                      <span className="text-[14px]">🏢</span>
+                      <div>
+                        <div className="text-[11px] font-semibold text-ink">{s.name}</div>
+                        <div className="text-[9px] text-ink-muted">{s.city}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Meta */}
+            <div className="grid grid-cols-2 gap-2 text-[10px] text-ink-muted pt-1 border-t border-border-light">
+              <div>
+                <span className="font-semibold">Joined: </span>
+                {new Date(detail.created_at).toLocaleDateString("en-IN")}
+              </div>
+              <div>
+                <span className="font-semibold">Last Login: </span>
+                {detail.last_login ? new Date(detail.last_login).toLocaleDateString("en-IN") : "Never"}
+              </div>
+              <div className="col-span-2 truncate">
+                <span className="font-semibold">ID: </span>
+                <span className="font-mono">{detail.id}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SuperAdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +206,7 @@ export default function SuperAdminUsers() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<User | null>(null);
   const [page, setPage] = useState(1);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -183,10 +348,11 @@ export default function SuperAdminUsers() {
       {/* Users List */}
       <div className="bg-white rounded-[14px] border border-border-default overflow-hidden">
         {/* Desktop header */}
-        <div className="hidden md:grid grid-cols-[2fr_2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 text-[10px] font-bold text-ink-muted uppercase tracking-wider border-b border-border-default bg-warm-50">
+        <div className="hidden md:grid grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 text-[10px] font-bold text-ink-muted uppercase tracking-wider border-b border-border-default bg-warm-50">
           <span>User</span>
           <span>Contact</span>
           <span>Role</span>
+          <span>Plan</span>
           <span>Joined</span>
           <span>Status</span>
           <span>Action</span>
@@ -200,7 +366,10 @@ export default function SuperAdminUsers() {
           paged.map((u) => (
             <div key={u.id}>
               {/* Desktop row */}
-              <div className="hidden md:grid grid-cols-[2fr_2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-3 items-center border-b border-border-light last:border-0 hover:bg-warm-50 transition-colors">
+              <div
+                className="hidden md:grid grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_auto] gap-4 px-4 py-3 items-center border-b border-border-light last:border-0 hover:bg-warm-50 transition-colors cursor-pointer"
+                onClick={() => setSelectedUserId(u.id)}
+              >
                 <div>
                   <div className="text-[12px] font-semibold text-ink">{u.full_name}</div>
                   <div className="text-[10px] text-ink-muted">{u.id.slice(0, 8)}…</div>
@@ -212,13 +381,16 @@ export default function SuperAdminUsers() {
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold self-start ${ROLE_BADGE[u.role] ?? "bg-gray-100 text-gray-600"}`}>
                   {ROLE_ICON[u.role]} {ROLE_LABEL[u.role] ?? u.role}
                 </span>
+                <div className="self-start" onClick={(e) => e.stopPropagation()}>
+                  <PlanBadge sub={u.subscription} />
+                </div>
                 <span className="text-[11px] text-ink-muted">
                   {new Date(u.created_at).toLocaleDateString("en-IN")}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold self-start ${u.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
                   {u.is_active ? "active" : "inactive"}
                 </span>
-                <div className="flex items-center gap-1.5 justify-end">
+                <div className="flex items-center gap-1.5 justify-end" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => handleToggleStatus(u)}
                     disabled={saving === u.id}
@@ -243,7 +415,10 @@ export default function SuperAdminUsers() {
               </div>
 
               {/* Mobile row */}
-              <div className="md:hidden p-3 border-b border-border-light last:border-0 flex items-start gap-3">
+              <div
+                className="md:hidden p-3 border-b border-border-light last:border-0 flex items-start gap-3 cursor-pointer active:bg-warm-50"
+                onClick={() => setSelectedUserId(u.id)}
+              >
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[14px] bg-warm-100 flex-shrink-0">
                   {ROLE_ICON[u.role] ?? "👤"}
                 </div>
@@ -259,8 +434,13 @@ export default function SuperAdminUsers() {
                   </div>
                   <div className="text-[10px] text-ink-muted mt-0.5">{u.email}</div>
                   <div className="text-[10px] text-ink-muted">{u.phone}</div>
+                  {u.subscription && (
+                    <div className="mt-1">
+                      <PlanBadge sub={u.subscription} />
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-col gap-1 flex-shrink-0">
+                <div className="flex flex-col gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => handleToggleStatus(u)}
                     disabled={saving === u.id}
@@ -317,6 +497,11 @@ export default function SuperAdminUsers() {
           </div>
         )}
       </div>
+
+      {/* User Detail Modal */}
+      {selectedUserId && (
+        <UserDetailModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
+      )}
 
       {/* Delete confirmation */}
       {confirmDel && (
