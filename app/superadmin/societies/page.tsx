@@ -5,9 +5,11 @@ import StatCard from "@/components/dashboard/StatCard";
 import toast from "react-hot-toast";
 import {
   getSocieties,
+  getSocietyDetail,
   updateSocietyPlan,
   updateSocietyStatus,
   type Society,
+  type SocietyDetail,
 } from "@/lib/superadmin-data";
 
 const PLAN_BADGE: Record<string, string> = {
@@ -26,6 +28,10 @@ export default function SuperAdminSocieties() {
   const [filterPlan, setFilterPlan] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<SocietyDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [showLandlords, setShowLandlords] = useState(false);
+  const [showTenants, setShowTenants] = useState(false);
   const [editPlan, setEditPlan] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
@@ -42,6 +48,21 @@ export default function SuperAdminSocieties() {
   }
 
   useEffect(() => { load(); }, []);
+
+  async function loadDetail(id: string) {
+    setDetailLoading(true);
+    setSelectedDetail(null);
+    setShowLandlords(false);
+    setShowTenants(false);
+    try {
+      const detail = await getSocietyDetail(id);
+      setSelectedDetail(detail);
+    } catch {
+      // detail load failure is non-fatal; basic info still shown from list
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   const filtered = societies.filter((s) => {
     const q = search.toLowerCase();
@@ -87,6 +108,7 @@ export default function SuperAdminSocieties() {
       setSocieties((prev) => prev.map((s) => s.id === id ? { ...s, is_active: !currentlyActive } : s));
       toast.success(`Society ${action}d`);
       setSelected(null);
+      setSelectedDetail(null);
     } catch {
       toast.error(`Failed — check RLS policies`);
     } finally {
@@ -164,9 +186,10 @@ export default function SuperAdminSocieties() {
               <div className="text-[15px] font-extrabold text-ink">{selectedSoc.name}</div>
               <div className="text-[11px] text-ink-muted">{selectedSoc.city}, {selectedSoc.state} · {selectedSoc.total_flats} flats</div>
             </div>
-            <button onClick={() => setSelected(null)} className="text-ink-muted hover:text-ink text-xl cursor-pointer leading-none">✕</button>
+            <button onClick={() => { setSelected(null); setSelectedDetail(null); }} className="text-ink-muted hover:text-ink text-xl cursor-pointer leading-none">✕</button>
           </div>
 
+          {/* Core Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
             {[
               { l: "Plan",          v: selectedSoc.subscription_plan },
@@ -184,6 +207,128 @@ export default function SuperAdminSocieties() {
               </div>
             ))}
           </div>
+
+          {/* Extended Detail — loaded async */}
+          {detailLoading && (
+            <div className="flex gap-2 mb-4">
+              {[...Array(3)].map((_, i) => <div key={i} className="h-14 flex-1 bg-warm-100 rounded-xl animate-pulse" />)}
+            </div>
+          )}
+
+          {selectedDetail && (
+            <>
+              {/* Admin + Contact */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
+                <div className="bg-blue-50 rounded-xl p-2.5 border border-blue-100">
+                  <div className="text-[10px] text-blue-600 font-bold mb-1">Society Admin</div>
+                  {selectedDetail.admin ? (
+                    <>
+                      <div className="text-[12px] font-bold text-ink truncate">{selectedDetail.admin.full_name}</div>
+                      <div className="text-[11px] text-ink-muted truncate">{selectedDetail.admin.email}</div>
+                      {selectedDetail.admin.phone && (
+                        <a href={`tel:${selectedDetail.admin.phone}`} className="text-[11px] text-blue-600 font-semibold hover:underline">
+                          📞 {selectedDetail.admin.phone}
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-[11px] text-ink-muted">No admin linked</div>
+                  )}
+                </div>
+
+                <div className="bg-warm-50 rounded-xl p-2.5 border border-border-default">
+                  <div className="text-[10px] text-ink-muted font-bold mb-1">Contact Phone</div>
+                  {selectedDetail.contact_phone ? (
+                    <a href={`tel:${selectedDetail.contact_phone}`} className="text-[12px] font-bold text-amber-600 hover:underline">
+                      📞 {selectedDetail.contact_phone}
+                    </a>
+                  ) : (
+                    <div className="text-[12px] text-ink-muted">—</div>
+                  )}
+                  {selectedDetail.contact_email && (
+                    <div className="text-[11px] text-ink-muted mt-0.5 truncate">{selectedDetail.contact_email}</div>
+                  )}
+                </div>
+
+                <div className="bg-warm-50 rounded-xl p-2.5 border border-border-default">
+                  <div className="text-[10px] text-ink-muted font-bold mb-1">Total Members</div>
+                  <div className="text-[18px] font-extrabold text-ink">{selectedDetail.total_members}</div>
+                  <div className="text-[10px] text-ink-muted">registered in society</div>
+                </div>
+              </div>
+
+              {/* Landlord & Tenant counts + expandable lists */}
+              <div className="grid grid-cols-2 gap-2.5 mb-4">
+                {/* Landlords */}
+                <div className="bg-amber-50 rounded-xl border border-amber-100 overflow-hidden">
+                  <button
+                    onClick={() => setShowLandlords((v) => !v)}
+                    className="w-full flex items-center justify-between p-2.5 cursor-pointer hover:bg-amber-100 transition-colors"
+                  >
+                    <div className="text-left">
+                      <div className="text-[10px] text-amber-700 font-bold">Total Landlords</div>
+                      <div className="text-[22px] font-extrabold text-amber-700 leading-tight">{selectedDetail.total_landlords}</div>
+                    </div>
+                    <span className="text-amber-400 text-[11px] font-bold">{showLandlords ? "▲ Hide" : "▼ Show"}</span>
+                  </button>
+                  {showLandlords && selectedDetail.landlords.length > 0 && (
+                    <div className="border-t border-amber-100 max-h-48 overflow-y-auto">
+                      {selectedDetail.landlords.map((l, i) => (
+                        <div key={i} className="flex items-start justify-between px-2.5 py-2 border-b border-amber-50 last:border-0 hover:bg-amber-50">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-bold text-ink truncate">{l.full_name}</div>
+                            <div className="text-[10px] text-ink-muted truncate">{l.email}</div>
+                          </div>
+                          {l.phone && (
+                            <a href={`tel:${l.phone}`} className="text-[10px] text-amber-600 font-semibold ml-2 flex-shrink-0 hover:underline">
+                              {l.phone}
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showLandlords && selectedDetail.landlords.length === 0 && (
+                    <div className="px-2.5 py-2 text-[11px] text-ink-muted border-t border-amber-100">No landlords registered</div>
+                  )}
+                </div>
+
+                {/* Tenants */}
+                <div className="bg-green-50 rounded-xl border border-green-100 overflow-hidden">
+                  <button
+                    onClick={() => setShowTenants((v) => !v)}
+                    className="w-full flex items-center justify-between p-2.5 cursor-pointer hover:bg-green-100 transition-colors"
+                  >
+                    <div className="text-left">
+                      <div className="text-[10px] text-green-700 font-bold">Total Tenants</div>
+                      <div className="text-[22px] font-extrabold text-green-700 leading-tight">{selectedDetail.total_tenants}</div>
+                    </div>
+                    <span className="text-green-400 text-[11px] font-bold">{showTenants ? "▲ Hide" : "▼ Show"}</span>
+                  </button>
+                  {showTenants && selectedDetail.tenants.length > 0 && (
+                    <div className="border-t border-green-100 max-h-48 overflow-y-auto">
+                      {selectedDetail.tenants.map((t, i) => (
+                        <div key={i} className="flex items-start justify-between px-2.5 py-2 border-b border-green-50 last:border-0 hover:bg-green-50">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-bold text-ink truncate">{t.full_name}</div>
+                            <div className="text-[10px] text-ink-muted truncate">{t.email}</div>
+                          </div>
+                          {t.phone && (
+                            <a href={`tel:${t.phone}`} className="text-[10px] text-green-600 font-semibold ml-2 flex-shrink-0 hover:underline">
+                              {t.phone}
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showTenants && selectedDetail.tenants.length === 0 && (
+                    <div className="px-2.5 py-2 text-[11px] text-ink-muted border-t border-green-100">No tenants registered</div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Change Plan */}
           <div className="mb-3">
@@ -238,7 +383,16 @@ export default function SuperAdminSocieties() {
         {filtered.map((s) => (
           <div
             key={s.id}
-            onClick={() => { setSelected(selected === s.id ? null : s.id); setEditPlan(s.subscription_plan); }}
+            onClick={() => {
+              if (selected === s.id) {
+                setSelected(null);
+                setSelectedDetail(null);
+              } else {
+                setSelected(s.id);
+                setEditPlan(s.subscription_plan);
+                loadDetail(s.id);
+              }
+            }}
             className={`bg-white rounded-[14px] p-4 border cursor-pointer transition-all hover:border-amber-300 hover:shadow-sm ${
               selected === s.id ? "border-amber-400" : "border-border-default"
             } ${!s.is_active ? "opacity-60" : ""}`}

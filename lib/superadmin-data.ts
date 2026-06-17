@@ -111,6 +111,56 @@ export async function getSocieties() {
   return data as Society[];
 }
 
+export type SocietyDetail = Society & {
+  contact_phone: string | null;
+  contact_email: string | null;
+  admin: { full_name: string; email: string; phone: string | null } | null;
+  total_landlords: number;
+  total_tenants: number;
+  total_members: number;
+  landlords: { full_name: string; email: string; phone: string | null }[];
+  tenants: { full_name: string; email: string; phone: string | null }[];
+};
+
+export async function getSocietyDetail(id: string): Promise<SocietyDetail | null> {
+  const [societyRes, membersRes] = await Promise.all([
+    supabase
+      .from("societies")
+      .select("*, contact_phone, contact_email")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("society_members")
+      .select("role, user:users(full_name, email, phone)")
+      .eq("society_id", id),
+  ]);
+
+  if (!societyRes.data) return null;
+
+  type MemberRow = { role: string; user: { full_name: string; email: string; phone: string | null } | null };
+  const members = (membersRes.data ?? []) as unknown as MemberRow[];
+
+  const admin = members.find((m) => m.role === "admin" || m.role === "society_admin")?.user ?? null;
+  const landlords = members
+    .filter((m) => m.role === "landlord")
+    .map((m) => m.user!)
+    .filter(Boolean);
+  const tenants = members
+    .filter((m) => m.role === "tenant")
+    .map((m) => m.user!)
+    .filter(Boolean);
+
+  return {
+    ...societyRes.data,
+    admin,
+    total_landlords: landlords.length,
+    total_tenants: tenants.length,
+    total_members: members.length,
+    landlords,
+    tenants,
+  } as SocietyDetail;
+}
+
 export async function updateSocietyPlan(id: string, plan: string) {
   const { error } = await supabase
     .from("societies")
