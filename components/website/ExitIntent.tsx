@@ -12,27 +12,33 @@ export default function ExitIntent() {
     // Don't show if already seen this session
     if (sessionStorage.getItem("exit_intent_seen")) return;
 
+    const trigger = () => {
+      if (triggered) return;
+      setTriggered(true);
+      setShow(true);
+      sessionStorage.setItem("exit_intent_seen", "1");
+    };
+
     // Desktop: mouse leaves top of viewport
     const onMouseLeave = (e: MouseEvent) => {
-      if (e.clientY <= 5 && !triggered) {
-        setTriggered(true);
-        setShow(true);
-        sessionStorage.setItem("exit_intent_seen", "1");
-      }
+      if (e.clientY <= 5) trigger();
+    };
+
+    // Tab close / navigation away
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") trigger();
     };
 
     // Mobile: show after 45 seconds of inactivity
     const mobileTimer = setTimeout(() => {
-      if (!triggered && window.innerWidth < 768) {
-        setTriggered(true);
-        setShow(true);
-        sessionStorage.setItem("exit_intent_seen", "1");
-      }
+      if (!triggered && window.innerWidth < 768) trigger();
     }, 45_000);
 
     document.addEventListener("mouseleave", onMouseLeave);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       document.removeEventListener("mouseleave", onMouseLeave);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       clearTimeout(mobileTimer);
     };
   }, [triggered]);

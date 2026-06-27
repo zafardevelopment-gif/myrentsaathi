@@ -22,13 +22,13 @@ export default function StickyBar() {
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <span className="text-lg hidden sm:block">🎁</span>
           <p className="text-sm font-semibold truncate">
-            <span className="font-black">30-din free trial</span> — abhi shuru karo, koi credit card nahi chahiye
+            <span className="font-black">30-day free trial</span> — start now, no credit card required
           </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <a
-            href="https://wa.me/919204298771?text=Namaste%21%20Mujhe%20MyRentSaathi%20ka%20free%20demo%20chahiye."
+            href="https://wa.me/919204298771?text=Hi%21%20I%27d%20like%20a%20free%20demo%20of%20MyRentSaathi."
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20b958] text-white text-xs font-bold px-3.5 py-1.5 rounded-full transition-colors"
@@ -39,7 +39,7 @@ export default function StickyBar() {
             href="/signup"
             className="hidden sm:flex items-center gap-1.5 bg-white text-brand-600 text-xs font-bold px-3.5 py-1.5 rounded-full hover:bg-brand-50 transition-colors"
           >
-            Trial Shuru Karein →
+            Start Free Trial →
           </a>
           <button
             onClick={() => setDismissed(true)}
