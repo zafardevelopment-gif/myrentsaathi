@@ -1,3 +1,5 @@
+import HeroLeadForm from "./HeroLeadForm";
+
 // Benefit-focused trust stats
 const HERO_STATS = [
   { value: "90%", label: "Rent Collected in 3 Days" },
@@ -34,24 +36,19 @@ export default function Hero() {
               <b>property management without the hassle.</b>
             </p>
 
-            <div className="animate-fade-up delay-300 flex gap-3.5 justify-center lg:justify-start mt-8 flex-wrap">
-              <a
-                href="/signup"
-                className="hover-lift px-9 py-4 rounded-[14px] bg-gradient-to-br from-brand-500 to-brand-600 text-white text-base font-bold shadow-[0_4px_20px_rgba(194,102,10,0.3)] cursor-pointer"
-              >
-                Start Free 14-Day Trial →
-              </a>
-              <a
-                href="#how"
-                className="hover-lift px-9 py-4 rounded-[14px] border-2 border-brand-500 text-brand-500 text-base font-bold cursor-pointer"
-              >
-                See How It Works
-              </a>
+            {/* Primary: WhatsApp demo capture */}
+            <div className="animate-fade-up delay-300">
+              <p className="text-[13px] font-bold text-ink-muted uppercase tracking-wider mt-8 mb-1">
+                👇 Free demo lein — WhatsApp par 5 minute mein
+              </p>
+              <HeroLeadForm />
+              <p className="text-[12px] text-ink-muted mt-2.5">
+                Ya seedha trial shuru karein:{" "}
+                <a href="/signup" className="text-brand-500 font-semibold underline underline-offset-2">
+                  Start Free 14-Day Trial →
+                </a>
+              </p>
             </div>
-
-            <p className="animate-fade-up delay-400 text-[13px] text-ink-muted mt-3.5">
-              No credit card required • Setup in 5 minutes • Cancel anytime
-            </p>
           </div>
 
           {/* ── Right: product visual (pure CSS, no image needed) ── */}

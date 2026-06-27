@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "./Navbar";
 import LoginModal from "./LoginModal";
+import StickyBar from "./StickyBar";
+import ExitIntent from "./ExitIntent";
 
 export default function HomePageClient() {
   const [showLogin, setShowLogin] = useState(false);
@@ -16,6 +18,8 @@ export default function HomePageClient() {
 
   return (
     <>
+      <StickyBar />
+      <ExitIntent />
       <Navbar onLoginClick={() => setShowLogin(true)} />
       {showLogin && (
         <LoginModal
