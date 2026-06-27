@@ -8,17 +8,26 @@ create table if not exists public.leads (
   created_at  timestamptz not null default now()
 );
 
--- Only superadmin can read/update leads
+-- RLS: service role inserts, authenticated superadmin reads
 alter table public.leads enable row level security;
 
-create policy "superadmin_all" on public.leads
-  for all using (
+-- Anyone can insert (API route uses service role, but anon also allowed)
+create policy "leads_insert" on public.leads
+  for insert with check (true);
+
+-- Only superadmin role can read/update leads
+create policy "leads_superadmin_read" on public.leads
+  for select using (
     exists (
-      select 1 from public.users
-      where id = auth.uid() and role = 'superadmin'
+      select 1 from users
+      where users.id = auth.uid() and users.role = 'superadmin'
     )
   );
 
--- Service role can insert (for API route)
-create policy "service_insert" on public.leads
-  for insert with check (true);
+create policy "leads_superadmin_update" on public.leads
+  for update using (
+    exists (
+      select 1 from users
+      where users.id = auth.uid() and users.role = 'superadmin'
+    )
+  );
