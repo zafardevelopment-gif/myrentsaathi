@@ -50,6 +50,20 @@ const STATIC_POSTS: BlogPost[] = [
     category: "Legal", tags: ["rent agreement", "legal"],
     published_at: new Date(Date.now() - 2 * 86400000).toISOString(), author: "MyRentSaathi Team",
   },
+  {
+    id: "4", slug: "apni-property-ko-rent-par-kaise-de",
+    title: "Apni Property Ko Rent Par Kaise De — Complete Guide 2025",
+    excerpt: "Ghar ya flat rent par dene ka poora process — tenant dhundhna, rent agreement banana, advance lena, aur payment track karna. Landlords ke liye step-by-step Hindi guide.",
+    category: "Landlord Guide", tags: ["property rent par dena", "landlord guide", "Hindi"],
+    published_at: new Date(Date.now() - 1 * 86400000).toISOString(), author: "MyRentSaathi Team",
+  },
+  {
+    id: "5", slug: "society-maintenance-collection-online-india",
+    title: "Society Maintenance Collection Online: Complete Guide for RWA Committees (2025)",
+    excerpt: "How housing society committees in India can collect maintenance online using UPI and WhatsApp. Cut collection time from 15 days to 3 days.",
+    category: "Society Management", tags: ["society maintenance", "RWA", "online collection"],
+    published_at: new Date().toISOString(), author: "MyRentSaathi Team",
+  },
 ];
 
 function formatDate(dateStr: string) {

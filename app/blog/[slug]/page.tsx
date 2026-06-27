@@ -103,6 +103,270 @@ MyRentSaathi's AI agreement generator creates legally-vetted templates for 8 Ind
     tags: ["rent agreement", "lease agreement", "legal"],
     published_at: new Date(Date.now() - 2 * 86400000).toISOString(),
   },
+
+  "apni-property-ko-rent-par-kaise-de": {
+    slug: "apni-property-ko-rent-par-kaise-de",
+    title: "Apni Property Ko Rent Par Kaise De — Complete Guide 2025",
+    excerpt: "Ghar ya flat rent par dene ka poora process — tenant dhundhna, rent agreement banana, advance lena, aur payment track karna. Landlords ke liye step-by-step Hindi guide.",
+    content: `## Introduction
+
+Agar aap pehli baar apna ghar ya flat rent par de rahe hain — ya phir purane process se pareshan hain — toh yeh guide aapke liye hai.
+
+Yahan hum cover karenge: **tenant kaise dhundhe, agreement kaise banaye, advance aur deposit kaise le, aur rent collection kaise automate kare.**
+
+---
+
+## Step 1: Property Rent-Ready Karein
+
+Tenant dekhne se pehle kuch cheezein fix kar lein:
+
+- **Minor repairs** — leaking taps, broken switches, damp walls
+- **Painting** — fresh coat = higher rent, faster tenant
+- **Cleaning** — professionally cleaned flat 20-30% jaldi milti hai
+- **Photos lein** — good photos se online listing par zyada inquiries aati hain
+
+---
+
+## Step 2: Sahi Rent Amount Decide Karein
+
+Apne area mein similar flats ki rates check karein — MagicBricks, 99acres, NoBroker par search karein.
+
+**Rent set karne ka formula:**
+- Market rate check karein (comparable size + locality)
+- Maintenance charges alag lein ya rent mein include karein — clearly decide karein
+- Annual 5-10% increment clause agreement mein daalein
+
+---
+
+## Step 3: Tenant Kahan Se Dhundhe
+
+**Online platforms:**
+- NoBroker (broker-free, sabse popular)
+- MagicBricks / 99acres
+- Housing.com
+- Facebook Groups (locality-specific groups)
+
+**Offline:**
+- Society noticeboard
+- Neighbours / word of mouth — sabse trusted source
+- Local broker (typically 1 month rent commission)
+
+**Tenant verify zaroor karein:**
+- Aadhaar card + PAN card copy lein
+- Previous landlord ka reference lein (agar possible ho)
+- Employment proof (salary slip ya business proof)
+
+---
+
+## Step 4: Rent Agreement Banana — Zaroori Hai
+
+Bina agreement ke koi bhi tenant mat do. Agreement mein yeh cheezein honi chahiye:
+
+1. **Rent amount aur due date** (jaise: har mahine ki 5 tarikh)
+2. **Security deposit** (typically 2-3 months rent)
+3. **Agreement duration** — usually 11 months (12 months se kam = registration compulsory nahi)
+4. **Maintenance charges** — kaun bharta hai?
+5. **Notice period** — 1-2 months standard hai
+6. **Lock-in period** — minimum stay duration
+7. **Permitted use** — residential only
+8. **Subletting ban** — tenant kisi aur ko nahi de sakta
+
+**Agreement kaise banayein:**
+- MyRentSaathi par AI-generated agreement 2 minute mein ready hota hai
+- 8 Indian cities ke liye legal templates available hain
+- Lawyer review ₹499 mein, registration support ₹999 mein
+
+---
+
+## Step 5: Security Deposit Aur Advance
+
+Standard practice in India:
+- **Security deposit**: 2-3 months rent (refundable)
+- **Advance rent**: 1-2 months (sometimes adjusted in last months)
+
+**Important:** Receipt zaroor do — cash bhi lein toh bhi. Disputes mein proof kaam aata hai.
+
+---
+
+## Step 6: Rent Collection Automate Karein
+
+Sabse badi pareshani hai rent time par lena. Iska solution hai automation:
+
+**WhatsApp + UPI se rent collection:**
+1. Har mahine automatic reminder jayega tenant ko WhatsApp par
+2. UPI payment link attached hoga — tenant seedha pay kare
+3. Receipt automatic generate ho jaaye
+4. Aapko Excel ya registers maintain nahi karne padte
+
+MyRentSaathi exactly yahi karta hai — **90% rent 3 din mein collect ho jaata hai** without any manual follow-up.
+
+---
+
+## Step 7: Common Mistakes Jo Avoid Karein
+
+❌ **Bina agreement ke tenant dena** — kabhi mat karein
+❌ **Cash mein lena without receipt** — tax aur dispute issues
+❌ **Deposit cheque lena without clearing** — bounced cheques baar baar hote hain
+❌ **Verbal promises** — sab kuch written mein rakhein
+❌ **Maintenance responsibility clear na karna** — future fights ki wajah
+
+---
+
+## Conclusion
+
+Apni property rent par dena mushkil nahi hai — bas sahi process follow karo:
+
+1. ✅ Property ready karo
+2. ✅ Sahi rent decide karo
+3. ✅ Verified tenant lo
+4. ✅ Agreement banao
+5. ✅ Deposit properly lo
+6. ✅ Rent collection automate karo
+
+**MyRentSaathi se shuru karein — 30 din free trial, koi credit card nahi chahiye.**`,
+    author: "MyRentSaathi Team",
+    category: "Landlord Guide",
+    tags: ["property rent par dena", "landlord guide", "rent agreement", "tenant dhundhna"],
+    published_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+  },
+
+  "society-maintenance-collection-online-india": {
+    slug: "society-maintenance-collection-online-india",
+    title: "Society Maintenance Collection Online: Complete Guide for RWA Committees (2025)",
+    excerpt: "How housing society committees in India can collect maintenance online using UPI, WhatsApp, and society management software. Cut collection time from 15 days to 3 days.",
+    content: `## Introduction
+
+If you're a society secretary or RWA committee member, you know the pain: maintenance collection takes 15+ days every month, residents ignore reminders, and tracking defaulters in Excel is a nightmare.
+
+In this guide, we'll show you how to **collect society maintenance online in India** — and cut your collection time from 15 days to under 3 days.
+
+---
+
+## Why Online Maintenance Collection Is Better
+
+Traditional methods (cash, cheque, manual follow-up) have major problems:
+
+- **Cash handling risks** — no audit trail, theft possibility
+- **Cheque bouncing** — 10-15% of cheques bounce on average
+- **Manual tracking** — someone has to update Excel every day
+- **No accountability** — residents deny paying, no proof
+
+Online collection solves all of this:
+
+✅ Every payment is recorded automatically
+✅ Receipts generated instantly
+✅ Defaulter list always up to date
+✅ CA-ready financial reports at month end
+
+---
+
+## Step 1: Set Up Online Collection
+
+You need three things:
+1. **A society bank account** with UPI enabled (most banks support this)
+2. **Society management software** (like MyRentSaathi)
+3. **WhatsApp numbers of all residents** (you already have these in your group)
+
+---
+
+## Step 2: Auto-Generate Monthly Maintenance Bills
+
+Good society software automatically:
+- Generates bills on the 1st of every month
+- Calculates per-flat amounts based on your rules (equal, per sq ft, etc.)
+- Includes any arrears from previous months
+- Sends bills to residents via WhatsApp
+
+No more manual bill preparation every month.
+
+---
+
+## Step 3: WhatsApp Reminders + UPI Payment Links
+
+The most effective collection method for Indian housing societies:
+
+1. Resident gets WhatsApp message: "Maintenance due: ₹3,500 for June 2025"
+2. Message includes a **UPI payment link** — one tap to pay
+3. Payment goes directly to society bank account
+4. Receipt auto-generated and sent back on WhatsApp
+
+**Result**: Most residents pay within 24-48 hours of the reminder.
+
+---
+
+## Step 4: Track Defaulters Automatically
+
+With online collection, your dashboard shows in real-time:
+- Who has paid this month
+- Who is overdue (and by how many days)
+- Total collected vs total expected
+- Month-on-month collection trends
+
+No more calling residents one by one. The system escalates automatically.
+
+---
+
+## Step 5: Expense Management & Financial Reporting
+
+Online collection is only half the picture. Society finances also need:
+
+- **Expense tracking** — every bill uploaded with photo and category
+- **Committee approval** — expenses above ₹X require board approval
+- **Monthly P&L** — income vs expenses, clearly shown
+- **Annual audit report** — CA-ready PDF in one click
+
+This level of transparency builds resident trust and reduces AGM disputes.
+
+---
+
+## How Long Does Setup Take?
+
+With modern society management software, setup takes less than a day:
+
+| Task | Time |
+|------|------|
+| Register society | 10 min |
+| Add flat list | 20 min |
+| Add resident WhatsApp numbers | 30 min |
+| First maintenance bill generated | Automatic |
+
+---
+
+## Real Results from Indian Societies
+
+Societies using online maintenance collection report:
+
+- **90% collection in 3 days** (vs 15+ days manually)
+- **Zero cash handling** — completely contactless
+- **50% fewer defaulters** — automatic reminders work
+- **Secretary time saved**: 10-15 hours/month
+
+---
+
+## Which Software to Use?
+
+MyRentSaathi is built specifically for Indian housing societies:
+
+- 🏢 WhatsApp-native — works without any app download for residents
+- 💰 Online maintenance collection with UPI
+- 📋 Expense management + committee approval workflow
+- 🗳️ Polls, notices, complaint tickets
+- 📊 Financial reports ready for AGM
+
+**Plans start at ₹10/flat/month.** 30-day free trial, no credit card required.
+
+---
+
+## Conclusion
+
+Online maintenance collection is no longer a luxury — it's the standard. If your society is still collecting cash or cheques, you're creating unnecessary work for the committee and frustration for residents.
+
+Start with a free trial today and see the difference in your first collection cycle.`,
+    author: "MyRentSaathi Team",
+    category: "Society Management",
+    tags: ["society maintenance collection", "RWA management", "housing society software", "maintenance online"],
+    published_at: new Date().toISOString(),
+  },
 };
 
 type Params = { slug: string };
