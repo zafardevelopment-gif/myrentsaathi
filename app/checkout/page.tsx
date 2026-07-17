@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { activatePaidPlan } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase";
-import { validatePromo, applyPromo, type PromoResult } from "@/lib/promos-data";
+import { validatePromo, applyPromo, fetchPromos, type Promo, type PromoResult } from "@/lib/promos-data";
 import { sendPaymentConfirmation } from "@/lib/whatsapp";
 import { emailPaymentConfirmation } from "@/lib/email";
 import toast, { Toaster } from "react-hot-toast";
@@ -37,6 +37,11 @@ function CheckoutContent() {
   const [promoApplied, setPromoApplied] = useState<PromoResult | null>(null);
   const [promoError, setPromoError]   = useState("");
   const [paying, setPaying]           = useState(false);
+  const [promos, setPromos]           = useState<Promo[]>([]);
+
+  useEffect(() => {
+    fetchPromos().then(setPromos).catch((err) => console.error("Failed to load promo codes", err));
+  }, []);
 
   // Redirect if no plan info
   useEffect(() => {
@@ -68,7 +73,7 @@ function CheckoutContent() {
   function handleApplyPromo() {
     const code = promoInput.trim();
     if (!code) { setPromoError("Please enter a promo code."); return; }
-    const result = validatePromo(code);
+    const result = validatePromo(code, promos);
     if (!result.valid) { setPromoError(result.error); setPromoApplied(null); return; }
     setPromoApplied(result.promo);
     setPromoError("");

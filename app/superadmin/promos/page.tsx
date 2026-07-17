@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
 import toast, { Toaster } from "react-hot-toast";
-import { PROMO_LIST, type Promo, type PromoStatus } from "@/lib/promos-data";
+import {
+  type Promo,
+  type PromoStatus,
+  fetchPromos,
+  createPromo,
+  updatePromo,
+  setPromoStatus,
+} from "@/lib/promos-data";
 
 const EMPTY_FORM = {
   code: "", type: "percentage" as "percentage" | "fixed",
@@ -13,12 +20,29 @@ const EMPTY_FORM = {
 // ── Main Page ─────────────────────────────────────────────────
 
 export default function SuperAdminPromos() {
-  const [promos, setPromos] = useState<Promo[]>(PROMO_LIST);
+  const [promos, setPromos] = useState<Promo[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"all" | PromoStatus>("all");
   const [showForm, setShowForm] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadPromos();
+  }, []);
+
+  async function loadPromos() {
+    setLoading(true);
+    try {
+      setPromos(await fetchPromos());
+    } catch (err) {
+      toast.error("Failed to load promo codes");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = promos.filter((p) =>
     filterStatus === "all" ? true : p.status === filterStatus
@@ -72,63 +96,76 @@ export default function SuperAdminPromos() {
     if (!validate()) return;
     setSaving(true);
 
-    // Simulate async save (replace with actual API call when DB ready)
-    await new Promise((r) => setTimeout(r, 600));
-
     const code = form.code.trim().toUpperCase();
 
-    if (editingCode) {
-      // Update existing
-      setPromos((prev) => prev.map((p) =>
-        p.code === editingCode
-          ? {
-              ...p,
-              type: form.type,
-              value: Number(form.value),
-              maxUses: Number(form.maxUses),
-              minPlan: form.minPlan,
-              validTill: form.validTill,
-              createdBy: form.linkedAgent ? `Agent: ${form.linkedAgent}` : p.createdBy,
-            }
-          : p
-      ));
-      toast.success(`Promo code ${editingCode} updated!`);
-    } else {
-      // Check duplicate
-      if (promos.some((p) => p.code === code)) {
-        toast.error(`Code "${code}" already exists`);
-        setSaving(false);
-        return;
+    try {
+      if (editingCode) {
+        const updated = await updatePromo(editingCode, {
+          type: form.type,
+          value: Number(form.value),
+          maxUses: Number(form.maxUses),
+          minPlan: form.minPlan,
+          validTill: form.validTill,
+          createdBy: form.linkedAgent ? `Agent: ${form.linkedAgent}` : promos.find((p) => p.code === editingCode)!.createdBy,
+        });
+        setPromos((prev) => prev.map((p) => (p.code === editingCode ? updated : p)));
+        toast.success(`Promo code ${editingCode} updated!`);
+      } else {
+        if (promos.some((p) => p.code === code)) {
+          toast.error(`Code "${code}" already exists`);
+          setSaving(false);
+          return;
+        }
+        const created = await createPromo({
+          code,
+          type: form.type,
+          value: Number(form.value),
+          maxUses: Number(form.maxUses),
+          minPlan: form.minPlan,
+          validTill: form.validTill,
+          createdBy: form.linkedAgent ? `Agent: ${form.linkedAgent}` : "Admin",
+        });
+        setPromos((prev) => [created, ...prev]);
+        toast.success(`Promo code ${code} created!`);
       }
-      const newPromo: Promo = {
-        code,
-        type: form.type,
-        value: Number(form.value),
-        maxUses: Number(form.maxUses),
-        used: 0,
-        minPlan: form.minPlan,
-        validTill: form.validTill,
-        status: "active",
-        savings: 0,
-        createdBy: form.linkedAgent ? `Agent: ${form.linkedAgent}` : "Admin",
-        revenue: 0,
-      };
-      setPromos((prev) => [newPromo, ...prev]);
-      toast.success(`Promo code ${code} created!`);
+      cancelForm();
+    } catch (err) {
+      toast.error("Failed to save promo code");
+      console.error(err);
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    cancelForm();
   }
 
-  function handleDisable(code: string) {
-    setPromos((prev) => prev.map((p) => p.code === code ? { ...p, status: "disabled" as PromoStatus } : p));
-    toast.success(`${code} disabled`);
+  async function handleDisable(code: string) {
+    try {
+      await setPromoStatus(code, "disabled");
+      setPromos((prev) => prev.map((p) => p.code === code ? { ...p, status: "disabled" as PromoStatus } : p));
+      toast.success(`${code} disabled`);
+    } catch (err) {
+      toast.error("Failed to disable promo code");
+      console.error(err);
+    }
   }
 
-  function handleEnable(code: string) {
-    setPromos((prev) => prev.map((p) => p.code === code ? { ...p, status: "active" as PromoStatus } : p));
-    toast.success(`${code} enabled`);
+  async function handleEnable(code: string) {
+    try {
+      await setPromoStatus(code, "active");
+      setPromos((prev) => prev.map((p) => p.code === code ? { ...p, status: "active" as PromoStatus } : p));
+      toast.success(`${code} enabled`);
+    } catch (err) {
+      toast.error("Failed to enable promo code");
+      console.error(err);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <Toaster position="top-center" />
+        <div className="text-center py-12 text-ink-muted text-sm">Loading promo codes...</div>
+      </div>
+    );
   }
 
   return (

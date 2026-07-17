@@ -1,6 +1,8 @@
-// Single source of truth for promo codes
-// Both checkout page and superadmin/promos page import from here
-// When DB is ready, replace PROMO_LIST with a fetch call
+// Promo codes are persisted in Supabase table `promo_codes` (migrations/promo-codes.sql).
+// This file holds shared types + validation logic used by both the checkout page
+// and the superadmin/promos page.
+
+import { supabase } from "@/lib/supabase";
 
 export type PromoType = "percentage" | "fixed";
 export type PromoStatus = "active" | "expired" | "disabled";
@@ -19,23 +21,113 @@ export type Promo = {
   revenue: number;
 };
 
-export const PROMO_LIST: Promo[] = [
-  { code: "LAUNCH50",   type: "percentage", value: 50,   maxUses: 500,  used: 234, minPlan: "any",          validTill: "2026-04-30", status: "active",  savings: 356000, createdBy: "System",               revenue: 0 },
-  { code: "SOCIETY20",  type: "percentage", value: 20,   maxUses: 200,  used: 89,  minPlan: "professional", validTill: "2026-06-30", status: "active",  savings: 120000, createdBy: "Admin",                revenue: 0 },
-  { code: "FLAT1000",   type: "fixed",      value: 1000, maxUses: 1000, used: 445, minPlan: "any",          validTill: "2026-12-31", status: "active",  savings: 445000, createdBy: "System",               revenue: 0 },
-  { code: "AGENTRAHUL", type: "percentage", value: 10,   maxUses: 100,  used: 45,  minPlan: "any",          validTill: "2026-12-31", status: "active",  savings: 45000,  createdBy: "Agent: Rahul Verma",   revenue: 185000 },
-  { code: "AGENTSNEHA", type: "percentage", value: 10,   maxUses: 100,  used: 28,  minPlan: "any",          validTill: "2026-12-31", status: "active",  savings: 28000,  createdBy: "Agent: Sneha Kulkarni", revenue: 100000 },
-  { code: "NRI30",      type: "percentage", value: 30,   maxUses: 100,  used: 28,  minPlan: "nri",          validTill: "2026-09-30", status: "active",  savings: 42000,  createdBy: "Admin",                revenue: 0 },
-  { code: "DIWALI25",   type: "percentage", value: 25,   maxUses: 300,  used: 300, minPlan: "any",          validTill: "2025-11-30", status: "expired", savings: 225000, createdBy: "System",               revenue: 0 },
-  { code: "SUMMER10",   type: "percentage", value: 10,   maxUses: 400,  used: 145, minPlan: "any",          validTill: "2026-08-31", status: "active",  savings: 65000,  createdBy: "Admin",                revenue: 0 },
-  { code: "TEST95",     type: "percentage", value: 95,   maxUses: 500,  used: 0,   minPlan: "any",          validTill: "2026-06-30", status: "active",  savings: 0,      createdBy: "Admin",                revenue: 0 },
-];
+type PromoRow = {
+  code: string;
+  type: PromoType;
+  value: number;
+  max_uses: number;
+  used: number;
+  min_plan: string;
+  valid_till: string;
+  status: PromoStatus;
+  savings: number;
+  created_by: string;
+  revenue: number;
+};
+
+function rowToPromo(row: PromoRow): Promo {
+  return {
+    code: row.code,
+    type: row.type,
+    value: Number(row.value),
+    maxUses: row.max_uses,
+    used: row.used,
+    minPlan: row.min_plan,
+    validTill: row.valid_till,
+    status: row.status,
+    savings: Number(row.savings),
+    createdBy: row.created_by,
+    revenue: Number(row.revenue),
+  };
+}
+
+export async function fetchPromos(): Promise<Promo[]> {
+  const { data, error } = await supabase
+    .from("promo_codes")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as PromoRow[]).map(rowToPromo);
+}
+
+export async function createPromo(input: {
+  code: string;
+  type: PromoType;
+  value: number;
+  maxUses: number;
+  minPlan: string;
+  validTill: string;
+  createdBy: string;
+}): Promise<Promo> {
+  const { data, error } = await supabase
+    .from("promo_codes")
+    .insert({
+      code: input.code,
+      type: input.type,
+      value: input.value,
+      max_uses: input.maxUses,
+      min_plan: input.minPlan,
+      valid_till: input.validTill,
+      created_by: input.createdBy,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToPromo(data as PromoRow);
+}
+
+export async function updatePromo(
+  code: string,
+  input: {
+    type: PromoType;
+    value: number;
+    maxUses: number;
+    minPlan: string;
+    validTill: string;
+    createdBy: string;
+  }
+): Promise<Promo> {
+  const { data, error } = await supabase
+    .from("promo_codes")
+    .update({
+      type: input.type,
+      value: input.value,
+      max_uses: input.maxUses,
+      min_plan: input.minPlan,
+      valid_till: input.validTill,
+      created_by: input.createdBy,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("code", code)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToPromo(data as PromoRow);
+}
+
+export async function setPromoStatus(code: string, status: PromoStatus): Promise<void> {
+  const { error } = await supabase
+    .from("promo_codes")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("code", code);
+  if (error) throw error;
+}
 
 export type PromoResult = { type: "percent" | "flat"; value: number; label: string };
 
 export function validatePromo(
   code: string,
-  allPromos: Promo[] = PROMO_LIST
+  allPromos: Promo[]
 ): { valid: true; promo: PromoResult } | { valid: false; error: string } {
   const found = allPromos.find((p) => p.code === code.trim().toUpperCase());
   if (!found) return { valid: false, error: "Invalid promo code." };
