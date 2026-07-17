@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(req: NextRequest) {
   try {
     const { phone, source } = await req.json();
     if (!phone) return NextResponse.json({ ok: false }, { status: 400 });
 
-    await supabase.from("leads").insert({
+    await supabaseAdmin.from("leads").insert({
       phone,
       source: source ?? "unknown",
       created_at: new Date().toISOString(),
