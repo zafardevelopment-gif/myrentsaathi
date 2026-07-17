@@ -6,12 +6,14 @@ import {
   getDailyVisits,
   getTopPages,
   getSectionVisits,
+  getLocationStats,
   getVisitDetails,
   getLoginDetails,
   type AnalyticsSummary,
   type DailyVisit,
   type PageCount,
   type SectionCount,
+  type LocationCount,
   type DateFilter,
   type VisitDetail,
   type VisitKind,
@@ -316,6 +318,7 @@ export default function AnalyticsPage() {
   const [dailyVisits, setDailyVisits] = useState<DailyVisit[]>([]);
   const [topPages, setTopPages] = useState<PageCount[]>([]);
   const [sections, setSections] = useState<SectionCount[]>([]);
+  const [locations, setLocations] = useState<LocationCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<DetailTarget | null>(null);
   const [inquiries, setInquiries] = useState<ContactInquiry[]>([]);
@@ -327,12 +330,14 @@ export default function AnalyticsPage() {
       getDailyVisits(filter),
       getTopPages(filter, 8),
       getSectionVisits(filter),
+      getLocationStats(filter, 10),
     ])
-      .then(([s, dv, tp, sec]) => {
+      .then(([s, dv, tp, sec, loc]) => {
         setSummary(s);
         setDailyVisits(dv);
         setTopPages(tp);
         setSections(sec);
+        setLocations(loc);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -384,6 +389,10 @@ export default function AnalyticsPage() {
       ["TOP PAGES"],
       ["Page", "Visits"],
       ...topPages.map((p) => [p.page, String(p.visits)]),
+      [],
+      ["LOCATIONS"],
+      ["Location", "Views"],
+      ...locations.map((l) => [l.label, String(l.visits)]),
       [],
       ["CONTACT INQUIRIES"],
       ["New", String(inquiryNew)],
@@ -600,6 +609,33 @@ export default function AnalyticsPage() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </section>
+
+          {/* Locations */}
+          <section className="bg-white rounded-xl border border-border-default p-5 shadow-sm">
+            <h2 className="text-sm font-bold text-ink mb-4">🌍 Locations</h2>
+            {locations.length === 0 ? (
+              <p className="text-sm text-gray-400">No location data for this period.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                      <th className="pb-2 font-semibold">City / Region / Country</th>
+                      <th className="pb-2 font-semibold text-right">Views</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {locations.map((l) => (
+                      <tr key={l.label} className="border-b border-gray-50 last:border-0">
+                        <td className="py-2 text-ink">{l.label}</td>
+                        <td className="py-2 text-right font-semibold text-ink">{l.visits}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </section>

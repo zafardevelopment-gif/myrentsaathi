@@ -29,12 +29,16 @@ export function trackPageVisit(
   // Run completely async — never await this
   void (async () => {
     try {
-      await supabase.from("page_visits").insert({
-        page,
-        user_id: opts?.userId ?? null,
-        role: opts?.role ?? "guest",
-        user_agent:
-          typeof navigator !== "undefined" ? navigator.userAgent : null,
+      await fetch("/api/track-visit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          page,
+          userId: opts?.userId ?? null,
+          role: opts?.role ?? "guest",
+          userAgent:
+            typeof navigator !== "undefined" ? navigator.userAgent : null,
+        }),
       });
     } catch {
       // Silently ignore — analytics must never break the app
@@ -302,6 +306,34 @@ export async function getLoginDetails(
     login_time: r.login_time,
     user: users[r.user_id] ?? null,
   }));
+}
+
+export type LocationCount = { label: string; visits: number };
+
+export async function getLocationStats(
+  filter: DateFilter = "7d",
+  limit = 10
+): Promise<LocationCount[]> {
+  const from = getDateFrom(filter);
+
+  const { data } = await supabase
+    .from("page_visits")
+    .select("city, region, country")
+    .gte("created_at", from);
+
+  if (!data || data.length === 0) return [];
+
+  const counts: Record<string, number> = {};
+  for (const row of data as { city: string | null; region: string | null; country: string | null }[]) {
+    const parts = [row.city, row.region, row.country].filter(Boolean);
+    const label = parts.length > 0 ? parts.join(", ") : "Unknown";
+    counts[label] = (counts[label] ?? 0) + 1;
+  }
+
+  return Object.entries(counts)
+    .map(([label, visits]) => ({ label, visits }))
+    .sort((a, b) => b.visits - a.visits)
+    .slice(0, limit);
 }
 
 export type PageCount = { page: string; visits: number };
