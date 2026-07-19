@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import StatusBadge from "@/components/dashboard/StatusBadge";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 import {
   getLandlordFlats, getLandlordUserId, addLandlordFlat, updateLandlordFlat,
   deleteLandlordFlat, findOrCreateSociety,
@@ -78,6 +79,7 @@ export default function LandlordProperties() {
   // Edit modal
   const [editFlat, setEditFlat] = useState<LandlordFlat | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
+  const [initialEditForm, setInitialEditForm] = useState(emptyForm);
 
   // Detail modal
   const [detailFlat, setDetailFlat] = useState<LandlordFlat | null>(null);
@@ -123,6 +125,11 @@ export default function LandlordProperties() {
   }
 
   useEffect(() => { loadData().catch(() => setLoading(false)); }, [user]);
+
+  const hasUnsavedChanges =
+    (showAddForm && JSON.stringify(addForm) !== JSON.stringify(emptyForm)) ||
+    (!!editFlat && JSON.stringify(editForm) !== JSON.stringify(initialEditForm));
+  useUnsavedChangesWarning(hasUnsavedChanges);
 
   async function openTenantModal(flat: LandlordFlat) {
     setTenantFlat(flat);
@@ -404,7 +411,7 @@ export default function LandlordProperties() {
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge status={flat.status} />
-                      <button onClick={() => { setEditFlat(flat); setEditForm({ flat_number: flat.flat_number, block: flat.block ?? "", flat_type: flat.flat_type ?? "", rental_type: flat.rental_type ?? "", floor_number: flat.floor_number != null ? String(flat.floor_number) : "", area_sqft: flat.area_sqft != null ? String(flat.area_sqft) : "", monthly_rent: flat.monthly_rent != null ? String(flat.monthly_rent) : "", security_deposit: flat.security_deposit != null ? String(flat.security_deposit) : "", society_id: "", society_name_custom: "" }); }}
+                      <button onClick={() => { const initial = { flat_number: flat.flat_number, block: flat.block ?? "", flat_type: flat.flat_type ?? "", rental_type: flat.rental_type ?? "", floor_number: flat.floor_number != null ? String(flat.floor_number) : "", area_sqft: flat.area_sqft != null ? String(flat.area_sqft) : "", monthly_rent: flat.monthly_rent != null ? String(flat.monthly_rent) : "", security_deposit: flat.security_deposit != null ? String(flat.security_deposit) : "", society_id: "", society_name_custom: "" }; setEditFlat(flat); setEditForm(initial); setInitialEditForm(initial); }}
                         className="p-1.5 rounded-lg border border-border-default text-ink-muted text-[11px] cursor-pointer hover:bg-warm-50">✏️</button>
                       <button onClick={() => setDeleteFlat(flat)} className="p-1.5 rounded-lg border border-red-200 text-red-500 text-[11px] cursor-pointer hover:bg-red-50">🗑️</button>
                     </div>
