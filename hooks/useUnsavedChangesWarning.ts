@@ -1,22 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useUnsavedChanges } from "@/components/providers/UnsavedChangesProvider";
 
 /**
- * Shows the browser's native "Leave site? Changes you made may not be saved."
- * confirmation when the user tries to close/reload/navigate away while
- * `hasUnsavedChanges` is true. Same behavior as the Income Tax e-filing portal.
+ * Registers `hasUnsavedChanges` with the app-wide UnsavedChangesProvider.
+ * When true, closing/reloading the tab shows the browser's native
+ * "Leave site? Changes you made may not be saved." confirmation.
  */
 export function useUnsavedChangesWarning(hasUnsavedChanges: boolean) {
-  useEffect(() => {
-    if (!hasUnsavedChanges) return;
-
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  useUnsavedChanges(hasUnsavedChanges);
 }

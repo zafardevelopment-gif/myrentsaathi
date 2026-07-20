@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 
 const AGENTS = [
   {
@@ -46,6 +47,7 @@ const MONTHS = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
 export default function SuperAdminAgents() {
   const [showPayoutModal, setShowPayoutModal] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  useUnsavedChangesWarning(showAddForm);
 
   const totalPending = AGENTS.reduce((a, ag) => a + ag.pendingCommission, 0);
   const totalPaid = AGENTS.reduce((a, ag) => a + ag.totalEarnings, 0);

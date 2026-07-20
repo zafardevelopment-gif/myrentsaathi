@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/providers/MockAuthProvider";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 import { getAdminSocietyId } from "@/lib/admin-data";
 import { formatCurrency } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -118,16 +119,22 @@ export default function AdminStaffPage() {
 
   // Add staff form
   const [showAddForm, setShowAddForm] = useState(false);
-  const [form, setForm] = useState({
+  const emptyStaffForm = {
     full_name: "", mobile: "", role: "Guard", address: "",
     joining_date: new Date().toISOString().slice(0, 10),
     monthly_salary: "", notes: "",
-  });
+  };
+  const [form, setForm] = useState(emptyStaffForm);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
   // Edit staff
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<typeof form & { monthly_salary: string }>>({});
+
+  const hasUnsavedStaffChanges =
+    (showAddForm && JSON.stringify(form) !== JSON.stringify(emptyStaffForm)) ||
+    (!!editingId && Object.keys(editForm).length > 0);
+  useUnsavedChangesWarning(hasUnsavedStaffChanges);
 
   // Doc upload form
   const [showDocForm, setShowDocForm] = useState(false);
