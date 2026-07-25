@@ -97,7 +97,7 @@ export default function LandlordAgreements() {
   async function loadData() {
     if (!user?.email) return;
     const [ag, f, lid] = await Promise.all([
-      getLandlordAgreements(user.email).catch(() => [] as LandlordAgreement[]),
+      getLandlordAgreements(user.email).catch((err) => { toast.error(`Failed to load agreements: ${err.message ?? err}`); return [] as LandlordAgreement[]; }),
       getLandlordFlats(user.email).catch(() => [] as LandlordFlat[]),
       getLandlordUserId(user.email),
     ]);
