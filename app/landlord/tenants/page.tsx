@@ -325,9 +325,14 @@ export default function LandlordTenants() {
     recurring: false, frequency: "yearly" as "monthly" | "quarterly" | "half_yearly" | "yearly",
   });
 
-  // Tenant credentials modal after creation
-  type TenantCreds = { name: string; userId: string; password: string; loginEmail: string; flatLabel: string };
+  // Tenant credentials modal (shown after creation, or on-demand via 🔑 Credentials button)
+  type TenantCreds = { userRecordId: string; name: string; userId: string; password: string; loginEmail: string; flatLabel: string };
   const [tenantCreds, setTenantCreds] = useState<TenantCreds | null>(null);
+  const [credsMode, setCredsMode] = useState<"created" | "view">("created");
+  const [loadingCreds, setLoadingCreds] = useState(false);
+  const [editingPassword, setEditingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
 
   // KYC modal
   const [kycFlat, setKycFlat] = useState<LandlordFlat | null>(null);
@@ -394,6 +399,42 @@ export default function LandlordTenants() {
       security_deposit: flat.security_deposit ? String(flat.security_deposit) : f.security_deposit,
     }));
   }, [flats]);
+
+  async function openCredentials(flat: LandlordFlat) {
+    const tenantUser = (flat.tenant as { user?: { full_name: string } | null } | null)?.user;
+    if (!flat.current_tenant_id) return;
+    setCredsMode("view");
+    setEditingPassword(false);
+    setNewPassword("");
+    setLoadingCreds(true);
+    setTenantCreds({
+      userRecordId: flat.current_tenant_id,
+      name: tenantUser?.full_name ?? "Tenant",
+      userId: "",
+      password: "",
+      loginEmail: "",
+      flatLabel: `${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}`,
+    });
+    const { data } = await supabase
+      .from("users")
+      .select("admin_user_id, password, email")
+      .eq("id", flat.current_tenant_id)
+      .maybeSingle();
+    setTenantCreds(c => c ? { ...c, userId: data?.admin_user_id ?? "—", password: data?.password ?? "—", loginEmail: data?.email ?? "—" } : c);
+    setLoadingCreds(false);
+  }
+
+  async function handleChangePassword() {
+    if (!tenantCreds || !newPassword.trim()) return;
+    setSavingPassword(true);
+    const { error } = await supabase.from("users").update({ password: newPassword.trim() }).eq("id", tenantCreds.userRecordId);
+    setSavingPassword(false);
+    if (error) { toast.error("Failed to update password."); return; }
+    setTenantCreds(c => c ? { ...c, password: newPassword.trim() } : c);
+    setEditingPassword(false);
+    setNewPassword("");
+    toast.success("Password updated.");
+  }
 
   async function openKyc(flat: LandlordFlat) {
     setKycFlat(flat);
@@ -565,7 +606,9 @@ export default function LandlordTenants() {
     if (result.generatedUserId && result.generatedPassword) {
       const flat = flats.find(f => f.id === form.flat_id);
       const flatLabel = flat ? `${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : form.flat_id;
+      setCredsMode("created");
       setTenantCreds({
+        userRecordId: result.userRecordId ?? "",
         name: form.full_name,
         userId: result.generatedUserId,
         password: result.generatedPassword,
@@ -643,14 +686,16 @@ export default function LandlordTenants() {
     <div>
       <Toaster position="top-center" />
 
-      {/* Tenant Credentials Modal */}
+      {/* Tenant Credentials Modal — shown after creation, or on-demand via 🔑 Credentials */}
       {tenantCreds && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setTenantCreds(null)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setTenantCreds(null); setEditingPassword(false); setNewPassword(""); }}>
           <div className="bg-white rounded-[20px] w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="bg-green-50 rounded-t-[20px] px-5 pt-5 pb-4 border-b border-green-100 text-center">
-              <div className="text-3xl mb-2">✅</div>
-              <div className="text-base font-extrabold text-green-700">Tenant Added!</div>
-              <div className="text-xs text-ink-muted mt-1">Share these login credentials with the tenant</div>
+              <div className="text-3xl mb-2">{credsMode === "created" ? "✅" : "🔑"}</div>
+              <div className="text-base font-extrabold text-green-700">{credsMode === "created" ? "Tenant Added!" : "Login Credentials"}</div>
+              <div className="text-xs text-ink-muted mt-1">
+                {credsMode === "created" ? "Share these login credentials with the tenant" : "View or change this tenant's login"}
+              </div>
             </div>
             <div className="px-5 py-4 space-y-3">
               <div className="bg-warm-50 rounded-xl p-3 border border-border-default">
@@ -658,34 +703,53 @@ export default function LandlordTenants() {
                 <div className="text-sm font-extrabold text-ink">{tenantCreds.name}</div>
                 <div className="text-xs text-ink-muted mt-0.5">Flat {tenantCreds.flatLabel}</div>
               </div>
-              <div className="bg-brand-50 rounded-xl p-4 border border-brand-200 space-y-3">
-                <div className="text-[11px] font-bold text-brand-600 uppercase tracking-widest text-center mb-1">Login Credentials</div>
-                <div>
-                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-1">User ID</div>
-                  <div className="flex items-center justify-between gap-2">
-                    <code className="text-base font-extrabold text-brand-600 bg-brand-100 px-3 py-1.5 rounded-lg flex-1 text-center tracking-wider">
-                      {tenantCreds.userId}
-                    </code>
-                    <button onClick={() => { navigator.clipboard.writeText(tenantCreds.userId); toast.success("Copied!"); }} className="text-[10px] text-brand-500 font-bold border border-brand-200 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-brand-50">Copy</button>
+              {loadingCreds ? (
+                <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="h-14 bg-warm-100 rounded-xl animate-pulse" />)}</div>
+              ) : (
+                <div className="bg-brand-50 rounded-xl p-4 border border-brand-200 space-y-3">
+                  <div className="text-[11px] font-bold text-brand-600 uppercase tracking-widest text-center mb-1">Login Credentials</div>
+                  <div>
+                    <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-1">User ID</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <code className="text-base font-extrabold text-brand-600 bg-brand-100 px-3 py-1.5 rounded-lg flex-1 text-center tracking-wider">
+                        {tenantCreds.userId}
+                      </code>
+                      <button onClick={() => { navigator.clipboard.writeText(tenantCreds.userId); toast.success("Copied!"); }} className="text-[10px] text-brand-500 font-bold border border-brand-200 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-brand-50">Copy</button>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-1">Password</div>
-                  <div className="flex items-center justify-between gap-2">
-                    <code className="text-base font-extrabold text-ink bg-warm-100 px-3 py-1.5 rounded-lg flex-1 text-center tracking-wider">
-                      {tenantCreds.password}
-                    </code>
-                    <button onClick={() => { navigator.clipboard.writeText(tenantCreds.password); toast.success("Copied!"); }} className="text-[10px] text-brand-500 font-bold border border-brand-200 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-brand-50">Copy</button>
+                  <div>
+                    <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-1">Password</div>
+                    {editingPassword ? (
+                      <div className="space-y-2">
+                        <input autoFocus className={inputClass} placeholder="New password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                        <div className="flex gap-2">
+                          <button onClick={() => { setEditingPassword(false); setNewPassword(""); }} className="flex-1 py-1.5 rounded-lg border border-border-default text-[11px] font-bold text-ink-muted cursor-pointer">Cancel</button>
+                          <button onClick={handleChangePassword} disabled={savingPassword || !newPassword.trim()} className="flex-1 py-1.5 rounded-lg bg-brand-500 text-white text-[11px] font-bold cursor-pointer disabled:opacity-60">{savingPassword ? "Saving..." : "Save"}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-base font-extrabold text-ink bg-warm-100 px-3 py-1.5 rounded-lg flex-1 text-center tracking-wider">
+                          {tenantCreds.password}
+                        </code>
+                        <button onClick={() => { navigator.clipboard.writeText(tenantCreds.password); toast.success("Copied!"); }} className="text-[10px] text-brand-500 font-bold border border-brand-200 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-brand-50">Copy</button>
+                      </div>
+                    )}
                   </div>
+                  {!editingPassword && (
+                    <button onClick={() => setEditingPassword(true)} className="w-full py-1.5 rounded-lg border border-brand-200 text-brand-600 text-[11px] font-bold cursor-pointer hover:bg-brand-100">Change Password</button>
+                  )}
+                  <div className="text-[10px] text-ink-muted text-center">Login email: {tenantCreds.loginEmail}</div>
                 </div>
-                <div className="text-[10px] text-ink-muted text-center">Login email: {tenantCreds.loginEmail}</div>
-              </div>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-[11px] text-yellow-700 text-center">
-                Screenshot these credentials — they won&apos;t be shown again.
-              </div>
+              )}
+              {credsMode === "created" && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-[11px] text-yellow-700 text-center">
+                  Screenshot these credentials — you can always view or change the password later from the tenant&apos;s 🔑 Credentials button.
+                </div>
+              )}
             </div>
             <div className="px-5 pb-5">
-              <button onClick={() => setTenantCreds(null)} className="w-full py-3 rounded-xl bg-brand-500 text-white text-sm font-bold cursor-pointer">Done</button>
+              <button onClick={() => { setTenantCreds(null); setEditingPassword(false); setNewPassword(""); }} className="w-full py-3 rounded-xl bg-brand-500 text-white text-sm font-bold cursor-pointer">Done</button>
             </div>
           </div>
         </div>
@@ -724,8 +788,8 @@ export default function LandlordTenants() {
             <div><label className={labelClass}>Security Deposit (₹)</label><input type="number" className={inputClass} placeholder="56000" value={form.security_deposit} onChange={e => setForm(f => ({ ...f, security_deposit: e.target.value }))} /></div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div><label className={labelClass}>Lease Start *</label><input required type="date" className={inputClass} value={form.lease_start} onChange={e => setForm(f => ({ ...f, lease_start: e.target.value }))} /></div>
-            <div><label className={labelClass}>Lease End *</label><input required type="date" className={inputClass} value={form.lease_end} onChange={e => setForm(f => ({ ...f, lease_end: e.target.value }))} /></div>
+            <div><label className={labelClass}>Lease Start *</label><input required type="date" className={inputClass} value={form.lease_start} onClick={e => e.currentTarget.showPicker?.()} onChange={e => setForm(f => ({ ...f, lease_start: e.target.value }))} /></div>
+            <div><label className={labelClass}>Lease End *</label><input required type="date" className={inputClass} value={form.lease_end} onClick={e => e.currentTarget.showPicker?.()} onChange={e => setForm(f => ({ ...f, lease_end: e.target.value }))} /></div>
           </div>
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-[11px] text-blue-700">
             📅 Rent is due on the <strong>last day of each month</strong>.
@@ -753,7 +817,7 @@ export default function LandlordTenants() {
                 </div>
                 <div>
                   <label className={labelClass}>Effective Date *</label>
-                  <input required={scheduleHike} type="date" min={form.lease_start || undefined} className={inputClass} value={hikeForm.effective_date} onChange={e => setHikeForm(h => ({ ...h, effective_date: e.target.value }))} />
+                  <input required={scheduleHike} type="date" min={form.lease_start || undefined} className={inputClass} value={hikeForm.effective_date} onClick={e => e.currentTarget.showPicker?.()} onChange={e => setHikeForm(h => ({ ...h, effective_date: e.target.value }))} />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={hikeForm.recurring} onChange={e => setHikeForm(h => ({ ...h, recurring: e.target.checked }))} className="w-4 h-4" />
@@ -789,7 +853,7 @@ export default function LandlordTenants() {
           </div>
 
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2 text-[11px] text-yellow-700">
-            Auto password: <strong>{form.full_name ? form.full_name.split(" ")[0] + "@123" : "FirstName@123"}</strong> — share with tenant
+            Login will be auto-generated — User ID: <strong>TNT-####</strong>, Password: <strong>{form.full_name ? form.full_name.split(" ")[0] + "@####" : "FirstName@####"}</strong>. You can view or change these anytime from the tenant&apos;s 🔑 Credentials button.
           </div>
           <button type="submit" disabled={saving} className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60">{saving ? "Adding Tenant..." : "Add Tenant"}</button>
         </form>
@@ -910,6 +974,7 @@ export default function LandlordTenants() {
                   {/* All buttons in one scrollable row */}
                   <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                     <button onClick={() => openKyc(flat)} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">🪪 KYC</button>
+                    <button onClick={() => openCredentials(flat)} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">🔑 Credentials</button>
                     <button onClick={() => { openTabModal(flat, "payments"); }} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">💰 Payments</button>
                     <button onClick={() => setAgreementFlat(flat)} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">📄 Agreement</button>
                     <button onClick={() => { openTabModal(flat, "documents"); }} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">🗂️ Docs</button>

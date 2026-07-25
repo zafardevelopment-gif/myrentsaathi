@@ -234,7 +234,7 @@ export default function RentHikePage() {
 
           <div>
             <label className={labelClass}>Effective Date *</label>
-            <input required type="date" className={inputClass} value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
+            <input required type="date" className={inputClass} value={effectiveDate} onClick={e => e.currentTarget.showPicker?.()} onChange={e => setEffectiveDate(e.target.value)} />
           </div>
 
           <label className="flex items-center gap-2 cursor-pointer">

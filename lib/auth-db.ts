@@ -326,7 +326,7 @@ export async function addTenant(params: {
   security_deposit: number;
   lease_start: string;
   lease_end: string;
-}): Promise<{ success: boolean; error?: string; generatedPassword?: string; generatedUserId?: string; loginEmail?: string }> {
+}): Promise<{ success: boolean; error?: string; generatedPassword?: string; generatedUserId?: string; loginEmail?: string; userRecordId?: string }> {
   // Upsert user
   let userId: string;
   let generatedPassword: string | undefined;
@@ -417,7 +417,7 @@ export async function addTenant(params: {
   if (params.society_id) rentInsert.society_id = params.society_id;
   await supabase.from("rent_payments").insert(rentInsert);
 
-  return { success: true, generatedPassword, generatedUserId, loginEmail };
+  return { success: true, generatedPassword, generatedUserId, loginEmail, userRecordId: userId };
 }
 
 // ─── ADD LANDLORD (by society admin) ────────────────────────
