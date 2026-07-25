@@ -1005,8 +1005,8 @@ export default function LandlordTenants() {
                     ))}
                   </div>
 
-                  {/* All buttons in one scrollable row */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                  {/* All buttons, wrapping onto multiple rows as needed */}
+                  <div className="flex gap-1.5 flex-wrap">
                     <button onClick={() => openKyc(flat)} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">🪪 KYC</button>
                     <button onClick={() => openCredentials(flat)} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">🔑 Credentials</button>
                     <button onClick={() => { openTabModal(flat, "payments"); }} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">💰 Payments</button>

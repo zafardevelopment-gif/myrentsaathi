@@ -25,12 +25,6 @@ const TIER_LABEL: Record<string, string> = {
   registered:       "Registered",
 };
 
-const TIERS = [
-  { value: "free",            label: "Free Draft" },
-  { value: "lawyer_verified", label: "Lawyer Verified (₹499)" },
-  { value: "registered",      label: "Registered (₹999)" },
-];
-
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
@@ -488,8 +482,8 @@ export default function LandlordAgreements() {
 
             <div>
               <label className={labelClass}>Agreement Type</label>
-              <select className={inputClass} value={form.tier} onChange={e => setForm(f => ({ ...f, tier: e.target.value }))}>
-                {TIERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              <select className={`${inputClass} opacity-70 cursor-not-allowed`} value="free" disabled>
+                <option value="free">Free Draft</option>
               </select>
             </div>
 
