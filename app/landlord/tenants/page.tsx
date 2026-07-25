@@ -318,6 +318,10 @@ export default function LandlordTenants() {
     lease_start: "", lease_end: "",
   });
 
+  // Optional scheduled rent hike at tenant creation
+  const [scheduleHike, setScheduleHike] = useState(false);
+  const [hikeForm, setHikeForm] = useState({ hike_type: "percentage" as "percentage" | "fixed", hike_value: "", effective_date: "" });
+
   // Tenant credentials modal after creation
   type TenantCreds = { name: string; userId: string; password: string; loginEmail: string; flatLabel: string };
   const [tenantCreds, setTenantCreds] = useState<TenantCreds | null>(null);
@@ -491,6 +495,24 @@ export default function LandlordTenants() {
     setSaving(false);
     if (!result.success) { toast.error(result.error ?? "Failed to add tenant."); return; }
 
+    // Optional scheduled rent hike
+    if (scheduleHike && hikeForm.hike_value && hikeForm.effective_date) {
+      const currentRent = Number(form.monthly_rent);
+      const newRent = hikeForm.hike_type === "percentage"
+        ? Math.round(currentRent * (1 + Number(hikeForm.hike_value) / 100))
+        : Math.round(currentRent + Number(hikeForm.hike_value));
+      await supabase.from("rent_hike_history").insert({
+        flat_id: form.flat_id,
+        old_rent: currentRent,
+        new_rent: newRent,
+        hike_type: hikeForm.hike_type,
+        hike_value: Number(hikeForm.hike_value),
+        effective_date: hikeForm.effective_date,
+        created_by: landlordId,
+        status: "scheduled",
+      }).then(({ error }) => { if (error) toast.error("Tenant added, but scheduling the rent hike failed."); });
+    }
+
     // Send WhatsApp welcome message (fire-and-forget — never blocks UI)
     const tenantSocietyName = (flats.find(f => f.id === form.flat_id)?.society as { name?: string } | null)?.name ?? "MyRentSaathi";
     if (form.phone) {
@@ -551,6 +573,8 @@ export default function LandlordTenants() {
     }
 
     setForm({ full_name: "", email: "", phone: "", flat_id: "", monthly_rent: "", security_deposit: "", lease_start: "", lease_end: "" });
+    setScheduleHike(false);
+    setHikeForm({ hike_type: "percentage", hike_value: "", effective_date: "" });
     setShowForm(false);
     setLoading(true);
     await loadData();
@@ -702,6 +726,48 @@ export default function LandlordTenants() {
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-[11px] text-blue-700">
             📅 Rent is due on the <strong>last day of each month</strong>.
           </div>
+
+          <div className="bg-warm-50 rounded-xl p-3 border border-border-default">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={scheduleHike} onChange={e => setScheduleHike(e.target.checked)} className="w-4 h-4" />
+              <span className="text-xs font-bold text-ink">📈 Schedule a rent hike (optional)</span>
+            </label>
+            {scheduleHike && (
+              <div className="mt-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={labelClass}>Hike Type</label>
+                    <select className={inputClass} value={hikeForm.hike_type} onChange={e => setHikeForm(h => ({ ...h, hike_type: e.target.value as "percentage" | "fixed" }))}>
+                      <option value="percentage">Percentage (%)</option>
+                      <option value="fixed">Fixed Amount (₹)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>{hikeForm.hike_type === "percentage" ? "Increase %" : "Increase ₹"} *</label>
+                    <input required={scheduleHike} type="number" min="1" className={inputClass} placeholder={hikeForm.hike_type === "percentage" ? "e.g. 10" : "e.g. 500"} value={hikeForm.hike_value} onChange={e => setHikeForm(h => ({ ...h, hike_value: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelClass}>Effective Date *</label>
+                  <input required={scheduleHike} type="date" min={form.lease_start || undefined} className={inputClass} value={hikeForm.effective_date} onChange={e => setHikeForm(h => ({ ...h, effective_date: e.target.value }))} />
+                </div>
+                {form.monthly_rent && hikeForm.hike_value && Number(hikeForm.hike_value) > 0 && (
+                  <div className="bg-green-50 border border-green-100 rounded-xl px-3 py-2 text-[11px] text-green-700">
+                    Rent will increase from <strong>{formatCurrency(Number(form.monthly_rent))}</strong> to{" "}
+                    <strong>
+                      {formatCurrency(
+                        hikeForm.hike_type === "percentage"
+                          ? Math.round(Number(form.monthly_rent) * (1 + Number(hikeForm.hike_value) / 100))
+                          : Math.round(Number(form.monthly_rent) + Number(hikeForm.hike_value))
+                      )}
+                    </strong>{" "}
+                    on the effective date.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2 text-[11px] text-yellow-700">
             Auto password: <strong>{form.full_name ? form.full_name.split(" ")[0] + "@123" : "FirstName@123"}</strong> — share with tenant
           </div>

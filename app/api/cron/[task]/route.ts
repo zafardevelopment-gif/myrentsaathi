@@ -7,6 +7,7 @@ import { generateChargesForPeriod } from "@/lib/billing/charge-service";
 import { applyLateFees } from "@/lib/billing/late-fee-service";
 import { processReminders } from "@/lib/billing/reminder-service";
 import { checkAgreementExpiry } from "@/lib/billing/agreement-expiry-service";
+import { applyScheduledHikes } from "@/lib/billing/rent-hike-service";
 
 export const runtime = "nodejs";
 
@@ -68,6 +69,10 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       }
       case "check-agreement-expiry": {
         const result = await checkAgreementExpiry();
+        return NextResponse.json({ task, ...result });
+      }
+      case "apply-scheduled-rent-hikes": {
+        const result = await applyScheduledHikes();
         return NextResponse.json({ task, ...result });
       }
       default:

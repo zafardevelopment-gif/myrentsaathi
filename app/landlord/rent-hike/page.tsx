@@ -18,6 +18,7 @@ type HikeHistory = {
   hike_value: number;
   effective_date: string;
   created_at: string;
+  status: "scheduled" | "applied" | "cancelled";
 };
 
 const inputClass = "w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500";
@@ -144,6 +145,13 @@ export default function RentHikePage() {
     }
   }
 
+  async function handleCancelScheduled(id: string) {
+    const { error } = await supabase.from("rent_hike_history").update({ status: "cancelled" }).eq("id", id);
+    if (error) { toast.error("Failed to cancel scheduled hike"); return; }
+    toast.success("Scheduled rent hike cancelled");
+    await loadData();
+  }
+
   const flatLabel = (f: LandlordFlat) =>
     `Flat ${f.flat_number}${f.block ? ` (${f.block})` : ""} — ${f.tenant?.user?.full_name ?? "Tenant"}`;
 
@@ -217,16 +225,23 @@ export default function RentHikePage() {
         </form>
       )}
 
-      {history.length > 0 && (
+      {history.filter(h => h.status !== "cancelled").length > 0 && (
         <>
           <h3 className="text-[13px] font-extrabold text-ink mb-3">History</h3>
-          {history.map(h => {
+          {history.filter(h => h.status !== "cancelled").map(h => {
             const f = historyFlatMap[h.flat_id];
             return (
               <div key={h.id} className="bg-white rounded-[14px] p-4 border border-border-default mb-2 flex justify-between items-center gap-3">
                 <div>
-                  <div className="text-sm font-bold text-ink">
-                    {f ? `Flat ${f.flat_number}${f.block ? ` (${f.block})` : ""}` : "Flat"}
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-bold text-ink">
+                      {f ? `Flat ${f.flat_number}${f.block ? ` (${f.block})` : ""}` : "Flat"}
+                    </div>
+                    {h.status === "scheduled" && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+                        Scheduled — effective {new Date(h.effective_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-ink-muted mt-0.5">
                     {formatCurrency(h.old_rent)} → {formatCurrency(h.new_rent)}
@@ -237,6 +252,9 @@ export default function RentHikePage() {
                   </div>
                   <div className="text-[10px] text-ink-muted mt-0.5">Effective {new Date(h.effective_date).toLocaleDateString("en-IN")}</div>
                 </div>
+                {h.status === "scheduled" && (
+                  <button onClick={() => handleCancelScheduled(h.id)} className="px-2.5 py-1.5 rounded-lg border border-red-200 text-red-500 text-[10px] font-semibold cursor-pointer hover:bg-red-50 flex-shrink-0">Cancel</button>
+                )}
               </div>
             );
           })}
