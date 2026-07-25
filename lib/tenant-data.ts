@@ -244,6 +244,7 @@ export type TenantAgreement = {
   custom_doc_name?: string | null;
   rent_hike_clause?: string | null;
   clauses?: string[] | null;
+  doc_brand?: string | null;
   doc_title?: string | null;
   doc_subtitle?: string | null;
   section_titles?: { parties?: string; property?: string; financial?: string; terms?: string } | null;
@@ -264,7 +265,7 @@ export async function getTenantAgreement(email: string): Promise<TenantAgreement
     .from("agreements")
     .select(`
       id, tier, status, start_date, end_date, monthly_rent, security_deposit, landlord_id, custom_doc_url, custom_doc_name,
-      rent_hike_clause, clauses, doc_title, doc_subtitle, section_titles,
+      rent_hike_clause, clauses, doc_brand, doc_title, doc_subtitle, section_titles,
       flat:flats(flat_number, block, floor_number, flat_type, area_sqft),
       society:societies(name, city, address)
     `)

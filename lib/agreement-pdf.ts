@@ -2,6 +2,7 @@ import { formatCurrency } from "@/lib/utils";
 
 // ─── shared defaults ────────────────────────────────────────────
 
+export const DEFAULT_DOC_BRAND = "MyRentSaathi";
 export const DEFAULT_DOC_TITLE = "RENTAL AGREEMENT";
 export const DEFAULT_DOC_SUBTITLE = "India's Smartest Rent & Society Management Platform";
 
@@ -63,6 +64,7 @@ export type AgreementPdfInput = {
   end_date: string;
   rent_hike_clause?: string | null;
   clauses?: string[] | null;
+  doc_brand?: string | null;
   doc_title?: string | null;
   doc_subtitle?: string | null;
   section_titles?: Partial<SectionTitles> | null;
@@ -78,6 +80,7 @@ export function buildAgreementHtml(ag: AgreementPdfInput): string {
   const tenant = ag.tenantContact ?? null;
   const landlord = ag.landlordContact ?? null;
 
+  const docBrand = ag.doc_brand?.trim() || DEFAULT_DOC_BRAND;
   const docTitle = ag.doc_title?.trim() || DEFAULT_DOC_TITLE;
   const docSubtitle = ag.doc_subtitle?.trim() || DEFAULT_DOC_SUBTITLE;
   const sectionTitles: SectionTitles = { ...DEFAULT_SECTION_TITLES, ...(ag.section_titles ?? {}) };
@@ -159,7 +162,7 @@ export function buildAgreementHtml(ag: AgreementPdfInput): string {
 
   <!-- Header -->
   <div class="header">
-    <div class="logo">MyRentSaathi</div>
+    <div class="logo">${docBrand}</div>
     <div class="sub">${docSubtitle}</div>
     <div style="margin-top:12px;">
       <span class="ribbon ${ag.status}">${ag.status.charAt(0).toUpperCase() + ag.status.slice(1)}</span>

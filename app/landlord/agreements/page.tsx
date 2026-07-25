@@ -10,7 +10,7 @@ import { formatCurrency } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
 import {
-  DEFAULT_DOC_TITLE, DEFAULT_DOC_SUBTITLE, DEFAULT_SECTION_TITLES, TIER_LABEL,
+  DEFAULT_DOC_BRAND, DEFAULT_DOC_TITLE, DEFAULT_DOC_SUBTITLE, DEFAULT_SECTION_TITLES, TIER_LABEL,
   fmtDate, durationMonths, defaultClauses, printAgreementPdf,
   type SectionTitles,
 } from "@/lib/agreement-pdf";
@@ -67,7 +67,7 @@ export default function LandlordAgreements() {
     landlord_name: "", landlord_phone: "", landlord_email: "",
     monthly_rent: "", security_deposit: "", start_date: "", end_date: "",
     rent_hike_clause: "",
-    doc_title: "", doc_subtitle: "",
+    doc_brand: "", doc_title: "", doc_subtitle: "",
     section_titles: { ...DEFAULT_SECTION_TITLES } as SectionTitles,
     clauses: [] as string[],
   });
@@ -172,6 +172,7 @@ export default function LandlordAgreements() {
       start_date: ag.start_date ?? "",
       end_date: ag.end_date ?? "",
       rent_hike_clause: ag.rent_hike_clause ?? "",
+      doc_brand: ag.doc_brand ?? DEFAULT_DOC_BRAND,
       doc_title: ag.doc_title ?? DEFAULT_DOC_TITLE,
       doc_subtitle: ag.doc_subtitle ?? DEFAULT_DOC_SUBTITLE,
       section_titles: { ...DEFAULT_SECTION_TITLES, ...(ag.section_titles ?? {}) },
@@ -196,6 +197,7 @@ export default function LandlordAgreements() {
       start_date: editForm.start_date,
       end_date: editForm.end_date,
       rent_hike_clause: editForm.rent_hike_clause || null,
+      doc_brand: editForm.doc_brand.trim() || null,
       doc_title: editForm.doc_title.trim() || null,
       doc_subtitle: editForm.doc_subtitle.trim() || null,
       section_titles: editForm.section_titles,
@@ -216,6 +218,7 @@ export default function LandlordAgreements() {
       start_date: editForm.start_date,
       end_date: editForm.end_date,
       rent_hike_clause: editForm.rent_hike_clause || null,
+      doc_brand: editForm.doc_brand.trim() || null,
       doc_title: editForm.doc_title.trim() || null,
       doc_subtitle: editForm.doc_subtitle.trim() || null,
       section_titles: editForm.section_titles,
@@ -568,13 +571,15 @@ export default function LandlordAgreements() {
                   <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Document Heading</div>
                   {editing ? (
                     <div className="bg-warm-50 rounded-[14px] border border-border-default p-3.5 space-y-2">
+                      <div><label className={labelClass}>Brand Name</label><input className={inputClass} placeholder={DEFAULT_DOC_BRAND} value={editForm.doc_brand} onChange={e => setEditForm(f => ({ ...f, doc_brand: e.target.value }))} /></div>
+                      <div><label className={labelClass}>Tagline</label><input className={inputClass} placeholder={DEFAULT_DOC_SUBTITLE} value={editForm.doc_subtitle} onChange={e => setEditForm(f => ({ ...f, doc_subtitle: e.target.value }))} /></div>
                       <div><label className={labelClass}>Main Title</label><input className={inputClass} placeholder={DEFAULT_DOC_TITLE} value={editForm.doc_title} onChange={e => setEditForm(f => ({ ...f, doc_title: e.target.value }))} /></div>
-                      <div><label className={labelClass}>Subtitle</label><input className={inputClass} placeholder={DEFAULT_DOC_SUBTITLE} value={editForm.doc_subtitle} onChange={e => setEditForm(f => ({ ...f, doc_subtitle: e.target.value }))} /></div>
                     </div>
                   ) : (
                     <div className="bg-warm-50 rounded-[14px] border border-border-default p-3.5">
-                      <div className="text-sm font-extrabold text-ink">{viewAg.doc_title?.trim() || DEFAULT_DOC_TITLE}</div>
+                      <div className="text-sm font-extrabold text-brand-600">{viewAg.doc_brand?.trim() || DEFAULT_DOC_BRAND}</div>
                       <div className="text-[11px] text-ink-muted mt-0.5">{viewAg.doc_subtitle?.trim() || DEFAULT_DOC_SUBTITLE}</div>
+                      <div className="text-xs font-bold text-ink mt-2">{viewAg.doc_title?.trim() || DEFAULT_DOC_TITLE}</div>
                     </div>
                   )}
                 </div>
