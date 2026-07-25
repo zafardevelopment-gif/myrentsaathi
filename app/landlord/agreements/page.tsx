@@ -9,6 +9,11 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
+import {
+  DEFAULT_DOC_TITLE, DEFAULT_DOC_SUBTITLE, DEFAULT_SECTION_TITLES, TIER_LABEL,
+  fmtDate, durationMonths, defaultClauses, printAgreementPdf,
+  type SectionTitles,
+} from "@/lib/agreement-pdf";
 
 // ─── helpers ────────────────────────────────────────────────
 
@@ -19,209 +24,25 @@ const STATUS_BADGE: Record<string, string> = {
   terminated: "bg-red-100 text-red-600 border-red-200",
 };
 
-const TIER_LABEL: Record<string, string> = {
-  free:             "Free Draft",
-  lawyer_verified:  "Lawyer Verified",
-  registered:       "Registered",
-};
-
-function fmtDate(d: string | null | undefined) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
-}
-
-function durationMonths(start: string, end: string) {
-  const s = new Date(start), e = new Date(end);
-  return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30));
-}
-
 // ─── PDF print ──────────────────────────────────────────────
 
 function printAgreement(ag: LandlordAgreement) {
-  const flat    = ag.flat as { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
+  const flat = ag.flat as { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
   const society = ag.society as { name: string; city: string; address?: string | null } | null;
-  const tenant  = ag.tenant?.user as { full_name: string; phone?: string | null; email?: string | null } | null;
+  const tenant = ag.tenant?.user as { full_name: string; phone?: string | null; email?: string | null } | null;
   const landlord = ag.landlord as { full_name?: string; phone?: string; email?: string } | null;
 
-  const flatLabel = flat ? `Flat ${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : "—";
-  const months = ag.start_date && ag.end_date ? durationMonths(ag.start_date, ag.end_date) : "—";
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<title>Rental Agreement — ${flatLabel}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Georgia', serif; color: #1c1917; background: #fff; font-size: 13px; line-height: 1.7; }
-  .page { max-width: 760px; margin: 0 auto; padding: 48px 48px 64px; }
-
-  /* Header */
-  .header { text-align: center; border-bottom: 3px double #1c1917; padding-bottom: 20px; margin-bottom: 28px; }
-  .header .logo { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; color: #c2660a; }
-  .header .sub { font-size: 11px; color: #78716c; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase; }
-  .header h1 { font-size: 18px; font-weight: 700; margin-top: 14px; letter-spacing: 0.5px; }
-  .header .ref { font-size: 10px; color: #78716c; margin-top: 4px; }
-
-  /* Sections */
-  .section { margin-bottom: 24px; }
-  .section-title { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
-    color: #c2660a; border-bottom: 1px solid #e7e2dc; padding-bottom: 6px; margin-bottom: 14px; }
-
-  /* Party cards */
-  .party-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .party-box { border: 1px solid #e7e2dc; border-radius: 10px; padding: 14px; background: #fefbf3; }
-  .party-box .role { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
-    color: #78716c; margin-bottom: 6px; }
-  .party-box .name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
-  .party-box .detail { font-size: 11px; color: #44403c; line-height: 1.6; }
-
-  /* Detail grid */
-  .detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .detail-cell { background: #fdf4e3; border-radius: 8px; padding: 10px 12px; }
-  .detail-cell .lbl { font-size: 9px; color: #78716c; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 3px; }
-  .detail-cell .val { font-size: 13px; font-weight: 700; }
-
-  /* Clause body */
-  .clause { font-size: 12.5px; color: #1c1917; line-height: 1.85; margin-bottom: 12px; text-align: justify; }
-  .clause strong { font-weight: 700; }
-  ol.clauses { padding-left: 18px; }
-  ol.clauses li { margin-bottom: 10px; }
-
-  /* Signatures */
-  .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 48px; }
-  .sig-box { border-top: 1.5px solid #1c1917; padding-top: 10px; }
-  .sig-box .label { font-size: 11px; font-weight: 700; }
-  .sig-box .name  { font-size: 10px; color: #78716c; margin-top: 4px; }
-  .sig-box .date  { font-size: 10px; color: #78716c; }
-
-  /* Footer */
-  .footer { margin-top: 40px; border-top: 1px solid #e7e2dc; padding-top: 12px;
-    font-size: 10px; color: #78716c; text-align: center; }
-
-  /* Status ribbon */
-  .ribbon { display: inline-block; padding: 3px 14px; border-radius: 20px; font-size: 10px;
-    font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-  .ribbon.active     { background: #dcfce7; color: #15803d; }
-  .ribbon.terminated { background: #fee2e2; color: #dc2626; }
-  .ribbon.expired    { background: #f3f4f6; color: #6b7280; }
-  .ribbon.pending    { background: #fef9c3; color: #b45309; }
-
-  @media print {
-    @page { size: A4; margin: 0; }
-    body  { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { padding: 28px 36px 48px; }
+  try {
+    printAgreementPdf({
+      ...ag,
+      flat,
+      society,
+      tenantContact: tenant,
+      landlordContact: landlord,
+    });
+  } catch {
+    toast.error("Pop-up blocked. Allow pop-ups and try again.");
   }
-</style>
-</head>
-<body>
-<div class="page">
-
-  <!-- Header -->
-  <div class="header">
-    <div class="logo">MyRentSaathi</div>
-    <div class="sub">India's Smartest Rent &amp; Society Management Platform</div>
-    <div style="margin-top:12px;">
-      <span class="ribbon ${ag.status}">${ag.status.charAt(0).toUpperCase() + ag.status.slice(1)}</span>
-    </div>
-    <h1>RENTAL AGREEMENT</h1>
-    <div class="ref">Agreement ID: ${ag.id.slice(0, 8).toUpperCase()} &nbsp;|&nbsp; Type: ${TIER_LABEL[ag.tier] ?? ag.tier} &nbsp;|&nbsp; Generated: ${fmtDate(new Date().toISOString())}</div>
-  </div>
-
-  <!-- Parties -->
-  <div class="section">
-    <div class="section-title">Parties to the Agreement</div>
-    <div class="party-grid">
-      <div class="party-box">
-        <div class="role">🏠 Landlord (Lessor)</div>
-        <div class="name">${landlord?.full_name ?? "—"}</div>
-        <div class="detail">
-          ${landlord?.phone ? `📞 ${landlord.phone}<br/>` : ""}
-          ${landlord?.email ? `✉️ ${landlord.email}` : ""}
-        </div>
-      </div>
-      <div class="party-box">
-        <div class="role">👤 Tenant (Lessee)</div>
-        <div class="name">${tenant?.full_name ?? "—"}</div>
-        <div class="detail">
-          ${tenant?.phone ? `📞 ${tenant.phone}<br/>` : ""}
-          ${tenant?.email ? `✉️ ${tenant.email}` : ""}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Property Details -->
-  <div class="section">
-    <div class="section-title">Property Details</div>
-    <div class="detail-grid">
-      <div class="detail-cell"><div class="lbl">Flat / Unit</div><div class="val">${flatLabel}</div></div>
-      <div class="detail-cell"><div class="lbl">Society / Area</div><div class="val">${society?.name ?? "Independent"}</div></div>
-      <div class="detail-cell"><div class="lbl">City</div><div class="val">${society?.city ?? "—"}</div></div>
-      ${flat?.flat_type ? `<div class="detail-cell"><div class="lbl">Type</div><div class="val">${flat.flat_type}</div></div>` : ""}
-      ${flat?.floor_number != null ? `<div class="detail-cell"><div class="lbl">Floor</div><div class="val">Floor ${flat.floor_number}</div></div>` : ""}
-      ${flat?.area_sqft ? `<div class="detail-cell"><div class="lbl">Area</div><div class="val">${flat.area_sqft} sq.ft</div></div>` : ""}
-      ${society?.address ? `<div class="detail-cell" style="grid-column:span 3"><div class="lbl">Address</div><div class="val">${society.address}</div></div>` : ""}
-    </div>
-  </div>
-
-  <!-- Financial Terms -->
-  <div class="section">
-    <div class="section-title">Financial Terms</div>
-    <div class="detail-grid">
-      <div class="detail-cell"><div class="lbl">Monthly Rent</div><div class="val" style="color:#c2660a">${formatCurrency(ag.monthly_rent)}</div></div>
-      <div class="detail-cell"><div class="lbl">Security Deposit</div><div class="val">${ag.security_deposit ? formatCurrency(ag.security_deposit) : "—"}</div></div>
-      <div class="detail-cell"><div class="lbl">Duration</div><div class="val">${months} months</div></div>
-      <div class="detail-cell"><div class="lbl">Start Date</div><div class="val">${fmtDate(ag.start_date)}</div></div>
-      <div class="detail-cell"><div class="lbl">End Date</div><div class="val">${fmtDate(ag.end_date)}</div></div>
-      <div class="detail-cell"><div class="lbl">Total Rent Value</div><div class="val">${typeof months === "number" ? formatCurrency(ag.monthly_rent * months) : "—"}</div></div>
-    </div>
-  </div>
-
-  <!-- Terms & Conditions -->
-  <div class="section">
-    <div class="section-title">Terms &amp; Conditions</div>
-    <ol class="clauses">
-      <li class="clause">The Landlord hereby lets and the Tenant hereby takes on rent the property described above for a period of <strong>${months} months</strong>, commencing from <strong>${fmtDate(ag.start_date)}</strong> and ending on <strong>${fmtDate(ag.end_date)}</strong>.</li>
-      <li class="clause">The Tenant shall pay a monthly rent of <strong>${formatCurrency(ag.monthly_rent)}</strong>, payable on or before the <strong>5th day</strong> of each calendar month. Any delay beyond the 5th shall attract a late fee as mutually agreed.</li>
-      <li class="clause">A security deposit of <strong>${ag.security_deposit ? formatCurrency(ag.security_deposit) : "Nil"}</strong> has been paid by the Tenant to the Landlord. This deposit shall be refunded within 30 days of vacating, after deducting any dues or damages.</li>
-      ${ag.rent_hike_clause ? `<li class="clause"><strong>Rent Escalation:</strong> ${ag.rent_hike_clause}</li>` : ""}
-      <li class="clause">The Tenant shall use the premises only for <strong>residential purposes</strong> and shall not sublet, assign, or part with the possession of the premises without prior written consent of the Landlord.</li>
-      <li class="clause">The Tenant shall maintain the premises in good condition and shall not make any structural alterations. Minor repairs up to ₹500 shall be borne by the Tenant; major repairs shall be the responsibility of the Landlord.</li>
-      <li class="clause">The Tenant shall pay all utility bills (electricity, water, internet) and maintenance charges applicable to the flat during the tenancy period.</li>
-      <li class="clause">Either party may terminate this agreement by giving <strong>30 days written notice</strong>. The Tenant shall vacate and hand over peaceful possession of the premises upon expiry or termination.</li>
-      <li class="clause">Any disputes arising out of this agreement shall be subject to the jurisdiction of courts in <strong>${society?.city ?? "the applicable city"}</strong> and shall be governed by the laws of India.</li>
-    </ol>
-  </div>
-
-  <!-- Signatures -->
-  <div class="sig-grid">
-    <div class="sig-box">
-      <div class="label">Landlord's Signature</div>
-      <div class="name">${landlord?.full_name ?? "—"}</div>
-      <div class="date">Date: _______________________</div>
-    </div>
-    <div class="sig-box">
-      <div class="label">Tenant's Signature</div>
-      <div class="name">${tenant?.full_name ?? "—"}</div>
-      <div class="date">Date: _______________________</div>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="footer">
-    This agreement is generated via MyRentSaathi. For legal enforceability, please get it notarised or registered at the local Sub-Registrar's office.
-    <br/>© ${new Date().getFullYear()} MyRentSaathi — All rights reserved.
-  </div>
-</div>
-</body>
-</html>`;
-
-  const w = window.open("", "_blank", "width=860,height=900");
-  if (!w) { toast.error("Pop-up blocked. Allow pop-ups and try again."); return; }
-  w.document.write(html);
-  w.document.close();
-  w.onload = () => { w.focus(); w.print(); };
 }
 
 // ─── Main Component ──────────────────────────────────────────
@@ -246,6 +67,9 @@ export default function LandlordAgreements() {
     landlord_name: "", landlord_phone: "", landlord_email: "",
     monthly_rent: "", security_deposit: "", start_date: "", end_date: "",
     rent_hike_clause: "",
+    doc_title: "", doc_subtitle: "",
+    section_titles: { ...DEFAULT_SECTION_TITLES } as SectionTitles,
+    clauses: [] as string[],
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -335,6 +159,7 @@ export default function LandlordAgreements() {
   function startEdit(ag: LandlordAgreement) {
     const tenant = ag.tenant?.user as { full_name: string; phone?: string | null; email?: string | null } | null;
     const landlord = ag.landlord as { full_name?: string; phone?: string; email?: string } | null;
+    const society = ag.society as { city?: string } | null;
     setEditForm({
       tenant_name: ag.tenant_name ?? tenant?.full_name ?? "",
       tenant_phone: ag.tenant_phone ?? tenant?.phone ?? "",
@@ -347,6 +172,10 @@ export default function LandlordAgreements() {
       start_date: ag.start_date ?? "",
       end_date: ag.end_date ?? "",
       rent_hike_clause: ag.rent_hike_clause ?? "",
+      doc_title: ag.doc_title ?? DEFAULT_DOC_TITLE,
+      doc_subtitle: ag.doc_subtitle ?? DEFAULT_DOC_SUBTITLE,
+      section_titles: { ...DEFAULT_SECTION_TITLES, ...(ag.section_titles ?? {}) },
+      clauses: ag.clauses && ag.clauses.length > 0 ? ag.clauses : defaultClauses(ag, society?.city ?? null),
     });
     setEditing(true);
   }
@@ -354,6 +183,7 @@ export default function LandlordAgreements() {
   async function handleSaveEdit() {
     if (!viewAg) return;
     setSavingEdit(true);
+    const cleanedClauses = editForm.clauses.map(c => c.trim()).filter(Boolean);
     const { error } = await supabase.from("agreements").update({
       tenant_name: editForm.tenant_name || null,
       tenant_phone: editForm.tenant_phone || null,
@@ -366,6 +196,10 @@ export default function LandlordAgreements() {
       start_date: editForm.start_date,
       end_date: editForm.end_date,
       rent_hike_clause: editForm.rent_hike_clause || null,
+      doc_title: editForm.doc_title.trim() || null,
+      doc_subtitle: editForm.doc_subtitle.trim() || null,
+      section_titles: editForm.section_titles,
+      clauses: cleanedClauses,
     }).eq("id", viewAg.id);
     setSavingEdit(false);
     if (error) { toast.error("Failed to save changes."); return; }
@@ -382,6 +216,10 @@ export default function LandlordAgreements() {
       start_date: editForm.start_date,
       end_date: editForm.end_date,
       rent_hike_clause: editForm.rent_hike_clause || null,
+      doc_title: editForm.doc_title.trim() || null,
+      doc_subtitle: editForm.doc_subtitle.trim() || null,
+      section_titles: editForm.section_titles,
+      clauses: cleanedClauses,
       tenant: { user: { full_name: editForm.tenant_name, phone: editForm.tenant_phone, email: editForm.tenant_email } },
       landlord: { full_name: editForm.landlord_name, phone: editForm.landlord_phone, email: editForm.landlord_email },
     };
@@ -725,9 +563,31 @@ export default function LandlordAgreements() {
 
               <div className="px-5 py-4 space-y-5">
 
+                {/* Document Title */}
+                <div>
+                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Document Heading</div>
+                  {editing ? (
+                    <div className="bg-warm-50 rounded-[14px] border border-border-default p-3.5 space-y-2">
+                      <div><label className={labelClass}>Main Title</label><input className={inputClass} placeholder={DEFAULT_DOC_TITLE} value={editForm.doc_title} onChange={e => setEditForm(f => ({ ...f, doc_title: e.target.value }))} /></div>
+                      <div><label className={labelClass}>Subtitle</label><input className={inputClass} placeholder={DEFAULT_DOC_SUBTITLE} value={editForm.doc_subtitle} onChange={e => setEditForm(f => ({ ...f, doc_subtitle: e.target.value }))} /></div>
+                    </div>
+                  ) : (
+                    <div className="bg-warm-50 rounded-[14px] border border-border-default p-3.5">
+                      <div className="text-sm font-extrabold text-ink">{viewAg.doc_title?.trim() || DEFAULT_DOC_TITLE}</div>
+                      <div className="text-[11px] text-ink-muted mt-0.5">{viewAg.doc_subtitle?.trim() || DEFAULT_DOC_SUBTITLE}</div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Parties */}
                 <div>
-                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Parties</div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    {editing ? (
+                      <input className={`${inputClass} text-[10px] font-bold uppercase tracking-widest`} value={editForm.section_titles.parties} onChange={e => setEditForm(f => ({ ...f, section_titles: { ...f.section_titles, parties: e.target.value } }))} />
+                    ) : (
+                      <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest">{viewAg.section_titles?.parties ?? DEFAULT_SECTION_TITLES.parties}</div>
+                    )}
+                  </div>
                   {editing ? (
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-green-50 border border-green-100 rounded-[14px] p-3.5 space-y-2">
@@ -775,7 +635,11 @@ export default function LandlordAgreements() {
 
                 {/* Property */}
                 <div>
-                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Property</div>
+                  {editing ? (
+                    <input className={`${inputClass} text-[10px] font-bold uppercase tracking-widest mb-3`} value={editForm.section_titles.property} onChange={e => setEditForm(f => ({ ...f, section_titles: { ...f.section_titles, property: e.target.value } }))} />
+                  ) : (
+                    <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">{viewAg.section_titles?.property ?? DEFAULT_SECTION_TITLES.property}</div>
+                  )}
                   <div className="bg-warm-50 rounded-[14px] border border-border-default p-4">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-xl bg-brand-100 flex items-center justify-center text-xl">🏠</div>
@@ -806,7 +670,11 @@ export default function LandlordAgreements() {
 
                 {/* Financial Terms */}
                 <div>
-                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Financial Terms</div>
+                  {editing ? (
+                    <input className={`${inputClass} text-[10px] font-bold uppercase tracking-widest mb-3`} value={editForm.section_titles.financial} onChange={e => setEditForm(f => ({ ...f, section_titles: { ...f.section_titles, financial: e.target.value } }))} />
+                  ) : (
+                    <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">{viewAg.section_titles?.financial ?? DEFAULT_SECTION_TITLES.financial}</div>
+                  )}
                   {editing ? (
                     <div className="space-y-2">
                       <div className="grid grid-cols-2 gap-2">
@@ -854,6 +722,52 @@ export default function LandlordAgreements() {
                     </div>
                   ) : (
                     <div className="text-xs text-ink-muted">No rent escalation clause set.</div>
+                  )}
+                </div>
+
+                {/* Terms & Conditions */}
+                <div>
+                  {editing ? (
+                    <input className={`${inputClass} text-[10px] font-bold uppercase tracking-widest mb-3`} value={editForm.section_titles.terms} onChange={e => setEditForm(f => ({ ...f, section_titles: { ...f.section_titles, terms: e.target.value } }))} />
+                  ) : (
+                    <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">{viewAg.section_titles?.terms ?? DEFAULT_SECTION_TITLES.terms}</div>
+                  )}
+                  {editing ? (
+                    <div className="space-y-2">
+                      {editForm.clauses.map((clause, i) => (
+                        <div key={i} className="flex gap-2 items-start">
+                          <span className="text-[11px] font-bold text-ink-muted mt-2 w-4 flex-shrink-0">{i + 1}.</span>
+                          <textarea
+                            className={inputClass}
+                            rows={2}
+                            value={clause}
+                            onChange={e => setEditForm(f => ({ ...f, clauses: f.clauses.map((c, ci) => ci === i ? e.target.value : c) }))}
+                          />
+                          <button
+                            onClick={() => setEditForm(f => ({ ...f, clauses: f.clauses.filter((_, ci) => ci !== i) }))}
+                            className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg border border-red-200 text-red-500 text-xs cursor-pointer hover:bg-red-50 mt-0.5"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setEditForm(f => ({ ...f, clauses: [...f.clauses, ""] }))}
+                        className="w-full py-2 rounded-xl border border-dashed border-border-default text-[11px] font-bold text-ink-muted cursor-pointer hover:bg-warm-50"
+                      >
+                        + Add Clause
+                      </button>
+                      <div className="text-[10px] text-ink-muted">You can use &lt;strong&gt;text&lt;/strong&gt; to bold parts of a clause.</div>
+                    </div>
+                  ) : (
+                    <ol className="list-decimal list-inside space-y-2">
+                      {(viewAg.clauses && viewAg.clauses.length > 0
+                        ? viewAg.clauses
+                        : defaultClauses(viewAg, (viewAg.society as { city?: string } | null)?.city ?? null)
+                      ).map((clause, i) => (
+                        <li key={i} className="text-xs text-ink leading-relaxed" dangerouslySetInnerHTML={{ __html: clause }} />
+                      ))}
+                    </ol>
                   )}
                 </div>
 

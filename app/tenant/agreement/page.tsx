@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getTenantAgreement, type TenantAgreement } from "@/lib/tenant-data";
+import { TIER_LABEL, fmtDate, durationMonths, defaultClauses, printAgreementPdf, DEFAULT_SECTION_TITLES } from "@/lib/agreement-pdf";
 
 // ─── helpers ────────────────────────────────────────────────
 
@@ -13,117 +14,24 @@ const STATUS_BADGE: Record<string, string> = {
   terminated: "bg-red-100 text-red-600 border-red-200",
   pending:    "bg-yellow-100 text-yellow-700 border-yellow-200",
 };
-const TIER_LABEL: Record<string, string> = {
-  free: "Free Draft", lawyer_verified: "Lawyer Verified", registered: "Registered",
-};
-function fmtDate(d: string | null | undefined) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" });
-}
-function durationMonths(start: string, end: string) {
-  return Math.round((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24 * 30));
-}
 
 function printAgreement(ag: TenantAgreement) {
-  const flat     = ag.flat as { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
-  const society  = ag.society as { name: string; city: string; address?: string | null } | null;
-  const tenant   = ag.tenant_user as { full_name: string; phone?: string | null; email?: string | null } | null;
+  const flat = ag.flat as { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
+  const society = ag.society as { name: string; city: string; address?: string | null } | null;
+  const tenant = ag.tenant_user as { full_name: string; phone?: string | null; email?: string | null } | null;
   const landlord = ag.landlord as { full_name?: string; phone?: string; email?: string } | null;
-  const flatLabel = flat ? `Flat ${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : "—";
-  const months   = ag.start_date && ag.end_date ? durationMonths(ag.start_date, ag.end_date) : "—";
 
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
-<title>Rental Agreement — ${flatLabel}</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Georgia',serif;color:#1c1917;background:#fff;font-size:13px;line-height:1.7}
-.page{max-width:760px;margin:0 auto;padding:48px 48px 64px}
-.header{text-align:center;border-bottom:3px double #1c1917;padding-bottom:20px;margin-bottom:28px}
-.header .logo{font-size:22px;font-weight:900;letter-spacing:-.5px;color:#c2660a}
-.header .sub{font-size:11px;color:#78716c;margin-top:2px;letter-spacing:1px;text-transform:uppercase}
-.header h1{font-size:18px;font-weight:700;margin-top:14px;letter-spacing:.5px}
-.header .ref{font-size:10px;color:#78716c;margin-top:4px}
-.section{margin-bottom:24px}
-.section-title{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#c2660a;border-bottom:1px solid #e7e2dc;padding-bottom:6px;margin-bottom:14px}
-.party-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.party-box{border:1px solid #e7e2dc;border-radius:10px;padding:14px;background:#fefbf3}
-.party-box .role{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#78716c;margin-bottom:6px}
-.party-box .name{font-size:15px;font-weight:700;margin-bottom:4px}
-.party-box .detail{font-size:11px;color:#44403c;line-height:1.6}
-.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.detail-cell{background:#fdf4e3;border-radius:8px;padding:10px 12px}
-.detail-cell .lbl{font-size:9px;color:#78716c;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:3px}
-.detail-cell .val{font-size:13px;font-weight:700}
-.clause{font-size:12.5px;color:#1c1917;line-height:1.85;margin-bottom:12px;text-align:justify}
-ol.clauses{padding-left:18px}ol.clauses li{margin-bottom:10px}
-.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:48px}
-.sig-box{border-top:1.5px solid #1c1917;padding-top:10px}
-.sig-box .label{font-size:11px;font-weight:700}.sig-box .name{font-size:10px;color:#78716c;margin-top:4px}.sig-box .date{font-size:10px;color:#78716c}
-.footer{margin-top:40px;border-top:1px solid #e7e2dc;padding-top:12px;font-size:10px;color:#78716c;text-align:center}
-.ribbon{display:inline-block;padding:3px 14px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
-.ribbon.active{background:#dcfce7;color:#15803d}.ribbon.terminated{background:#fee2e2;color:#dc2626}.ribbon.expired{background:#f3f4f6;color:#6b7280}.ribbon.pending{background:#fef9c3;color:#b45309}
-@media print{@page{size:A4;margin:0}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{padding:28px 36px 48px}}
-</style></head><body><div class="page">
-<div class="header">
-  <div class="logo">MyRentSaathi</div>
-  <div class="sub">India's Smartest Rent &amp; Society Management Platform</div>
-  <div style="margin-top:12px"><span class="ribbon ${ag.status}">${ag.status.charAt(0).toUpperCase()+ag.status.slice(1)}</span></div>
-  <h1>RENTAL AGREEMENT</h1>
-  <div class="ref">ID: ${ag.id.slice(0,8).toUpperCase()} &nbsp;|&nbsp; Type: ${TIER_LABEL[ag.tier]??ag.tier} &nbsp;|&nbsp; Generated: ${fmtDate(new Date().toISOString())}</div>
-</div>
-<div class="section">
-  <div class="section-title">Parties to the Agreement</div>
-  <div class="party-grid">
-    <div class="party-box"><div class="role">🏠 Landlord (Lessor)</div><div class="name">${landlord?.full_name??"—"}</div><div class="detail">${landlord?.phone?`📞 ${landlord.phone}<br/>`:""}${landlord?.email?`✉️ ${landlord.email}`:""}</div></div>
-    <div class="party-box"><div class="role">👤 Tenant (Lessee)</div><div class="name">${tenant?.full_name??"—"}</div><div class="detail">${tenant?.phone?`📞 ${tenant.phone}<br/>`:""}${tenant?.email?`✉️ ${tenant.email}`:""}</div></div>
-  </div>
-</div>
-<div class="section">
-  <div class="section-title">Property Details</div>
-  <div class="detail-grid">
-    <div class="detail-cell"><div class="lbl">Flat / Unit</div><div class="val">${flatLabel}</div></div>
-    <div class="detail-cell"><div class="lbl">Society / Area</div><div class="val">${society?.name??"Independent"}</div></div>
-    <div class="detail-cell"><div class="lbl">City</div><div class="val">${society?.city??"—"}</div></div>
-    ${flat?.flat_type?`<div class="detail-cell"><div class="lbl">Type</div><div class="val">${flat.flat_type}</div></div>`:""}
-    ${flat?.floor_number!=null?`<div class="detail-cell"><div class="lbl">Floor</div><div class="val">Floor ${flat.floor_number}</div></div>`:""}
-    ${flat?.area_sqft?`<div class="detail-cell"><div class="lbl">Area</div><div class="val">${flat.area_sqft} sq.ft</div></div>`:""}
-  </div>
-</div>
-<div class="section">
-  <div class="section-title">Financial Terms</div>
-  <div class="detail-grid">
-    <div class="detail-cell"><div class="lbl">Monthly Rent</div><div class="val" style="color:#c2660a">${formatCurrency(ag.monthly_rent)}</div></div>
-    <div class="detail-cell"><div class="lbl">Security Deposit</div><div class="val">${ag.security_deposit?formatCurrency(ag.security_deposit):"—"}</div></div>
-    <div class="detail-cell"><div class="lbl">Duration</div><div class="val">${months} months</div></div>
-    <div class="detail-cell"><div class="lbl">Start Date</div><div class="val">${fmtDate(ag.start_date)}</div></div>
-    <div class="detail-cell"><div class="lbl">End Date</div><div class="val">${fmtDate(ag.end_date)}</div></div>
-    <div class="detail-cell"><div class="lbl">Total Value</div><div class="val">${typeof months==="number"?formatCurrency(ag.monthly_rent*months):"—"}</div></div>
-  </div>
-</div>
-<div class="section">
-  <div class="section-title">Terms &amp; Conditions</div>
-  <ol class="clauses">
-    <li class="clause">The Landlord hereby lets and the Tenant hereby takes on rent the above property for <strong>${months} months</strong>, from <strong>${fmtDate(ag.start_date)}</strong> to <strong>${fmtDate(ag.end_date)}</strong>.</li>
-    <li class="clause">The Tenant shall pay a monthly rent of <strong>${formatCurrency(ag.monthly_rent)}</strong>, payable on or before the <strong>5th day</strong> of each month. Late payment shall attract a fee as mutually agreed.</li>
-    <li class="clause">A security deposit of <strong>${ag.security_deposit?formatCurrency(ag.security_deposit):"Nil"}</strong> has been paid. This shall be refunded within 30 days of vacating, after deducting any dues or damages.</li>
-    <li class="clause">The Tenant shall use the premises only for <strong>residential purposes</strong> and shall not sublet without prior written consent of the Landlord.</li>
-    <li class="clause">The Tenant shall maintain the premises in good condition. Minor repairs up to ₹500 shall be borne by the Tenant; major repairs by the Landlord.</li>
-    <li class="clause">The Tenant shall pay all utility bills (electricity, water, internet) and applicable maintenance charges during the tenancy.</li>
-    <li class="clause">Either party may terminate this agreement by giving <strong>30 days written notice</strong>.</li>
-    <li class="clause">Disputes shall be subject to the jurisdiction of courts in <strong>${society?.city??"the applicable city"}</strong> and governed by the laws of India.</li>
-  </ol>
-</div>
-<div class="sig-grid">
-  <div class="sig-box"><div class="label">Landlord's Signature</div><div class="name">${landlord?.full_name??"—"}</div><div class="date">Date: _______________________</div></div>
-  <div class="sig-box"><div class="label">Tenant's Signature</div><div class="name">${tenant?.full_name??"—"}</div><div class="date">Date: _______________________</div></div>
-</div>
-<div class="footer">Generated via MyRentSaathi. For legal enforceability, get it notarised or registered at the Sub-Registrar's office.<br/>© ${new Date().getFullYear()} MyRentSaathi</div>
-</div></body></html>`;
-
-  const w = window.open("", "_blank", "width=860,height=900");
-  if (!w) { alert("Pop-up blocked. Please allow pop-ups and try again."); return; }
-  w.document.write(html);
-  w.document.close();
-  w.onload = () => { w.focus(); w.print(); };
+  try {
+    printAgreementPdf({
+      ...ag,
+      flat,
+      society,
+      tenantContact: tenant,
+      landlordContact: landlord,
+    });
+  } catch {
+    alert("Pop-up blocked. Please allow pop-ups and try again.");
+  }
 }
 
 // ─── Component ───────────────────────────────────────────────
@@ -278,6 +186,23 @@ export default function TenantAgreementPage() {
               <div className={`text-sm font-extrabold mt-0.5 ${d.highlight ? "text-brand-600" : "text-ink"}`}>{d.value}</div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Terms & Conditions */}
+      <div className="mb-3">
+        <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-2 px-1">
+          {agreement.section_titles?.terms ?? DEFAULT_SECTION_TITLES.terms}
+        </div>
+        <div className="bg-white rounded-[14px] border border-border-default p-4">
+          <ol className="list-decimal list-inside space-y-2">
+            {(agreement.clauses && agreement.clauses.length > 0
+              ? agreement.clauses
+              : defaultClauses(agreement, (agreement.society as { city?: string } | null)?.city ?? null)
+            ).map((clause, i) => (
+              <li key={i} className="text-xs text-ink leading-relaxed" dangerouslySetInnerHTML={{ __html: clause }} />
+            ))}
+          </ol>
         </div>
       </div>
 

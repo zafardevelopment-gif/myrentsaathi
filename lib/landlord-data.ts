@@ -64,6 +64,9 @@ export type LandlordAgreement = {
   landlord_email?: string | null;
   rent_hike_clause?: string | null;
   clauses?: string[] | null;
+  doc_title?: string | null;
+  doc_subtitle?: string | null;
+  section_titles?: { parties?: string; property?: string; financial?: string; terms?: string } | null;
   flat?: { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
   society?: { name: string; city: string; address?: string | null } | null;
   tenant?: { user?: { full_name: string; phone?: string | null; email?: string | null } | null } | null;
@@ -268,6 +271,7 @@ export async function getLandlordAgreements(email: string): Promise<LandlordAgre
       id, flat_id, tenant_id, tier, status, monthly_rent, security_deposit, start_date, end_date, created_at,
       custom_doc_url, custom_doc_name,
       tenant_name, tenant_phone, tenant_email, landlord_name, landlord_phone, landlord_email, rent_hike_clause, clauses,
+      doc_title, doc_subtitle, section_titles,
       flat:flats(flat_number, block, floor_number, flat_type, area_sqft),
       society:societies(name, city, address)
     `)
