@@ -8,6 +8,15 @@ import { formatCurrency } from "../utils";
 import { sendRentHikeNotice } from "../whatsapp";
 import { emailRentHikeNotice } from "../email";
 
+type Frequency = "monthly" | "quarterly" | "half_yearly" | "yearly";
+
+function nextEffectiveDate(from: string, frequency: Frequency): string {
+  const d = new Date(from + "T00:00:00Z");
+  const monthsToAdd = { monthly: 1, quarterly: 3, half_yearly: 6, yearly: 12 }[frequency];
+  d.setUTCMonth(d.getUTCMonth() + monthsToAdd);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function applyScheduledHikes(today?: string): Promise<{ applied: number; errors: number }> {
   const todayStr = today ?? new Date().toISOString().slice(0, 10);
   let applied = 0;
@@ -15,7 +24,7 @@ export async function applyScheduledHikes(today?: string): Promise<{ applied: nu
 
   const { data: hikes } = await supabaseAdmin
     .from("rent_hike_history")
-    .select("id, flat_id, old_rent, new_rent, effective_date, created_by")
+    .select("id, flat_id, old_rent, new_rent, hike_type, hike_value, effective_date, created_by, recurrence_frequency")
     .eq("status", "scheduled")
     .lte("effective_date", todayStr);
 
@@ -30,6 +39,27 @@ export async function applyScheduledHikes(today?: string): Promise<{ applied: nu
 
       await supabaseAdmin.from("flats").update({ monthly_rent: hike.new_rent }).eq("id", hike.flat_id);
       await supabaseAdmin.from("rent_hike_history").update({ status: "applied" }).eq("id", hike.id);
+
+      // Recurring hike: spawn the next occurrence off the newly-applied rent.
+      if (hike.recurrence_frequency) {
+        const frequency = hike.recurrence_frequency as Frequency;
+        const nextEffective = nextEffectiveDate(hike.effective_date, frequency);
+        const nextNewRent = hike.hike_type === "percentage"
+          ? Math.round(hike.new_rent * (1 + Number(hike.hike_value) / 100))
+          : Math.round(hike.new_rent + Number(hike.hike_value));
+        await supabaseAdmin.from("rent_hike_history").insert({
+          flat_id: hike.flat_id,
+          old_rent: hike.new_rent,
+          new_rent: nextNewRent,
+          hike_type: hike.hike_type,
+          hike_value: hike.hike_value,
+          effective_date: nextEffective,
+          created_by: hike.created_by,
+          status: "scheduled",
+          recurrence_frequency: frequency,
+          recurrence_parent_id: hike.id,
+        });
+      }
 
       const flatLabel = `${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}`;
       const effectiveDateStr = new Date(hike.effective_date).toLocaleDateString("en-IN", {

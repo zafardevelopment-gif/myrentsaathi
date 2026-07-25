@@ -320,7 +320,10 @@ export default function LandlordTenants() {
 
   // Optional scheduled rent hike at tenant creation
   const [scheduleHike, setScheduleHike] = useState(false);
-  const [hikeForm, setHikeForm] = useState({ hike_type: "percentage" as "percentage" | "fixed", hike_value: "", effective_date: "" });
+  const [hikeForm, setHikeForm] = useState({
+    hike_type: "percentage" as "percentage" | "fixed", hike_value: "", effective_date: "",
+    recurring: false, frequency: "yearly" as "monthly" | "quarterly" | "half_yearly" | "yearly",
+  });
 
   // Tenant credentials modal after creation
   type TenantCreds = { name: string; userId: string; password: string; loginEmail: string; flatLabel: string };
@@ -510,6 +513,7 @@ export default function LandlordTenants() {
         effective_date: hikeForm.effective_date,
         created_by: landlordId,
         status: "scheduled",
+        recurrence_frequency: hikeForm.recurring ? hikeForm.frequency : null,
       }).then(({ error }) => { if (error) toast.error("Tenant added, but scheduling the rent hike failed."); });
     }
 
@@ -574,7 +578,7 @@ export default function LandlordTenants() {
 
     setForm({ full_name: "", email: "", phone: "", flat_id: "", monthly_rent: "", security_deposit: "", lease_start: "", lease_end: "" });
     setScheduleHike(false);
-    setHikeForm({ hike_type: "percentage", hike_value: "", effective_date: "" });
+    setHikeForm({ hike_type: "percentage", hike_value: "", effective_date: "", recurring: false, frequency: "yearly" });
     setShowForm(false);
     setLoading(true);
     await loadData();
@@ -751,6 +755,22 @@ export default function LandlordTenants() {
                   <label className={labelClass}>Effective Date *</label>
                   <input required={scheduleHike} type="date" min={form.lease_start || undefined} className={inputClass} value={hikeForm.effective_date} onChange={e => setHikeForm(h => ({ ...h, effective_date: e.target.value }))} />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={hikeForm.recurring} onChange={e => setHikeForm(h => ({ ...h, recurring: e.target.checked }))} className="w-4 h-4" />
+                  <span className="text-[11px] font-semibold text-ink">Repeat this hike automatically</span>
+                </label>
+                {hikeForm.recurring && (
+                  <div>
+                    <label className={labelClass}>Repeat Every *</label>
+                    <select className={inputClass} value={hikeForm.frequency} onChange={e => setHikeForm(h => ({ ...h, frequency: e.target.value as typeof h.frequency }))}>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly (3 months)</option>
+                      <option value="half_yearly">Half-Yearly (6 months)</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                    <div className="text-[10px] text-ink-muted mt-1">Rent will keep increasing by this amount every {{ monthly: "month", quarterly: "3 months", half_yearly: "6 months", yearly: "year" }[hikeForm.frequency]}, until you stop it from the Rent Hike page.</div>
+                  </div>
+                )}
                 {form.monthly_rent && hikeForm.hike_value && Number(hikeForm.hike_value) > 0 && (
                   <div className="bg-green-50 border border-green-100 rounded-xl px-3 py-2 text-[11px] text-green-700">
                     Rent will increase from <strong>{formatCurrency(Number(form.monthly_rent))}</strong> to{" "}

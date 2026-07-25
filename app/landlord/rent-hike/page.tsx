@@ -19,6 +19,11 @@ type HikeHistory = {
   effective_date: string;
   created_at: string;
   status: "scheduled" | "applied" | "cancelled";
+  recurrence_frequency: "monthly" | "quarterly" | "half_yearly" | "yearly" | null;
+};
+
+const FREQUENCY_LABEL: Record<string, string> = {
+  monthly: "Monthly", quarterly: "Quarterly", half_yearly: "Half-Yearly", yearly: "Yearly",
 };
 
 const inputClass = "w-full border border-border-default rounded-xl px-3 py-2 text-sm text-ink bg-warm-50 focus:outline-none focus:border-brand-500";
@@ -36,6 +41,8 @@ export default function RentHikePage() {
   const [hikeType, setHikeType] = useState<"percentage" | "fixed">("percentage");
   const [hikeValue, setHikeValue] = useState("");
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split("T")[0]);
+  const [recurring, setRecurring] = useState(false);
+  const [frequency, setFrequency] = useState<"monthly" | "quarterly" | "half_yearly" | "yearly">("yearly");
 
   const occupiedFlats = flats.filter(f => f.current_tenant_id && f.monthly_rent);
   const selectedFlat = occupiedFlats.find(f => f.id === selectedFlatId);
@@ -75,7 +82,7 @@ export default function RentHikePage() {
     setSaving(true);
     try {
       // 1. Insert history
-      const { error: histErr } = await supabase.from("rent_hike_history").insert({
+      const { data: histRow, error: histErr } = await supabase.from("rent_hike_history").insert({
         flat_id: selectedFlatId,
         old_rent: currentRent,
         new_rent: newRent,
@@ -83,8 +90,31 @@ export default function RentHikePage() {
         hike_value: Number(hikeValue),
         effective_date: effectiveDate,
         created_by: landlordId,
-      });
+        recurrence_frequency: recurring ? frequency : null,
+      }).select("id").single();
       if (histErr) throw histErr;
+
+      // 1b. If recurring, schedule the next occurrence off the new rent
+      if (recurring && histRow) {
+        const monthsToAdd = { monthly: 1, quarterly: 3, half_yearly: 6, yearly: 12 }[frequency];
+        const nextDate = new Date(effectiveDate + "T00:00:00Z");
+        nextDate.setUTCMonth(nextDate.getUTCMonth() + monthsToAdd);
+        const nextNewRent = hikeType === "percentage"
+          ? Math.round(newRent * (1 + Number(hikeValue) / 100))
+          : Math.round(newRent + Number(hikeValue));
+        await supabase.from("rent_hike_history").insert({
+          flat_id: selectedFlatId,
+          old_rent: newRent,
+          new_rent: nextNewRent,
+          hike_type: hikeType,
+          hike_value: Number(hikeValue),
+          effective_date: nextDate.toISOString().slice(0, 10),
+          created_by: landlordId,
+          status: "scheduled",
+          recurrence_frequency: frequency,
+          recurrence_parent_id: histRow.id,
+        });
+      }
 
       // 2. Update flat rent
       const { error: flatErr } = await supabase
@@ -137,6 +167,8 @@ export default function RentHikePage() {
       toast.success("Rent updated and notice sent to tenant!");
       setHikeValue("");
       setSelectedFlatId("");
+      setRecurring(false);
+      setFrequency("yearly");
       await loadData();
     } catch (err: unknown) {
       toast.error((err as Error).message ?? "Failed to apply rent hike");
@@ -205,6 +237,22 @@ export default function RentHikePage() {
             <input required type="date" className={inputClass} value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
           </div>
 
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={recurring} onChange={e => setRecurring(e.target.checked)} className="w-4 h-4" />
+            <span className="text-[11px] font-semibold text-ink">Repeat this hike automatically</span>
+          </label>
+          {recurring && (
+            <div>
+              <label className={labelClass}>Repeat Every *</label>
+              <select className={inputClass} value={frequency} onChange={e => setFrequency(e.target.value as typeof frequency)}>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly (3 months)</option>
+                <option value="half_yearly">Half-Yearly (6 months)</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          )}
+
           {selectedFlat && hikeValue && Number(hikeValue) > 0 && (
             <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3">
               <div className="text-[10px] text-green-700 font-semibold uppercase tracking-wide mb-1">New Rent Preview</div>
@@ -240,6 +288,11 @@ export default function RentHikePage() {
                     {h.status === "scheduled" && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
                         Scheduled — effective {new Date(h.effective_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                      </span>
+                    )}
+                    {h.recurrence_frequency && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                        🔁 {FREQUENCY_LABEL[h.recurrence_frequency]}
                       </span>
                     )}
                   </div>
