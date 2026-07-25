@@ -56,6 +56,14 @@ export type LandlordAgreement = {
   created_at: string;
   custom_doc_url?: string | null;
   custom_doc_name?: string | null;
+  tenant_name?: string | null;
+  tenant_phone?: string | null;
+  tenant_email?: string | null;
+  landlord_name?: string | null;
+  landlord_phone?: string | null;
+  landlord_email?: string | null;
+  rent_hike_clause?: string | null;
+  clauses?: string[] | null;
   flat?: { flat_number: string; block: string | null; floor_number?: number | null; flat_type?: string | null; area_sqft?: number | null } | null;
   society?: { name: string; city: string; address?: string | null } | null;
   tenant?: { user?: { full_name: string; phone?: string | null; email?: string | null } | null } | null;
@@ -259,6 +267,7 @@ export async function getLandlordAgreements(email: string): Promise<LandlordAgre
     .select(`
       id, flat_id, tenant_id, tier, status, monthly_rent, security_deposit, start_date, end_date, created_at,
       custom_doc_url, custom_doc_name,
+      tenant_name, tenant_phone, tenant_email, landlord_name, landlord_phone, landlord_email, rent_hike_clause, clauses,
       flat:flats(flat_number, block, floor_number, flat_type, area_sqft),
       society:societies(name, city, address)
     `)
@@ -302,10 +311,14 @@ export async function getLandlordAgreements(email: string): Promise<LandlordAgre
 
   return agreements.map(ag => ({
     ...ag,
-    tenant: ag.tenant_id && tenantUserMap[ag.tenant_id]
-      ? { user: tenantUserMap[ag.tenant_id] }
-      : null,
-    landlord: landlordUser ?? null,
+    tenant: ag.tenant_name
+      ? { user: { full_name: ag.tenant_name, phone: ag.tenant_phone, email: ag.tenant_email } }
+      : ag.tenant_id && tenantUserMap[ag.tenant_id]
+        ? { user: tenantUserMap[ag.tenant_id] }
+        : null,
+    landlord: ag.landlord_name
+      ? { full_name: ag.landlord_name, phone: ag.landlord_phone ?? undefined, email: ag.landlord_email ?? undefined }
+      : landlordUser ?? null,
   }));
 }
 

@@ -132,6 +132,7 @@ ol.clauses{padding-left:18px}ol.clauses li{margin-bottom:10px}
     <li class="clause">The Landlord hereby lets and the Tenant hereby takes on rent the above property for <strong>${months} months</strong>, from <strong>${fmtDateAg(ag.start_date)}</strong> to <strong>${fmtDateAg(ag.end_date)}</strong>.</li>
     <li class="clause">The Tenant shall pay a monthly rent of <strong>${formatCurrency(ag.monthly_rent)}</strong>, payable on or before the <strong>5th day</strong> of each month. Late payment shall attract a fee as mutually agreed.</li>
     <li class="clause">A security deposit of <strong>${ag.security_deposit?formatCurrency(ag.security_deposit):"Nil"}</strong> has been paid. This shall be refunded within 30 days of vacating, after deducting any dues or damages.</li>
+    ${ag.rent_hike_clause ? `<li class="clause"><strong>Rent Escalation:</strong> ${ag.rent_hike_clause}</li>` : ""}
     <li class="clause">The Tenant shall use the premises only for <strong>residential purposes</strong> and shall not sublet without prior written consent of the Landlord.</li>
     <li class="clause">The Tenant shall maintain the premises in good condition. Minor repairs up to ₹500 shall be borne by the Tenant; major repairs by the Landlord.</li>
     <li class="clause">The Tenant shall pay all utility bills (electricity, water, internet) and applicable maintenance charges during the tenancy.</li>
@@ -556,6 +557,39 @@ export default function LandlordTenants() {
         status: "scheduled",
         recurrence_frequency: hikeForm.recurring ? hikeForm.frequency : null,
       }).then(({ error }) => { if (error) toast.error("Tenant added, but scheduling the rent hike failed."); });
+    }
+
+    // Auto-create a draft rental agreement, snapshotting everything just entered —
+    // fully editable afterwards from the Agreements page, independent of the live tenant record.
+    {
+      const { data: landlordUser } = await supabase.from("users").select("full_name, phone, email").eq("id", landlordId).maybeSingle();
+      const hikeAmountLabel = hikeForm.hike_type === "percentage" ? `${hikeForm.hike_value}%` : formatCurrency(Number(hikeForm.hike_value || 0));
+      const frequencyLabel = { monthly: "month", quarterly: "3 months", half_yearly: "6 months", yearly: "year" }[hikeForm.frequency];
+      const rentHikeClause = scheduleHike && hikeForm.hike_value && hikeForm.effective_date
+        ? `Rent shall increase by ${hikeAmountLabel} effective ${new Date(hikeForm.effective_date).toLocaleDateString("en-IN")}` +
+          (hikeForm.recurring ? `, and shall continue to increase by ${hikeAmountLabel} every ${frequencyLabel} thereafter.` : ".")
+        : null;
+
+      await supabase.from("agreements").insert({
+        landlord_id: landlordId,
+        flat_id: form.flat_id,
+        society_id: selectedFlat.society_id || null,
+        tenant_id: result.tenantRecordId ?? null,
+        tier: "free",
+        agreement_type: "free",
+        start_date: form.lease_start,
+        end_date: form.lease_end,
+        monthly_rent: Number(form.monthly_rent),
+        security_deposit: Number(form.security_deposit) || null,
+        status: "active",
+        tenant_name: form.full_name,
+        tenant_phone: form.phone,
+        tenant_email: form.email,
+        landlord_name: landlordUser?.full_name ?? null,
+        landlord_phone: landlordUser?.phone ?? null,
+        landlord_email: landlordUser?.email ?? null,
+        rent_hike_clause: rentHikeClause,
+      }).then(({ error }) => { if (error) toast.error("Tenant added, but agreement draft could not be created."); });
     }
 
     // Send WhatsApp welcome message (fire-and-forget — never blocks UI)

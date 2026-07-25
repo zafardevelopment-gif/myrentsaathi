@@ -191,6 +191,7 @@ function printAgreement(ag: LandlordAgreement) {
       <li class="clause">The Landlord hereby lets and the Tenant hereby takes on rent the property described above for a period of <strong>${months} months</strong>, commencing from <strong>${fmtDate(ag.start_date)}</strong> and ending on <strong>${fmtDate(ag.end_date)}</strong>.</li>
       <li class="clause">The Tenant shall pay a monthly rent of <strong>${formatCurrency(ag.monthly_rent)}</strong>, payable on or before the <strong>5th day</strong> of each calendar month. Any delay beyond the 5th shall attract a late fee as mutually agreed.</li>
       <li class="clause">A security deposit of <strong>${ag.security_deposit ? formatCurrency(ag.security_deposit) : "Nil"}</strong> has been paid by the Tenant to the Landlord. This deposit shall be refunded within 30 days of vacating, after deducting any dues or damages.</li>
+      ${ag.rent_hike_clause ? `<li class="clause"><strong>Rent Escalation:</strong> ${ag.rent_hike_clause}</li>` : ""}
       <li class="clause">The Tenant shall use the premises only for <strong>residential purposes</strong> and shall not sublet, assign, or part with the possession of the premises without prior written consent of the Landlord.</li>
       <li class="clause">The Tenant shall maintain the premises in good condition and shall not make any structural alterations. Minor repairs up to ₹500 shall be borne by the Tenant; major repairs shall be the responsibility of the Landlord.</li>
       <li class="clause">The Tenant shall pay all utility bills (electricity, water, internet) and maintenance charges applicable to the flat during the tenancy period.</li>
@@ -243,6 +244,16 @@ export default function LandlordAgreements() {
   const [saving, setSaving] = useState(false);
   const [viewAg, setViewAg] = useState<LandlordAgreement | null>(null);
   const [terminating, setTerminating] = useState(false);
+
+  // Inline edit of an agreement's snapshot fields
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    tenant_name: "", tenant_phone: "", tenant_email: "",
+    landlord_name: "", landlord_phone: "", landlord_email: "",
+    monthly_rent: "", security_deposit: "", start_date: "", end_date: "",
+    rent_hike_clause: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Custom document upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -325,6 +336,65 @@ export default function LandlordAgreements() {
     setShowForm(false);
     setLoading(true);
     await loadData();
+  }
+
+  function startEdit(ag: LandlordAgreement) {
+    const tenant = ag.tenant?.user as { full_name: string; phone?: string | null; email?: string | null } | null;
+    const landlord = ag.landlord as { full_name?: string; phone?: string; email?: string } | null;
+    setEditForm({
+      tenant_name: ag.tenant_name ?? tenant?.full_name ?? "",
+      tenant_phone: ag.tenant_phone ?? tenant?.phone ?? "",
+      tenant_email: ag.tenant_email ?? tenant?.email ?? "",
+      landlord_name: ag.landlord_name ?? landlord?.full_name ?? "",
+      landlord_phone: ag.landlord_phone ?? landlord?.phone ?? "",
+      landlord_email: ag.landlord_email ?? landlord?.email ?? "",
+      monthly_rent: String(ag.monthly_rent ?? ""),
+      security_deposit: ag.security_deposit != null ? String(ag.security_deposit) : "",
+      start_date: ag.start_date ?? "",
+      end_date: ag.end_date ?? "",
+      rent_hike_clause: ag.rent_hike_clause ?? "",
+    });
+    setEditing(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!viewAg) return;
+    setSavingEdit(true);
+    const { error } = await supabase.from("agreements").update({
+      tenant_name: editForm.tenant_name || null,
+      tenant_phone: editForm.tenant_phone || null,
+      tenant_email: editForm.tenant_email || null,
+      landlord_name: editForm.landlord_name || null,
+      landlord_phone: editForm.landlord_phone || null,
+      landlord_email: editForm.landlord_email || null,
+      monthly_rent: Number(editForm.monthly_rent) || 0,
+      security_deposit: Number(editForm.security_deposit) || null,
+      start_date: editForm.start_date,
+      end_date: editForm.end_date,
+      rent_hike_clause: editForm.rent_hike_clause || null,
+    }).eq("id", viewAg.id);
+    setSavingEdit(false);
+    if (error) { toast.error("Failed to save changes."); return; }
+    const updated: LandlordAgreement = {
+      ...viewAg,
+      tenant_name: editForm.tenant_name || null,
+      tenant_phone: editForm.tenant_phone || null,
+      tenant_email: editForm.tenant_email || null,
+      landlord_name: editForm.landlord_name || null,
+      landlord_phone: editForm.landlord_phone || null,
+      landlord_email: editForm.landlord_email || null,
+      monthly_rent: Number(editForm.monthly_rent) || 0,
+      security_deposit: Number(editForm.security_deposit) || null,
+      start_date: editForm.start_date,
+      end_date: editForm.end_date,
+      rent_hike_clause: editForm.rent_hike_clause || null,
+      tenant: { user: { full_name: editForm.tenant_name, phone: editForm.tenant_phone, email: editForm.tenant_email } },
+      landlord: { full_name: editForm.landlord_name, phone: editForm.landlord_phone, email: editForm.landlord_email },
+    };
+    setViewAg(updated);
+    setAgreements(prev => prev.map(a => a.id === viewAg.id ? updated : a));
+    toast.success("Agreement updated.");
+    setEditing(false);
   }
 
   async function handleTerminate(agId: string) {
@@ -638,7 +708,7 @@ export default function LandlordAgreements() {
 
         return (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-3 md:p-6"
-            onClick={() => setViewAg(null)}>
+            onClick={() => { setViewAg(null); setEditing(false); }}>
             <div className="bg-white rounded-[20px] w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-2xl"
               onClick={e => e.stopPropagation()}>
 
@@ -655,7 +725,7 @@ export default function LandlordAgreements() {
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${STATUS_BADGE[viewAg.status] ?? "bg-gray-100 text-gray-500 border-gray-200"}`}>
                     {viewAg.status.charAt(0).toUpperCase() + viewAg.status.slice(1)}
                   </span>
-                  <button onClick={() => setViewAg(null)} className="w-8 h-8 flex items-center justify-center rounded-xl text-ink-muted hover:bg-warm-50 cursor-pointer text-lg">✕</button>
+                  <button onClick={() => { setViewAg(null); setEditing(false); }} className="w-8 h-8 flex items-center justify-center rounded-xl text-ink-muted hover:bg-warm-50 cursor-pointer text-lg">✕</button>
                 </div>
               </div>
 
@@ -664,32 +734,49 @@ export default function LandlordAgreements() {
                 {/* Parties */}
                 <div>
                   <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Parties</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Landlord */}
-                    <div className="bg-green-50 border border-green-100 rounded-[14px] p-3.5">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-7 h-7 rounded-full bg-green-200 flex items-center justify-center text-xs font-extrabold text-green-800">
-                          {landlord?.full_name?.split(" ").map(n => n[0]).join("").slice(0, 2) ?? "L"}
-                        </div>
+                  {editing ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-green-50 border border-green-100 rounded-[14px] p-3.5 space-y-2">
                         <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Landlord</div>
+                        <input className={inputClass} placeholder="Name" value={editForm.landlord_name} onChange={e => setEditForm(f => ({ ...f, landlord_name: e.target.value }))} />
+                        <input className={inputClass} placeholder="Phone" value={editForm.landlord_phone} onChange={e => setEditForm(f => ({ ...f, landlord_phone: e.target.value }))} />
+                        <input className={inputClass} placeholder="Email" value={editForm.landlord_email} onChange={e => setEditForm(f => ({ ...f, landlord_email: e.target.value }))} />
                       </div>
-                      <div className="text-sm font-extrabold text-ink">{landlord?.full_name ?? "—"}</div>
-                      {landlord?.phone && <div className="text-[10px] text-ink-muted mt-0.5">📞 {landlord.phone}</div>}
-                      {landlord?.email && <div className="text-[10px] text-ink-muted truncate">✉️ {landlord.email}</div>}
-                    </div>
-                    {/* Tenant */}
-                    <div className="bg-blue-50 border border-blue-100 rounded-[14px] p-3.5">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-7 h-7 rounded-full bg-blue-200 flex items-center justify-center text-xs font-extrabold text-blue-800">
-                          {tenant?.full_name?.split(" ").map(n => n[0]).join("").slice(0, 2) ?? "T"}
-                        </div>
+                      <div className="bg-blue-50 border border-blue-100 rounded-[14px] p-3.5 space-y-2">
                         <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wider">Tenant</div>
+                        <input className={inputClass} placeholder="Name" value={editForm.tenant_name} onChange={e => setEditForm(f => ({ ...f, tenant_name: e.target.value }))} />
+                        <input className={inputClass} placeholder="Phone" value={editForm.tenant_phone} onChange={e => setEditForm(f => ({ ...f, tenant_phone: e.target.value }))} />
+                        <input className={inputClass} placeholder="Email" value={editForm.tenant_email} onChange={e => setEditForm(f => ({ ...f, tenant_email: e.target.value }))} />
                       </div>
-                      <div className="text-sm font-extrabold text-ink">{tenant?.full_name ?? "—"}</div>
-                      {tenant?.phone && <div className="text-[10px] text-ink-muted mt-0.5">📞 {tenant.phone}</div>}
-                      {tenant?.email && <div className="text-[10px] text-ink-muted truncate">✉️ {tenant.email}</div>}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Landlord */}
+                      <div className="bg-green-50 border border-green-100 rounded-[14px] p-3.5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-7 h-7 rounded-full bg-green-200 flex items-center justify-center text-xs font-extrabold text-green-800">
+                            {landlord?.full_name?.split(" ").map(n => n[0]).join("").slice(0, 2) ?? "L"}
+                          </div>
+                          <div className="text-[9px] font-bold text-green-700 uppercase tracking-wider">Landlord</div>
+                        </div>
+                        <div className="text-sm font-extrabold text-ink">{landlord?.full_name ?? "—"}</div>
+                        {landlord?.phone && <div className="text-[10px] text-ink-muted mt-0.5">📞 {landlord.phone}</div>}
+                        {landlord?.email && <div className="text-[10px] text-ink-muted truncate">✉️ {landlord.email}</div>}
+                      </div>
+                      {/* Tenant */}
+                      <div className="bg-blue-50 border border-blue-100 rounded-[14px] p-3.5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-7 h-7 rounded-full bg-blue-200 flex items-center justify-center text-xs font-extrabold text-blue-800">
+                            {tenant?.full_name?.split(" ").map(n => n[0]).join("").slice(0, 2) ?? "T"}
+                          </div>
+                          <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wider">Tenant</div>
+                        </div>
+                        <div className="text-sm font-extrabold text-ink">{tenant?.full_name ?? "—"}</div>
+                        {tenant?.phone && <div className="text-[10px] text-ink-muted mt-0.5">📞 {tenant.phone}</div>}
+                        {tenant?.email && <div className="text-[10px] text-ink-muted truncate">✉️ {tenant.email}</div>}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Property */}
@@ -726,21 +813,54 @@ export default function LandlordAgreements() {
                 {/* Financial Terms */}
                 <div>
                   <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Financial Terms</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { label: "Monthly Rent",     value: formatCurrency(viewAg.monthly_rent),                    highlight: true },
-                      { label: "Security Deposit", value: viewAg.security_deposit ? formatCurrency(viewAg.security_deposit) : "—", highlight: false },
-                      { label: "Start Date",       value: fmtDate(viewAg.start_date),                             highlight: false },
-                      { label: "End Date",         value: fmtDate(viewAg.end_date),                               highlight: false },
-                      { label: "Duration",         value: months ? `${months} months` : "—",                     highlight: false },
-                      { label: "Total Value",      value: months ? formatCurrency(viewAg.monthly_rent * months) : "—", highlight: false },
-                    ].map(d => (
-                      <div key={d.label} className={`rounded-[12px] p-3 border ${d.highlight ? "bg-brand-50 border-brand-200" : "bg-warm-50 border-border-default"}`}>
-                        <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
-                        <div className={`text-sm font-extrabold mt-0.5 ${d.highlight ? "text-brand-600" : "text-ink"}`}>{d.value}</div>
+                  {editing ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><label className={labelClass}>Monthly Rent (₹)</label><input type="number" className={inputClass} value={editForm.monthly_rent} onChange={e => setEditForm(f => ({ ...f, monthly_rent: e.target.value }))} /></div>
+                        <div><label className={labelClass}>Security Deposit (₹)</label><input type="number" className={inputClass} value={editForm.security_deposit} onChange={e => setEditForm(f => ({ ...f, security_deposit: e.target.value }))} /></div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><label className={labelClass}>Start Date</label><input type="date" className={inputClass} value={editForm.start_date} onClick={e => e.currentTarget.showPicker?.()} onChange={e => setEditForm(f => ({ ...f, start_date: e.target.value }))} /></div>
+                        <div><label className={labelClass}>End Date</label><input type="date" className={inputClass} value={editForm.end_date} onClick={e => e.currentTarget.showPicker?.()} onChange={e => setEditForm(f => ({ ...f, end_date: e.target.value }))} /></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: "Monthly Rent",     value: formatCurrency(viewAg.monthly_rent),                    highlight: true },
+                        { label: "Security Deposit", value: viewAg.security_deposit ? formatCurrency(viewAg.security_deposit) : "—", highlight: false },
+                        { label: "Start Date",       value: fmtDate(viewAg.start_date),                             highlight: false },
+                        { label: "End Date",         value: fmtDate(viewAg.end_date),                               highlight: false },
+                        { label: "Duration",         value: months ? `${months} months` : "—",                     highlight: false },
+                        { label: "Total Value",      value: months ? formatCurrency(viewAg.monthly_rent * months) : "—", highlight: false },
+                      ].map(d => (
+                        <div key={d.label} className={`rounded-[12px] p-3 border ${d.highlight ? "bg-brand-50 border-brand-200" : "bg-warm-50 border-border-default"}`}>
+                          <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
+                          <div className={`text-sm font-extrabold mt-0.5 ${d.highlight ? "text-brand-600" : "text-ink"}`}>{d.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Rent Escalation Clause */}
+                <div>
+                  <div className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-3">Rent Escalation</div>
+                  {editing ? (
+                    <textarea
+                      className={inputClass}
+                      rows={3}
+                      placeholder="e.g. Rent shall increase by 10% every 12 months, starting 1 Jun 2027."
+                      value={editForm.rent_hike_clause}
+                      onChange={e => setEditForm(f => ({ ...f, rent_hike_clause: e.target.value }))}
+                    />
+                  ) : viewAg.rent_hike_clause ? (
+                    <div className="bg-orange-50 border border-orange-100 rounded-[14px] p-3.5 text-xs text-ink">
+                      📈 {viewAg.rent_hike_clause}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-ink-muted">No rent escalation clause set.</div>
+                  )}
                 </div>
 
                 {/* Agreement type + ID */}
@@ -812,19 +932,38 @@ export default function LandlordAgreements() {
 
               {/* Footer actions */}
               <div className="sticky bottom-0 bg-white rounded-b-[20px] border-t border-border-default px-5 py-3.5 flex gap-2">
-                <button onClick={() => setViewAg(null)}
-                  className="flex-1 py-2.5 rounded-xl bg-warm-100 text-ink text-xs font-bold cursor-pointer hover:bg-warm-200 transition-colors">
-                  Close
-                </button>
-                <button onClick={() => printAgreement(viewAg)}
-                  className="flex-1 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer hover:bg-brand-600 transition-colors flex items-center justify-center gap-1.5">
-                  ⬇ Download PDF
-                </button>
-                {viewAg.status === "active" && (
-                  <button onClick={() => handleTerminate(viewAg.id)} disabled={terminating}
-                    className="flex-1 py-2.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold cursor-pointer hover:bg-red-100 transition-colors disabled:opacity-60">
-                    {terminating ? "..." : "Terminate"}
-                  </button>
+                {editing ? (
+                  <>
+                    <button onClick={() => setEditing(false)}
+                      className="flex-1 py-2.5 rounded-xl bg-warm-100 text-ink text-xs font-bold cursor-pointer hover:bg-warm-200 transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={handleSaveEdit} disabled={savingEdit}
+                      className="flex-1 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer hover:bg-brand-600 transition-colors disabled:opacity-60">
+                      {savingEdit ? "Saving..." : "Save Changes"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => setViewAg(null)}
+                      className="flex-1 py-2.5 rounded-xl bg-warm-100 text-ink text-xs font-bold cursor-pointer hover:bg-warm-200 transition-colors">
+                      Close
+                    </button>
+                    <button onClick={() => startEdit(viewAg)}
+                      className="flex-1 py-2.5 rounded-xl border border-brand-200 text-brand-600 text-xs font-bold cursor-pointer hover:bg-brand-50 transition-colors">
+                      ✎ Edit
+                    </button>
+                    <button onClick={() => printAgreement(viewAg)}
+                      className="flex-1 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer hover:bg-brand-600 transition-colors flex items-center justify-center gap-1.5">
+                      ⬇ Download PDF
+                    </button>
+                    {viewAg.status === "active" && (
+                      <button onClick={() => handleTerminate(viewAg.id)} disabled={terminating}
+                        className="flex-1 py-2.5 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold cursor-pointer hover:bg-red-100 transition-colors disabled:opacity-60">
+                        {terminating ? "..." : "Terminate"}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
