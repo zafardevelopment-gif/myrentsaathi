@@ -31,14 +31,26 @@ export function durationMonths(start: string, end: string) {
   return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30));
 }
 
+function lateFeeClauseText(
+  ag: { monthly_rent: number; late_fee_type?: "percentage" | "fixed" | null; late_fee_value?: number | null }
+): string {
+  if (!ag.late_fee_type || !ag.late_fee_value) {
+    return "Any delay beyond the 5th shall attract a late fee as mutually agreed.";
+  }
+  const perDay = ag.late_fee_type === "percentage"
+    ? `<strong>${ag.late_fee_value}%</strong> of the monthly rent (${formatCurrency(Math.round(ag.monthly_rent * ag.late_fee_value / 100))})`
+    : `<strong>${formatCurrency(ag.late_fee_value)}</strong>`;
+  return `Any delay beyond the 5th shall attract a late fee of ${perDay} per day of delay, until the outstanding rent is paid in full.`;
+}
+
 export function defaultClauses(
-  ag: { start_date: string; end_date: string; monthly_rent: number; security_deposit: number | null; rent_hike_clause?: string | null },
+  ag: { start_date: string; end_date: string; monthly_rent: number; security_deposit: number | null; rent_hike_clause?: string | null; late_fee_type?: "percentage" | "fixed" | null; late_fee_value?: number | null },
   societyCity: string | null
 ): string[] {
   const months = ag.start_date && ag.end_date ? durationMonths(ag.start_date, ag.end_date) : "—";
   const clauses = [
     `The Landlord hereby lets and the Tenant hereby takes on rent the property described above for a period of <strong>${months} months</strong>, commencing from <strong>${fmtDate(ag.start_date)}</strong> and ending on <strong>${fmtDate(ag.end_date)}</strong>.`,
-    `The Tenant shall pay a monthly rent of <strong>${formatCurrency(ag.monthly_rent)}</strong>, payable on or before the <strong>5th day</strong> of each calendar month. Any delay beyond the 5th shall attract a late fee as mutually agreed.`,
+    `The Tenant shall pay a monthly rent of <strong>${formatCurrency(ag.monthly_rent)}</strong>, payable on or before the <strong>5th day</strong> of each calendar month. ${lateFeeClauseText(ag)}`,
     `A security deposit of <strong>${ag.security_deposit ? formatCurrency(ag.security_deposit) : "Nil"}</strong> has been paid by the Tenant to the Landlord. This deposit shall be refunded within 30 days of vacating, after deducting any dues or damages.`,
   ];
   if (ag.rent_hike_clause) clauses.push(`<strong>Rent Escalation:</strong> ${ag.rent_hike_clause}`);
@@ -63,6 +75,8 @@ export type AgreementPdfInput = {
   start_date: string;
   end_date: string;
   rent_hike_clause?: string | null;
+  late_fee_type?: "percentage" | "fixed" | null;
+  late_fee_value?: number | null;
   clauses?: string[] | null;
   doc_brand?: string | null;
   doc_title?: string | null;
@@ -218,6 +232,11 @@ export function buildAgreementHtml(ag: AgreementPdfInput): string {
       <div class="detail-cell"><div class="lbl">Start Date</div><div class="val">${fmtDate(ag.start_date)}</div></div>
       <div class="detail-cell"><div class="lbl">End Date</div><div class="val">${fmtDate(ag.end_date)}</div></div>
       <div class="detail-cell"><div class="lbl">Total Rent Value</div><div class="val">${typeof months === "number" ? formatCurrency(ag.monthly_rent * months) : "—"}</div></div>
+      <div class="detail-cell"><div class="lbl">Late Fee</div><div class="val">${
+        ag.late_fee_type && ag.late_fee_value
+          ? `${ag.late_fee_type === "percentage" ? `${ag.late_fee_value}%` : formatCurrency(ag.late_fee_value)} / day`
+          : "—"
+      }</div></div>
     </div>
   </div>
 

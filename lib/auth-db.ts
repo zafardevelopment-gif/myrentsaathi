@@ -326,6 +326,8 @@ export async function addTenant(params: {
   security_deposit: number;
   lease_start: string;
   lease_end: string;
+  late_fee_type?: "percentage" | "fixed" | null;
+  late_fee_value?: number | null;
 }): Promise<{ success: boolean; error?: string; generatedPassword?: string; generatedUserId?: string; loginEmail?: string; userRecordId?: string; tenantRecordId?: string }> {
   // Upsert user
   let userId: string;
@@ -344,6 +346,14 @@ export async function addTenant(params: {
     generatedUserId = existing.admin_user_id ?? undefined;
     generatedPassword = existing.password ?? undefined;
     loginEmail = existing.email ?? undefined;
+
+    // Legacy/orphaned user rows can be missing admin_user_id — backfill it now
+    // rather than leaving the Credentials modal showing a permanent "—".
+    if (!generatedUserId) {
+      const suffix = Math.floor(1000 + Math.random() * 9000).toString();
+      generatedUserId = `TNT-${suffix}`;
+      await supabase.from("users").update({ admin_user_id: generatedUserId }).eq("id", userId);
+    }
   } else {
     const suffix = Math.floor(1000 + Math.random() * 9000).toString();
     generatedUserId = `TNT-${suffix}`;
@@ -377,6 +387,8 @@ export async function addTenant(params: {
     monthly_rent: params.monthly_rent,
     security_deposit: params.security_deposit,
     status: "active",
+    late_fee_type: params.late_fee_type ?? null,
+    late_fee_value: params.late_fee_value ?? null,
   };
   if (params.society_id) tenantInsert.society_id = params.society_id;
 
@@ -418,6 +430,41 @@ export async function addTenant(params: {
   await supabase.from("rent_payments").insert(rentInsert);
 
   return { success: true, generatedPassword, generatedUserId, loginEmail, userRecordId: userId, tenantRecordId: tenantRecord.id };
+}
+
+// ─── UPDATE TENANT (by landlord) ─────────────────────────────
+
+export async function updateTenant(params: {
+  tenantRecordId: string;
+  userRecordId: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  monthly_rent: number;
+  security_deposit: number;
+  lease_start: string;
+  lease_end: string;
+  late_fee_type?: "percentage" | "fixed" | null;
+  late_fee_value?: number | null;
+}): Promise<{ success: boolean; error?: string }> {
+  const { error: userErr } = await supabase.from("users").update({
+    full_name: params.full_name.trim(),
+    phone: params.phone.trim(),
+    email: params.email.trim().toLowerCase(),
+  }).eq("id", params.userRecordId);
+  if (userErr) return { success: false, error: userErr.message };
+
+  const { error: tenantErr } = await supabase.from("tenants").update({
+    monthly_rent: params.monthly_rent,
+    security_deposit: params.security_deposit,
+    lease_start: params.lease_start,
+    lease_end: params.lease_end,
+    late_fee_type: params.late_fee_type ?? null,
+    late_fee_value: params.late_fee_value ?? null,
+  }).eq("id", params.tenantRecordId);
+  if (tenantErr) return { success: false, error: tenantErr.message };
+
+  return { success: true };
 }
 
 // ─── ADD LANDLORD (by society admin) ────────────────────────

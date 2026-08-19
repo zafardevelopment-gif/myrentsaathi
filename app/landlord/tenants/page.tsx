@@ -5,7 +5,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getLandlordFlats, getLandlordAgreements, getLandlordUserId, type LandlordFlat, type LandlordAgreement } from "@/lib/landlord-data";
 import { getLandlordTenantStats } from "@/lib/admin-data";
-import { addTenant } from "@/lib/auth-db";
+import { addTenant, updateTenant } from "@/lib/auth-db";
 import { supabase } from "@/lib/supabase";
 import toast, { Toaster } from "react-hot-toast";
 import ReceiptModal from "@/components/tenant/ReceiptModal";
@@ -29,7 +29,14 @@ type TenantDetail = {
   pan_number: string | null;
   emergency_contact: string | null;
   emergency_name: string | null;
+  late_fee_type?: "percentage" | "fixed" | null;
+  late_fee_value?: number | null;
 };
+
+function lateFeeLabel(type?: "percentage" | "fixed" | null, value?: number | null): string {
+  if (!type || !value) return "—";
+  return type === "percentage" ? `${value}% / day` : `${formatCurrency(value)} / day`;
+}
 
 type TenantModalTab = "payments" | "agreement" | "documents" | "complaints";
 type RentPayment = { id: string; amount: number; month_year: string; status: string; payment_date: string | null; payment_method: string | null };
@@ -177,6 +184,7 @@ function AgreementModal({ flat, agreement, onClose }: { flat: LandlordFlat; agre
                 { label: "End Date",         value: fmtDateAg(agreement.end_date),                                    highlight: false },
                 { label: "Duration",         value: months ? `${months} months` : "—",                                highlight: false },
                 { label: "Total Value",      value: months ? formatCurrency(agreement.monthly_rent * months) : "—",   highlight: false },
+                { label: "Late Fee",         value: lateFeeLabel(agreement.late_fee_type, agreement.late_fee_value), highlight: false },
               ].map(d => (
                 <div key={d.label} className={`rounded-[12px] p-3 border ${d.highlight ? "bg-brand-50 border-brand-200" : "bg-warm-50 border-border-default"}`}>
                   <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
@@ -227,7 +235,22 @@ export default function LandlordTenants() {
     full_name: "", email: "", phone: "",
     flat_id: "", monthly_rent: "", security_deposit: "",
     lease_start: "", lease_end: "",
+    late_fee_type: "percentage" as "percentage" | "fixed",
+    late_fee_value: "",
   });
+
+  // Edit tenant
+  const [editFlat, setEditFlat] = useState<LandlordFlat | null>(null);
+  const [editTenantRecordId, setEditTenantRecordId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    full_name: "", email: "", phone: "",
+    monthly_rent: "", security_deposit: "",
+    lease_start: "", lease_end: "",
+    late_fee_type: "percentage" as "percentage" | "fixed",
+    late_fee_value: "",
+  });
+  const [loadingEdit, setLoadingEdit] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Optional scheduled rent hike at tenant creation
   const [scheduleHike, setScheduleHike] = useState(false);
@@ -331,7 +354,15 @@ export default function LandlordTenants() {
       .select("admin_user_id, password, email")
       .eq("id", flat.current_tenant_id)
       .maybeSingle();
-    setTenantCreds(c => c ? { ...c, userId: data?.admin_user_id ?? "—", password: data?.password ?? "—", loginEmail: data?.email ?? "—" } : c);
+
+    let userId = data?.admin_user_id ?? null;
+    if (!userId) {
+      // Legacy row missing admin_user_id — generate and persist one now instead of showing "—" forever.
+      const suffix = Math.floor(1000 + Math.random() * 9000).toString();
+      userId = `TNT-${suffix}`;
+      await supabase.from("users").update({ admin_user_id: userId }).eq("id", flat.current_tenant_id);
+    }
+    setTenantCreds(c => c ? { ...c, userId: userId ?? "—", password: data?.password ?? "—", loginEmail: data?.email ?? "—" } : c);
     setLoadingCreds(false);
   }
 
@@ -354,7 +385,7 @@ export default function LandlordTenants() {
     setLoadingKyc(true);
     const { data: tenantRec } = await supabase
       .from("tenants")
-      .select("id, user_id, flat_id, landlord_id, lease_start, lease_end, monthly_rent, security_deposit, status, aadhaar_encrypted, pan_number, emergency_contact, emergency_name")
+      .select("id, user_id, flat_id, landlord_id, lease_start, lease_end, monthly_rent, security_deposit, status, aadhaar_encrypted, pan_number, emergency_contact, emergency_name, late_fee_type, late_fee_value")
       .eq("flat_id", flat.id)
       .eq("status", "active")
       .maybeSingle();
@@ -368,6 +399,64 @@ export default function LandlordTenants() {
       setTenantDocs(docs ?? []);
     }
     setLoadingKyc(false);
+  }
+
+  async function openEdit(flat: LandlordFlat) {
+    setEditFlat(flat);
+    setEditTenantRecordId(null);
+    setLoadingEdit(true);
+    const tenantUser = (flat.tenant as { user?: { full_name: string; phone: string; email: string } | null } | null)?.user;
+    const { data: tenantRec } = await supabase
+      .from("tenants")
+      .select("id, lease_start, lease_end, monthly_rent, security_deposit, late_fee_type, late_fee_value")
+      .eq("flat_id", flat.id)
+      .eq("status", "active")
+      .maybeSingle();
+    setEditTenantRecordId(tenantRec?.id ?? null);
+    setEditForm({
+      full_name: tenantUser?.full_name ?? "",
+      email: tenantUser?.email ?? "",
+      phone: tenantUser?.phone ?? "",
+      monthly_rent: tenantRec?.monthly_rent != null ? String(tenantRec.monthly_rent) : "",
+      security_deposit: tenantRec?.security_deposit != null ? String(tenantRec.security_deposit) : "",
+      lease_start: tenantRec?.lease_start ?? "",
+      lease_end: tenantRec?.lease_end ?? "",
+      late_fee_type: (tenantRec?.late_fee_type as "percentage" | "fixed") ?? "percentage",
+      late_fee_value: tenantRec?.late_fee_value != null ? String(tenantRec.late_fee_value) : "",
+    });
+    setLoadingEdit(false);
+  }
+
+  async function handleUpdateTenant(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editFlat || !editFlat.current_tenant_id || !editTenantRecordId) return;
+
+    if (!isValidPhone(editForm.phone)) {
+      toast.error("Enter valid 10-digit mobile number");
+      return;
+    }
+
+    setSavingEdit(true);
+    const result = await updateTenant({
+      tenantRecordId: editTenantRecordId,
+      userRecordId: editFlat.current_tenant_id,
+      full_name: editForm.full_name,
+      email: editForm.email,
+      phone: editForm.phone,
+      monthly_rent: Number(editForm.monthly_rent),
+      security_deposit: Number(editForm.security_deposit),
+      lease_start: editForm.lease_start,
+      lease_end: editForm.lease_end,
+      late_fee_type: editForm.late_fee_value ? editForm.late_fee_type : null,
+      late_fee_value: editForm.late_fee_value ? Number(editForm.late_fee_value) : null,
+    });
+    setSavingEdit(false);
+    if (!result.success) { toast.error(result.error ?? "Failed to update tenant."); return; }
+
+    toast.success("Tenant updated.");
+    setEditFlat(null);
+    setLoading(true);
+    await loadData();
   }
 
   async function openTabModal(flat: LandlordFlat, tab: TenantModalTab) {
@@ -446,6 +535,8 @@ export default function LandlordTenants() {
       monthly_rent: Number(form.monthly_rent),
       security_deposit: Number(form.security_deposit),
       lease_start: form.lease_start, lease_end: form.lease_end,
+      late_fee_type: form.late_fee_value ? form.late_fee_type : null,
+      late_fee_value: form.late_fee_value ? Number(form.late_fee_value) : null,
     });
     setSaving(false);
     if (!result.success) { toast.error(result.error ?? "Failed to add tenant."); return; }
@@ -499,6 +590,8 @@ export default function LandlordTenants() {
         landlord_phone: landlordUser?.phone ?? null,
         landlord_email: landlordUser?.email ?? null,
         rent_hike_clause: rentHikeClause,
+        late_fee_type: form.late_fee_value ? form.late_fee_type : null,
+        late_fee_value: form.late_fee_value ? Number(form.late_fee_value) : null,
       }).then(({ error }) => { if (error) toast.error("Tenant added, but agreement draft could not be created."); });
     }
 
@@ -563,7 +656,7 @@ export default function LandlordTenants() {
       toast.success("Tenant added successfully.");
     }
 
-    setForm({ full_name: "", email: "", phone: "", flat_id: "", monthly_rent: "", security_deposit: "", lease_start: "", lease_end: "" });
+    setForm({ full_name: "", email: "", phone: "", flat_id: "", monthly_rent: "", security_deposit: "", lease_start: "", lease_end: "", late_fee_type: "percentage", late_fee_value: "" });
     setScheduleHike(false);
     setHikeForm({ hike_type: "percentage", hike_value: "", effective_date: "", recurring: false, frequency: "yearly" });
     setShowForm(false);
@@ -740,6 +833,34 @@ export default function LandlordTenants() {
           </div>
 
           <div className="bg-warm-50 rounded-xl p-3 border border-border-default">
+            <div className="text-xs font-bold text-ink mb-2">⏰ Late Payment Fee (optional)</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelClass}>Fee Type</label>
+                <select className={inputClass} value={form.late_fee_type} onChange={e => setForm(f => ({ ...f, late_fee_type: e.target.value as "percentage" | "fixed" }))}>
+                  <option value="percentage">Percentage (%) of rent</option>
+                  <option value="fixed">Fixed Amount (₹)</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>{form.late_fee_type === "percentage" ? "% per day late" : "₹ per day late"}</label>
+                <input type="number" min="0" step="0.01" className={inputClass} placeholder={form.late_fee_type === "percentage" ? "e.g. 1" : "e.g. 100"} value={form.late_fee_value} onChange={e => setForm(f => ({ ...f, late_fee_value: e.target.value }))} />
+              </div>
+            </div>
+            {form.late_fee_value && Number(form.late_fee_value) > 0 && (
+              <div className="text-[10px] text-ink-muted mt-2">
+                If rent is paid late, the tenant will be charged{" "}
+                <strong>
+                  {form.late_fee_type === "percentage"
+                    ? `${form.late_fee_value}% of rent (${formatCurrency(Math.round(Number(form.monthly_rent || 0) * Number(form.late_fee_value) / 100))})`
+                    : formatCurrency(Number(form.late_fee_value))}
+                </strong>{" "}
+                for every day of delay.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-warm-50 rounded-xl p-3 border border-border-default">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={scheduleHike} onChange={e => setScheduleHike(e.target.checked)} className="w-4 h-4" />
               <span className="text-xs font-bold text-ink">📈 Schedule a rent hike (optional)</span>
@@ -899,6 +1020,7 @@ export default function LandlordTenants() {
                       <div className="text-[11px] text-ink-muted">{flat.flat_number}{flat.block ? ` (${flat.block})` : ""}{society ? ` · ${society.name}` : ""}</div>
                       <div className="text-[11px] text-ink-muted">{tenantUser.phone} · {tenantUser.email}</div>
                     </div>
+                    <button onClick={() => openEdit(flat)} className="p-1.5 rounded-lg border border-border-default text-ink-muted text-[11px] cursor-pointer hover:bg-warm-50 flex-shrink-0" title="Edit tenant">✎</button>
                     <button onClick={() => setRemoveFlat(flat)} className="p-1.5 rounded-lg border border-red-200 text-red-400 text-[11px] cursor-pointer hover:bg-red-50 flex-shrink-0" title="Remove tenant">✕</button>
                   </div>
 
@@ -990,6 +1112,7 @@ export default function LandlordTenants() {
                     { label: "Lease End", value: tenantDetail.lease_end ? new Date(tenantDetail.lease_end).toLocaleDateString("en-IN") : "—" },
                     { label: "Monthly Rent", value: formatCurrency(tenantDetail.monthly_rent ?? 0) },
                     { label: "Security Deposit", value: formatCurrency(tenantDetail.security_deposit ?? 0) },
+                    { label: "Late Fee", value: lateFeeLabel(tenantDetail.late_fee_type, tenantDetail.late_fee_value) },
                   ].map(d => (
                     <div key={d.label} className="bg-warm-50 rounded-xl p-2.5">
                       <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
@@ -1148,6 +1271,57 @@ export default function LandlordTenants() {
       {/* Agreement Modal */}
       {agreementFlat && (
         <AgreementModal flat={agreementFlat} agreement={getAgreement(agreementFlat) ?? null} onClose={() => setAgreementFlat(null)} />
+      )}
+
+      {/* Edit Tenant Modal */}
+      {editFlat && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setEditFlat(null)}>
+          <div className="bg-white rounded-[18px] w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-base font-extrabold text-ink">✎ Edit Tenant</div>
+              <button onClick={() => setEditFlat(null)} className="text-ink-muted text-lg cursor-pointer">✕</button>
+            </div>
+            {loadingEdit ? (
+              <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-10 bg-warm-100 rounded-xl animate-pulse" />)}</div>
+            ) : (
+              <form onSubmit={handleUpdateTenant} className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className={labelClass}>Full Name *</label><input required className={inputClass} value={editForm.full_name} onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))} /></div>
+                  <div><label className={labelClass}>Phone *</label><input required className={inputClass} maxLength={10} inputMode="numeric" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))} /></div>
+                </div>
+                <div><label className={labelClass}>Email *</label><input required type="email" autoComplete="off" className={inputClass} value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} /></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className={labelClass}>Monthly Rent (₹) *</label><input required type="number" className={inputClass} value={editForm.monthly_rent} onChange={e => setEditForm(f => ({ ...f, monthly_rent: e.target.value }))} /></div>
+                  <div><label className={labelClass}>Security Deposit (₹)</label><input type="number" className={inputClass} value={editForm.security_deposit} onChange={e => setEditForm(f => ({ ...f, security_deposit: e.target.value }))} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className={labelClass}>Lease Start *</label><input required type="date" className={inputClass} value={editForm.lease_start} onClick={e => e.currentTarget.showPicker?.()} onChange={e => setEditForm(f => ({ ...f, lease_start: e.target.value }))} /></div>
+                  <div><label className={labelClass}>Lease End *</label><input required type="date" className={inputClass} value={editForm.lease_end} onClick={e => e.currentTarget.showPicker?.()} onChange={e => setEditForm(f => ({ ...f, lease_end: e.target.value }))} /></div>
+                </div>
+                <div className="bg-warm-50 rounded-xl p-3 border border-border-default">
+                  <div className="text-xs font-bold text-ink mb-2">⏰ Late Payment Fee (optional)</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelClass}>Fee Type</label>
+                      <select className={inputClass} value={editForm.late_fee_type} onChange={e => setEditForm(f => ({ ...f, late_fee_type: e.target.value as "percentage" | "fixed" }))}>
+                        <option value="percentage">Percentage (%) of rent</option>
+                        <option value="fixed">Fixed Amount (₹)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>{editForm.late_fee_type === "percentage" ? "% per day late" : "₹ per day late"}</label>
+                      <input type="number" min="0" step="0.01" className={inputClass} placeholder={editForm.late_fee_type === "percentage" ? "e.g. 1" : "e.g. 100"} value={editForm.late_fee_value} onChange={e => setEditForm(f => ({ ...f, late_fee_value: e.target.value }))} />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button type="button" onClick={() => setEditFlat(null)} className="flex-1 py-2.5 rounded-xl border border-border-default text-sm font-bold cursor-pointer">Cancel</button>
+                  <button type="submit" disabled={savingEdit} className="flex-1 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-bold cursor-pointer disabled:opacity-60">{savingEdit ? "Saving..." : "Save Changes"}</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Remove Tenant Confirm */}

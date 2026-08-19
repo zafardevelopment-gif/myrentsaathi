@@ -63,6 +63,8 @@ export type LandlordAgreement = {
   landlord_phone?: string | null;
   landlord_email?: string | null;
   rent_hike_clause?: string | null;
+  late_fee_type?: "percentage" | "fixed" | null;
+  late_fee_value?: number | null;
   clauses?: string[] | null;
   doc_brand?: string | null;
   doc_title?: string | null;
@@ -271,7 +273,7 @@ export async function getLandlordAgreements(email: string): Promise<LandlordAgre
     .select(`
       id, flat_id, tenant_id, tier, status, monthly_rent, security_deposit, start_date, end_date, created_at,
       custom_doc_url, custom_doc_name,
-      tenant_name, tenant_phone, tenant_email, landlord_name, landlord_phone, landlord_email, rent_hike_clause, clauses,
+      tenant_name, tenant_phone, tenant_email, landlord_name, landlord_phone, landlord_email, rent_hike_clause, late_fee_type, late_fee_value, clauses,
       doc_brand, doc_title, doc_subtitle, section_titles,
       flat:flats(flat_number, block, floor_number, flat_type, area_sqft),
       society:societies(name, city, address)
