@@ -59,6 +59,75 @@ const emptyForm = { flat_number: "", block: "", flat_type: "", rental_type: "", 
 
 type TenantModalTab = "profile" | "payments" | "agreement" | "documents" | "complaints";
 
+type BulkRowResult = { flat_number: string; block: string; status: "created" | "updated" | "error"; error?: string };
+
+function parseCSV(text: string): Record<string, string>[] {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+  return lines.slice(1).map(line => {
+    const cells: string[] = [];
+    let cur = "", inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === "," && !inQ) { cells.push(cur.trim()); cur = ""; }
+      else { cur += ch; }
+    }
+    cells.push(cur.trim());
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => { row[h] = (cells[i] ?? "").replace(/^"|"$/g, ""); });
+    return row;
+  });
+}
+
+function BulkResultsModal({ results, onClose }: { results: BulkRowResult[]; onClose: () => void }) {
+  const created = results.filter(r => r.status === "created").length;
+  const updated = results.filter(r => r.status === "updated").length;
+  const errors = results.filter(r => r.status === "error").length;
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-[20px] w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="px-5 pt-5 pb-4 border-b border-border-default">
+          <div className="text-base font-extrabold text-ink">📊 Import Results</div>
+          <div className="flex flex-wrap gap-3 mt-2 text-xs">
+            <span className="text-green-700 font-bold">✅ {created} created</span>
+            {updated > 0 && <span className="text-blue-700 font-bold">🔄 {updated} updated</span>}
+            {errors > 0 && <span className="text-red-600 font-bold">❌ {errors} errors</span>}
+          </div>
+        </div>
+        <div className="px-5 py-3 max-h-72 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-warm-50">
+              <tr>
+                <th className="py-1 text-left font-bold text-ink-muted">Flat</th>
+                <th className="py-1 text-left font-bold text-ink-muted">Status</th>
+                <th className="py-1 text-left font-bold text-ink-muted">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((r, i) => (
+                <tr key={i} className="border-b border-border-light">
+                  <td className="py-1 font-semibold">{r.flat_number}{r.block ? ` (${r.block})` : ""}</td>
+                  <td className="py-1">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${r.status === "created" ? "bg-green-100 text-green-700" : r.status === "updated" ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-600"}`}>
+                      {r.status}
+                    </span>
+                  </td>
+                  <td className="py-1 text-ink-muted">{r.error ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-5 py-4">
+          <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type RentPayment = { id: string; amount: number; month_year: string; status: string; payment_date: string | null; payment_method: string | null };
 type Agreement = { id: string; tier: string; status: string; monthly_rent: number; security_deposit: number | null; start_date: string; end_date: string };
 type Document = { id: string; title?: string; file_name: string; file_url: string; file_size?: number | null; category?: string; created_at: string };
@@ -102,6 +171,13 @@ export default function LandlordProperties() {
   const [rentFlat, setRentFlat] = useState<LandlordFlat | null>(null);
   const [rentValue, setRentValue] = useState("");
   const [rentSaving, setRentSaving] = useState(false);
+
+  // Bulk upload
+  const [previewData, setPreviewData] = useState<Record<string, string>[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [uploadingBulk, setUploadingBulk] = useState(false);
+  const [bulkResults, setBulkResults] = useState<BulkRowResult[] | null>(null);
 
   // Search / Filter
   const [filterName, setFilterName] = useState("");
@@ -236,6 +312,117 @@ export default function LandlordProperties() {
     await loadData();
   }
 
+  // ─── BULK UPLOAD ──────────────────────────────────────────
+
+  function downloadSampleCSV() {
+    const headers = ["flat_number", "block", "society_name", "flat_type", "rental_type", "floor_number", "area_sqft", "monthly_rent", "security_deposit"];
+    const sampleRows = [
+      ["101", "A", "Green Valley Society", "2BHK", "residential", "1", "900", "20000", "50000"],
+      ["102", "B", "", "3BHK", "flat", "2", "1200", "28000", "60000"],
+    ];
+    const csv = [headers.join(","), ...sampleRows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "properties_sample.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function handleBulkUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = "";
+    if (!file) return;
+    file.text().then(text => {
+      const data = parseCSV(text);
+      if (data.length === 0) {
+        toast.error("Invalid CSV format. Download the sample CSV for the correct format.");
+        return;
+      }
+      setPreviewData(data);
+      setSelectedRows(new Set(data.map((_, i) => i)));
+      setShowPreview(true);
+    }).catch(() => toast.error("Could not read the file. Please try again."));
+  }
+
+  async function confirmBulkImport() {
+    if (!landlordId) return;
+    setUploadingBulk(true);
+    const results: BulkRowResult[] = [];
+    const societyCache = new Map<string, string | null>();
+    const rowsToImport = previewData.filter((_, i) => selectedRows.has(i));
+
+    for (const row of rowsToImport) {
+      const flat_number = row.flat_number?.trim();
+      const block = row.block?.trim() || "";
+      if (!flat_number) {
+        results.push({ flat_number: flat_number || "(unknown)", block, status: "error", error: "Missing flat_number" });
+        continue;
+      }
+      try {
+        // Resolve society (cache per unique name within this import run)
+        let societyId: string | undefined;
+        const societyName = row.society_name?.trim() || "";
+        if (societyName) {
+          if (societyCache.has(societyName)) {
+            societyId = societyCache.get(societyName) ?? undefined;
+          } else {
+            const soc = await findOrCreateSociety(societyName);
+            societyCache.set(societyName, soc.id);
+            societyId = soc.id ?? undefined;
+          }
+        }
+
+        // Match existing property for this landlord by flat_number + block
+        const existing = flats.find(f => f.flat_number.trim().toLowerCase() === flat_number.toLowerCase() && (f.block ?? "").trim().toLowerCase() === block.toLowerCase());
+
+        const payload = {
+          flat_type: row.flat_type?.trim() || undefined,
+          rental_type: row.rental_type?.trim() || undefined,
+          floor_number: row.floor_number ? Number(row.floor_number) : undefined,
+          area_sqft: row.area_sqft ? Number(row.area_sqft) : undefined,
+          monthly_rent: row.monthly_rent ? Number(row.monthly_rent) : undefined,
+          security_deposit: row.security_deposit ? Number(row.security_deposit) : undefined,
+        };
+
+        if (existing) {
+          const upd = await updateLandlordFlat(existing.id, {
+            flat_number,
+            block: block || null,
+            flat_type: payload.flat_type ?? null,
+            rental_type: payload.rental_type ?? null,
+            floor_number: payload.floor_number ?? null,
+            area_sqft: payload.area_sqft ?? null,
+            monthly_rent: payload.monthly_rent ?? null,
+            security_deposit: payload.security_deposit ?? null,
+          });
+          if (!upd.success) { results.push({ flat_number, block, status: "error", error: upd.error }); continue; }
+          results.push({ flat_number, block, status: "updated" });
+        } else {
+          const add = await addLandlordFlat({
+            owner_id: landlordId,
+            society_id: societyId,
+            flat_number,
+            block: block || undefined,
+            ...payload,
+          });
+          if (!add.success) { results.push({ flat_number, block, status: "error", error: add.error }); continue; }
+          results.push({ flat_number, block, status: "created" });
+        }
+      } catch (err) {
+        results.push({ flat_number, block, status: "error", error: (err as Error).message });
+      }
+    }
+
+    setShowPreview(false);
+    setPreviewData([]);
+    setSelectedRows(new Set());
+    setUploadingBulk(false);
+    if (results.length > 0) setBulkResults(results);
+    setLoading(true);
+    await loadData();
+  }
+
   async function handleRentSave() {
     if (!rentFlat || !rentValue.trim()) return;
     const newRent = Number(rentValue);
@@ -288,12 +475,90 @@ export default function LandlordProperties() {
     <div>
       <Toaster position="top-center" />
 
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h2 className="text-[15px] font-extrabold text-ink">🏠 My Properties</h2>
-        <button onClick={() => setShowAddForm(!showAddForm)} className="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer">
-          {showAddForm ? "Cancel" : "+ Add Property"}
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={downloadSampleCSV} className="px-3 py-2 rounded-xl bg-green-500 text-white text-xs font-bold cursor-pointer">
+            📥 Sample CSV
+          </button>
+          <label className="px-3 py-2 rounded-xl bg-blue-500 text-white text-xs font-bold cursor-pointer">
+            📤 Bulk Upload
+            <input type="file" accept=".csv" onChange={handleBulkUpload} className="hidden" />
+          </label>
+          <button onClick={() => setShowAddForm(!showAddForm)} className="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer">
+            {showAddForm ? "Cancel" : "+ Add Property"}
+          </button>
+        </div>
       </div>
+
+      {/* Bulk Results Modal */}
+      {bulkResults && <BulkResultsModal results={bulkResults} onClose={() => setBulkResults(null)} />}
+
+      {/* Bulk Import Preview */}
+      {showPreview && (
+        <div className="bg-white rounded-[14px] p-4 border border-yellow-300 mb-4">
+          <div className="text-sm font-bold text-ink mb-2">
+            📋 Import Preview ({previewData.length} rows · {selectedRows.size} selected)
+          </div>
+          <div className="text-[11px] text-ink-muted mb-2">
+            Existing properties (matched by flat number + block) will be <b>updated</b>; new ones will be <b>created</b>.
+          </div>
+          <div className="overflow-x-auto max-h-72 overflow-y-auto mb-3 border border-border-light rounded-xl">
+            <table className="w-full text-xs">
+              <thead className="bg-warm-50 sticky top-0">
+                <tr>
+                  <th className="px-2 py-1.5 text-center w-8">
+                    <input
+                      type="checkbox"
+                      checked={selectedRows.size === previewData.length}
+                      onChange={() => setSelectedRows(selectedRows.size === previewData.length ? new Set() : new Set(previewData.map((_, i) => i)))}
+                      className="cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Flat</th>
+                  <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Block</th>
+                  <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Society</th>
+                  <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Type</th>
+                  <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Floor</th>
+                  <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Area</th>
+                  <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Rent</th>
+                  <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Deposit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewData.map((row, idx) => {
+                  const isSelected = selectedRows.has(idx);
+                  const existing = flats.find(f => f.flat_number.trim().toLowerCase() === (row.flat_number ?? "").trim().toLowerCase() && (f.block ?? "").trim().toLowerCase() === (row.block ?? "").trim().toLowerCase());
+                  return (
+                    <tr key={idx} className={`border-b border-border-light cursor-pointer ${isSelected ? "bg-brand-50" : "hover:bg-warm-50"}`}
+                      onClick={() => setSelectedRows(prev => { const next = new Set(prev); if (next.has(idx)) next.delete(idx); else next.add(idx); return next; })}>
+                      <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" checked={isSelected} onChange={() => setSelectedRows(prev => { const next = new Set(prev); if (next.has(idx)) next.delete(idx); else next.add(idx); return next; })} className="cursor-pointer" />
+                      </td>
+                      <td className="px-2 py-1.5 font-semibold">{row.flat_number || "—"} {existing && <span className="text-[9px] text-blue-600 font-bold">(update)</span>}</td>
+                      <td className="px-2 py-1.5">{row.block || "—"}</td>
+                      <td className="px-2 py-1.5 text-ink-muted">{row.society_name || "Independent"}</td>
+                      <td className="px-2 py-1.5">{row.flat_type || "—"}</td>
+                      <td className="px-2 py-1.5">{row.floor_number || "—"}</td>
+                      <td className="px-2 py-1.5">{row.area_sqft || "—"}</td>
+                      <td className="px-2 py-1.5">{row.monthly_rent || "—"}</td>
+                      <td className="px-2 py-1.5">{row.security_deposit || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={confirmBulkImport} disabled={uploadingBulk || selectedRows.size === 0} className="flex-1 py-2 rounded-xl bg-green-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60">
+              {uploadingBulk ? "Importing..." : `✓ Import ${selectedRows.size} Selected`}
+            </button>
+            <button onClick={() => { setShowPreview(false); setPreviewData([]); setSelectedRows(new Set()); }} className="flex-1 py-2 rounded-xl bg-gray-300 text-ink text-xs font-bold cursor-pointer">
+              ✕ Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add Form */}
       {showAddForm && (
