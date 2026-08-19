@@ -599,6 +599,34 @@ export default function LandlordTenants() {
     URL.revokeObjectURL(url);
   }
 
+  function downloadPrefilledTenantCSV() {
+    if (flats.length === 0) {
+      toast.error("Add properties first — there's nothing to prefill.");
+      return;
+    }
+    const headers = ["flat_number", "block", "full_name", "email", "phone", "monthly_rent", "security_deposit", "lease_start", "lease_end", "late_fee_type", "late_fee_value"];
+    const rows = flats.map(f => {
+      const tenantUser = (f.tenant as { user?: { full_name: string; phone: string; email: string } | null } | null)?.user;
+      return [
+        f.flat_number,
+        f.block ?? "",
+        tenantUser?.full_name ?? "",
+        tenantUser?.email ?? "",
+        tenantUser?.phone ?? "",
+        f.monthly_rent != null ? String(f.monthly_rent) : "",
+        f.security_deposit != null ? String(f.security_deposit) : "",
+        "", "", "", "",
+      ];
+    });
+    const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${v.replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "tenants_prefilled_by_property.csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function handleBulkTenantUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.currentTarget.files?.[0];
     e.currentTarget.value = "";
@@ -999,6 +1027,9 @@ export default function LandlordTenants() {
         <div className="flex gap-2 flex-wrap">
           <button onClick={downloadTenantSampleCSV} className="px-3 py-2 rounded-xl bg-green-500 text-white text-xs font-bold cursor-pointer">
             📥 Sample CSV
+          </button>
+          <button onClick={downloadPrefilledTenantCSV} className="px-3 py-2 rounded-xl bg-indigo-500 text-white text-xs font-bold cursor-pointer">
+            🏠 Prefill by Property
           </button>
           <label className="px-3 py-2 rounded-xl bg-blue-500 text-white text-xs font-bold cursor-pointer">
             📤 Bulk Upload
