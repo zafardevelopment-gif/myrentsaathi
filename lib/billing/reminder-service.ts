@@ -81,11 +81,14 @@ async function drain(): Promise<{ sent: number; failed: number }> {
   for (const row of rows ?? []) {
     try {
       const { data: user } = await supabaseAdmin
-        .from("users").select("full_name, email, phone").eq("id", row.recipient_user_id).maybeSingle();
+        .from("users").select("full_name, email, phone, notifications_enabled").eq("id", row.recipient_user_id).maybeSingle();
       const outstanding = formatINR(Number(row.payload?.outstanding ?? 0));
+      const notifyOk = user?.notifications_enabled !== false;
 
       let ok = false;
-      if (row.channel === "email" && user?.email) {
+      if (!notifyOk) {
+        ok = true; // tenant opted out → treat as resolved, no send
+      } else if (row.channel === "email" && user?.email) {
         const dueDate = row.payload?.due_date ?? "";
         const daysPastDue = dueDate
           ? Math.max(0, Math.floor((Date.now() - new Date(dueDate + "T00:00:00Z").getTime()) / 86_400_000))

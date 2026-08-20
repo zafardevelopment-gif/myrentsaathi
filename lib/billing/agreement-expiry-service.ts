@@ -40,7 +40,7 @@ export async function checkAgreementExpiry(today?: string): Promise<{ sent: numb
 
         // Get tenant user info
         const { data: tenantUser } = tenant?.user_id
-          ? await supabaseAdmin.from("users").select("email, full_name").eq("id", tenant.user_id).maybeSingle()
+          ? await supabaseAdmin.from("users").select("email, full_name, notifications_enabled").eq("id", tenant.user_id).maybeSingle()
           : { data: null };
 
         // Get landlord info
@@ -51,8 +51,8 @@ export async function checkAgreementExpiry(today?: string): Promise<{ sent: numb
         const landlordName = landlordUser?.full_name ?? "Your Landlord";
         const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com"}/tenant/profile`;
 
-        // Send to tenant
-        if (tenantUser?.email) {
+        // Send to tenant (unless they've opted out of notifications)
+        if (tenantUser?.email && tenantUser.notifications_enabled !== false) {
           await emailAgreementExpiring({
             to: tenantUser.email,
             tenantName: tenantUser.full_name ?? "Tenant",

@@ -131,10 +131,12 @@ async function sendPaymentEmails(
     // Get tenant info
     let tenantEmail: string | null = null;
     let tenantName = "Tenant";
+    let tenantNotifyOk = true;
     if (inv.recipient_user_id) {
-      const { data: u } = await supabase.from("users").select("email, full_name").eq("id", inv.recipient_user_id).maybeSingle();
+      const { data: u } = await supabase.from("users").select("email, full_name, notifications_enabled").eq("id", inv.recipient_user_id).maybeSingle();
       tenantEmail = u?.email ?? null;
       tenantName = u?.full_name ?? "Tenant";
+      tenantNotifyOk = u?.notifications_enabled !== false;
     }
 
     // Get flat number
@@ -154,8 +156,8 @@ async function sendPaymentEmails(
       landlordName = l?.full_name ?? "Landlord";
     }
 
-    // Email to tenant — payment receipt
-    if (tenantEmail) {
+    // Email to tenant — payment receipt (unless they've opted out of notifications)
+    if (tenantEmail && tenantNotifyOk) {
       await emailInvoicePaymentReceipt({
         to: tenantEmail, tenantName, invoiceNumber: inv.invoice_number,
         billingPeriod: inv.billing_period, amountPaid, paymentDate: today,

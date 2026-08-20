@@ -79,11 +79,12 @@ export async function applyScheduledHikes(today?: string): Promise<{ applied: nu
       if (flat.current_tenant_id) {
         const { data: tenantUser } = await supabaseAdmin
           .from("users")
-          .select("phone, email, full_name")
+          .select("phone, email, full_name, notifications_enabled")
           .eq("id", flat.current_tenant_id)
           .maybeSingle();
+        const notifyOk = tenantUser?.notifications_enabled !== false;
 
-        if (tenantUser?.phone) {
+        if (notifyOk && tenantUser?.phone) {
           await sendRentHikeNotice({
             phone: tenantUser.phone,
             fullName: tenantUser.full_name ?? "Tenant",
@@ -93,7 +94,7 @@ export async function applyScheduledHikes(today?: string): Promise<{ applied: nu
             effectiveFrom: effectiveDateStr,
           }).catch(() => {});
         }
-        if (tenantUser?.email) {
+        if (notifyOk && tenantUser?.email) {
           await emailRentHikeNotice({
             to: tenantUser.email,
             tenantName: tenantUser.full_name ?? "Tenant",

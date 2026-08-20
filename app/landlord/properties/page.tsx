@@ -55,7 +55,7 @@ function TenantProfileTab({ tenantFlat }: { tenantFlat: LandlordFlat }) {
   );
 }
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
-const emptyForm = { flat_number: "", block: "", flat_type: "", rental_type: "", floor_number: "", area_sqft: "", monthly_rent: "", security_deposit: "", society_id: "", society_name_custom: "" };
+const emptyForm = { flat_number: "", block: "", flat_type: "", rental_type: "", floor_number: "", area_sqft: "", monthly_rent: "", security_deposit: "", society_id: "", society_name_custom: "", upc_number: "" };
 
 type TenantModalTab = "profile" | "payments" | "agreement" | "documents" | "complaints";
 
@@ -268,6 +268,7 @@ export default function LandlordProperties() {
       area_sqft: addForm.area_sqft ? Number(addForm.area_sqft) : undefined,
       monthly_rent: addForm.monthly_rent ? Number(addForm.monthly_rent) : undefined,
       security_deposit: addForm.security_deposit ? Number(addForm.security_deposit) : undefined,
+      upc_number: addForm.upc_number || undefined,
     });
     setSaving(false);
     if (!result.success) { toast.error(result.error ?? "Failed to add property."); return; }
@@ -291,6 +292,7 @@ export default function LandlordProperties() {
       area_sqft: editForm.area_sqft ? Number(editForm.area_sqft) : null,
       monthly_rent: editForm.monthly_rent ? Number(editForm.monthly_rent) : null,
       security_deposit: editForm.security_deposit ? Number(editForm.security_deposit) : null,
+      upc_number: editForm.upc_number || null,
     });
     setSaving(false);
     if (!result.success) { toast.error(result.error ?? "Failed to update."); return; }
@@ -599,6 +601,11 @@ export default function LandlordProperties() {
             <div><label className={labelClass}>Monthly Rent (₹)</label><input type="number" className={inputClass} placeholder="25000" value={addForm.monthly_rent} onChange={e => setAddForm(f => ({ ...f, monthly_rent: e.target.value }))} /></div>
           </div>
           <div><label className={labelClass}>Security Deposit (₹)</label><input type="number" className={inputClass} placeholder="50000" value={addForm.security_deposit} onChange={e => setAddForm(f => ({ ...f, security_deposit: e.target.value }))} /></div>
+          <div>
+            <label className={labelClass}>UPC Number</label>
+            <input className={inputClass} placeholder="Optional — your own reference/UPC code" value={addForm.upc_number} onChange={e => setAddForm(f => ({ ...f, upc_number: e.target.value }))} />
+            <p className="text-[9px] text-ink-muted mt-1">For your own records only — not shown to the tenant.</p>
+          </div>
           <button type="submit" disabled={saving} className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60">{saving ? "Adding..." : "Add Property"}</button>
         </form>
       )}
@@ -676,7 +683,7 @@ export default function LandlordProperties() {
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge status={flat.status} />
-                      <button onClick={() => { const initial = { flat_number: flat.flat_number, block: flat.block ?? "", flat_type: flat.flat_type ?? "", rental_type: flat.rental_type ?? "", floor_number: flat.floor_number != null ? String(flat.floor_number) : "", area_sqft: flat.area_sqft != null ? String(flat.area_sqft) : "", monthly_rent: flat.monthly_rent != null ? String(flat.monthly_rent) : "", security_deposit: flat.security_deposit != null ? String(flat.security_deposit) : "", society_id: "", society_name_custom: "" }; setEditFlat(flat); setEditForm(initial); setInitialEditForm(initial); }}
+                      <button onClick={() => { const initial = { flat_number: flat.flat_number, block: flat.block ?? "", flat_type: flat.flat_type ?? "", rental_type: flat.rental_type ?? "", floor_number: flat.floor_number != null ? String(flat.floor_number) : "", area_sqft: flat.area_sqft != null ? String(flat.area_sqft) : "", monthly_rent: flat.monthly_rent != null ? String(flat.monthly_rent) : "", security_deposit: flat.security_deposit != null ? String(flat.security_deposit) : "", society_id: "", society_name_custom: "", upc_number: flat.upc_number ?? "" }; setEditFlat(flat); setEditForm(initial); setInitialEditForm(initial); }}
                         className="p-1.5 rounded-lg border border-border-default text-ink-muted text-[11px] cursor-pointer hover:bg-warm-50">✏️</button>
                       <button onClick={() => setDeleteFlat(flat)} className="p-1.5 rounded-lg border border-red-200 text-red-500 text-[11px] cursor-pointer hover:bg-red-50">🗑️</button>
                     </div>
@@ -936,6 +943,7 @@ export default function LandlordProperties() {
                 { label: "Security Deposit", value: formatCurrency(detailFlat.security_deposit ?? 0) },
                 { label: "Status", value: detailFlat.status },
                 { label: "Society", value: (detailFlat.society as { name: string } | null)?.name ?? "Independent" },
+                { label: "UPC Number", value: detailFlat.upc_number ?? "—" },
               ].map(d => (
                 <div key={d.label} className="bg-warm-50 rounded-xl p-2.5">
                   <div className="text-[9px] text-ink-muted uppercase tracking-wide">{d.label}</div>
@@ -982,6 +990,7 @@ export default function LandlordProperties() {
                 <div><label className={labelClass}>Monthly Rent (₹)</label><input type="number" className={inputClass} value={editForm.monthly_rent} onChange={e => setEditForm(f => ({ ...f, monthly_rent: e.target.value }))} /></div>
               </div>
               <div><label className={labelClass}>Security Deposit (₹)</label><input type="number" className={inputClass} value={editForm.security_deposit} onChange={e => setEditForm(f => ({ ...f, security_deposit: e.target.value }))} /></div>
+              <div><label className={labelClass}>UPC Number</label><input className={inputClass} placeholder="Optional — your own reference/UPC code" value={editForm.upc_number} onChange={e => setEditForm(f => ({ ...f, upc_number: e.target.value }))} /></div>
               <button type="submit" disabled={saving} className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60">{saving ? "Saving..." : "Save Changes"}</button>
             </form>
           </div>

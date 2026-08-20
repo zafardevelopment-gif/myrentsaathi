@@ -20,8 +20,9 @@ export type LandlordFlat = {
   security_deposit: number | null;
   society_id: string;
   current_tenant_id: string | null;
+  upc_number?: string | null;
   society?: { name: string; city: string } | null;
-  tenant?: { id: string; user?: { full_name: string; phone: string; email: string } | null } | null;
+  tenant?: { id: string; user?: { full_name: string; phone: string; email: string; notifications_enabled?: boolean } | null } | null;
 };
 
 export type LandlordRentPayment = {
@@ -97,7 +98,7 @@ export async function getLandlordFlats(email: string): Promise<LandlordFlat[]> {
     .from("flats")
     .select(`
       id, flat_number, block, flat_type, rental_type, floor_number, area_sqft, status,
-      monthly_rent, security_deposit, society_id, current_tenant_id,
+      monthly_rent, security_deposit, society_id, current_tenant_id, upc_number,
       society:societies(name, city)
     `)
     .eq("owner_id", userId)
@@ -116,10 +117,10 @@ export async function getLandlordFlats(email: string): Promise<LandlordFlat[]> {
 
   const { data: tenantUsers } = await supabase
     .from("users")
-    .select("id, full_name, phone, email")
+    .select("id, full_name, phone, email, notifications_enabled")
     .in("id", tenantUserIds);
 
-  const userById: Record<string, { id: string; full_name: string; phone: string; email: string }> = {};
+  const userById: Record<string, { id: string; full_name: string; phone: string; email: string; notifications_enabled?: boolean }> = {};
   (tenantUsers ?? []).forEach(u => { userById[u.id] = u; });
   return flats.map(f => ({
     ...f,
@@ -140,6 +141,7 @@ export async function addLandlordFlat(params: {
   area_sqft?: number;
   monthly_rent?: number;
   security_deposit?: number;
+  upc_number?: string;
 }): Promise<{ success: boolean; error?: string; flatId?: string }> {
   const { data, error } = await supabase
     .from("flats")
@@ -154,6 +156,7 @@ export async function addLandlordFlat(params: {
       area_sqft: params.area_sqft ?? null,
       monthly_rent: params.monthly_rent ?? null,
       security_deposit: params.security_deposit ?? null,
+      upc_number: params.upc_number?.trim() || null,
       status: "vacant",
     })
     .select("id")
@@ -171,6 +174,7 @@ export async function updateLandlordFlat(flatId: string, params: {
   area_sqft?: number | null;
   monthly_rent?: number | null;
   security_deposit?: number | null;
+  upc_number?: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   const { error } = await supabase.from("flats").update(params).eq("id", flatId);
   if (error) return { success: false, error: error.message };

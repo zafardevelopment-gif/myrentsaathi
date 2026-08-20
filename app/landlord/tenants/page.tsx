@@ -319,12 +319,15 @@ export default function LandlordTenants() {
     lease_start: "", lease_end: "",
     late_fee_type: "percentage" as "percentage" | "fixed",
     late_fee_value: "",
+    notifications_enabled: true,
   });
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Optional scheduled rent hike at tenant creation
   const [scheduleHike, setScheduleHike] = useState(false);
+  const [notifyTenant, setNotifyTenant] = useState(true);
+  const [showNotifyReport, setShowNotifyReport] = useState(false);
   const [hikeForm, setHikeForm] = useState({
     hike_type: "percentage" as "percentage" | "fixed", hike_value: "", effective_date: "",
     recurring: false, frequency: "yearly" as "monthly" | "quarterly" | "half_yearly" | "yearly",
@@ -483,7 +486,7 @@ export default function LandlordTenants() {
     setEditFlat(flat);
     setEditTenantRecordId(null);
     setLoadingEdit(true);
-    const tenantUser = (flat.tenant as { user?: { full_name: string; phone: string; email: string } | null } | null)?.user;
+    const tenantUser = (flat.tenant as { user?: { full_name: string; phone: string; email: string; notifications_enabled?: boolean } | null } | null)?.user;
     const { data: tenantRec } = await supabase
       .from("tenants")
       .select("id, lease_start, lease_end, monthly_rent, security_deposit, late_fee_type, late_fee_value")
@@ -501,6 +504,7 @@ export default function LandlordTenants() {
       lease_end: tenantRec?.lease_end ?? "",
       late_fee_type: (tenantRec?.late_fee_type as "percentage" | "fixed") ?? "percentage",
       late_fee_value: tenantRec?.late_fee_value != null ? String(tenantRec.late_fee_value) : "",
+      notifications_enabled: tenantUser?.notifications_enabled ?? true,
     });
     setLoadingEdit(false);
   }
@@ -527,6 +531,7 @@ export default function LandlordTenants() {
       lease_end: editForm.lease_end,
       late_fee_type: editForm.late_fee_value ? editForm.late_fee_type : null,
       late_fee_value: editForm.late_fee_value ? Number(editForm.late_fee_value) : null,
+      notifications_enabled: editForm.notifications_enabled,
     });
     setSavingEdit(false);
     if (!result.success) { toast.error(result.error ?? "Failed to update tenant."); return; }
@@ -827,7 +832,7 @@ export default function LandlordTenants() {
 
     // Send WhatsApp welcome message (fire-and-forget — never blocks UI)
     const tenantSocietyName = (flats.find(f => f.id === form.flat_id)?.society as { name?: string } | null)?.name ?? "MyRentSaathi";
-    if (form.phone) {
+    if (notifyTenant && form.phone) {
       sendWelcomeMessage({
         phone: form.phone,
         fullName: form.full_name,
@@ -840,7 +845,7 @@ export default function LandlordTenants() {
     // Send credential email + WhatsApp notification (fire-and-forget)
     const credEmail = result.loginEmail ?? form.email;
     const credPassword = result.generatedPassword;
-    if (credEmail && credPassword) {
+    if (notifyTenant && credEmail && credPassword) {
       fetch("/api/email/send-credentials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -888,6 +893,7 @@ export default function LandlordTenants() {
 
     setForm({ full_name: "", email: "", phone: "", flat_id: "", monthly_rent: "", security_deposit: "", lease_start: "", lease_end: "", late_fee_type: "percentage", late_fee_value: "" });
     setScheduleHike(false);
+    setNotifyTenant(true);
     setHikeForm({ hike_type: "percentage", hike_value: "", effective_date: "", recurring: false, frequency: "yearly" });
     setShowForm(false);
     setLoading(true);
@@ -1035,6 +1041,9 @@ export default function LandlordTenants() {
             📤 Bulk Upload
             <input type="file" accept=".csv" onChange={handleBulkTenantUpload} className="hidden" />
           </label>
+          <button onClick={() => setShowNotifyReport(v => !v)} className="px-3 py-2 rounded-xl bg-gray-600 text-white text-xs font-bold cursor-pointer">
+            🔔 Notification Status
+          </button>
           {vacantFlats.length > 0 && (
             <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer">
               {showForm ? "Cancel" : "+ Add Tenant"}
@@ -1042,6 +1051,49 @@ export default function LandlordTenants() {
           )}
         </div>
       </div>
+
+      {/* Notification Status Report — one place to see who's on/off */}
+      {showNotifyReport && (
+        <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
+          <div className="flex justify-between items-center mb-3">
+            <div className="text-sm font-bold text-ink">🔔 Tenant Notification Status</div>
+            <button onClick={() => setShowNotifyReport(false)} className="text-ink-muted text-sm cursor-pointer">✕</button>
+          </div>
+          {occupiedFlats.length === 0 ? (
+            <div className="text-center py-6 text-ink-muted text-sm">No tenants yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-warm-50">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Tenant</th>
+                    <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Flat</th>
+                    <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Phone / Email</th>
+                    <th className="px-2 py-1.5 text-center text-ink-muted font-bold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {occupiedFlats.map(flat => {
+                    const tu = (flat.tenant as { user?: { full_name: string; phone: string; email: string; notifications_enabled?: boolean } | null } | null)?.user;
+                    if (!tu) return null;
+                    const on = tu.notifications_enabled !== false;
+                    return (
+                      <tr key={flat.id} className="border-b border-border-light hover:bg-warm-50 cursor-pointer" onClick={() => { setShowNotifyReport(false); openEdit(flat); }}>
+                        <td className="px-2 py-1.5 font-semibold text-ink">{tu.full_name}</td>
+                        <td className="px-2 py-1.5 text-ink-muted">{flat.flat_number}{flat.block ? ` (${flat.block})` : ""}</td>
+                        <td className="px-2 py-1.5 text-ink-muted">{tu.phone} · {tu.email}</td>
+                        <td className="px-2 py-1.5 text-center">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${on ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>{on ? "🔔 On" : "🔕 Off"}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Bulk Results Modal */}
       {bulkResults && <BulkTenantResultsModal results={bulkResults} onClose={() => setBulkResults(null)} />}
@@ -1232,6 +1284,13 @@ export default function LandlordTenants() {
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2 text-[11px] text-yellow-700">
             Login will be auto-generated — User ID: <strong>TNT-####</strong>, Password: <strong>{form.full_name ? form.full_name.split(" ")[0] + "@####" : "FirstName@####"}</strong>. You can view or change these anytime from the tenant&apos;s 🔑 Credentials button.
           </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={notifyTenant} onChange={e => setNotifyTenant(e.target.checked)} className="w-4 h-4" />
+            <span className="text-[11px] font-semibold text-ink">Send login details to tenant via Email &amp; WhatsApp</span>
+          </label>
+          {!notifyTenant && (
+            <div className="text-[10px] text-ink-muted -mt-2">Tenant won&apos;t be emailed or WhatsApp&apos;d. Share the credentials yourself from the tenant&apos;s 🔑 Credentials button.</div>
+          )}
           <button type="submit" disabled={saving} className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold cursor-pointer disabled:opacity-60">{saving ? "Adding Tenant..." : "Add Tenant"}</button>
         </form>
       )}
@@ -1306,7 +1365,7 @@ export default function LandlordTenants() {
             <div className="text-center py-8 text-ink-muted text-sm">No tenants match the current filters.</div>
           ) : (
             pagedFlats.map((flat) => {
-              const tenantUser = (flat.tenant as { id: string; user?: { full_name: string; phone: string; email: string } | null } | null)?.user;
+              const tenantUser = (flat.tenant as { id: string; user?: { full_name: string; phone: string; email: string; notifications_enabled?: boolean } | null } | null)?.user;
               const society = flat.society as { name: string; city: string } | null;
               const agreement = getAgreement(flat);
               if (!tenantUser) return null;
@@ -1328,6 +1387,7 @@ export default function LandlordTenants() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="text-sm font-extrabold text-ink">{tenantUser.full_name}</div>
                         {leaseBadge && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${leaseBadge.cls}`}>{leaseBadge.label}</span>}
+                        {tenantUser.notifications_enabled === false && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600" title="Email & WhatsApp notifications are off for this tenant">🔕 Notify Off</span>}
                       </div>
                       <div className="text-[11px] text-ink-muted">{flat.flat_number}{flat.block ? ` (${flat.block})` : ""}{society ? ` · ${society.name}` : ""}</div>
                       <div className="text-[11px] text-ink-muted">{tenantUser.phone} · {tenantUser.email}</div>
@@ -1626,6 +1686,13 @@ export default function LandlordTenants() {
                     </div>
                   </div>
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer bg-warm-50 rounded-xl p-3 border border-border-default">
+                  <input type="checkbox" checked={editForm.notifications_enabled} onChange={e => setEditForm(f => ({ ...f, notifications_enabled: e.target.checked }))} className="w-4 h-4" />
+                  <span className="text-[11px] font-semibold text-ink">Notify this tenant (Email &amp; WhatsApp)</span>
+                </label>
+                {!editForm.notifications_enabled && (
+                  <div className="text-[10px] text-ink-muted -mt-2">Rent reminders, receipts, and all other automated messages will not be sent to this tenant until re-enabled.</div>
+                )}
                 <div className="flex gap-2 pt-1">
                   <button type="button" onClick={() => setEditFlat(null)} className="flex-1 py-2.5 rounded-xl border border-border-default text-sm font-bold cursor-pointer">Cancel</button>
                   <button type="submit" disabled={savingEdit} className="flex-1 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-bold cursor-pointer disabled:opacity-60">{savingEdit ? "Saving..." : "Save Changes"}</button>

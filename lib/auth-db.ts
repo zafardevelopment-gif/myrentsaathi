@@ -446,11 +446,13 @@ export async function updateTenant(params: {
   lease_end: string;
   late_fee_type?: "percentage" | "fixed" | null;
   late_fee_value?: number | null;
+  notifications_enabled?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   const { error: userErr } = await supabase.from("users").update({
     full_name: params.full_name.trim(),
     phone: params.phone.trim(),
     email: params.email.trim().toLowerCase(),
+    ...(params.notifications_enabled !== undefined ? { notifications_enabled: params.notifications_enabled } : {}),
   }).eq("id", params.userRecordId);
   if (userErr) return { success: false, error: userErr.message };
 
