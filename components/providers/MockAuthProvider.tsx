@@ -22,6 +22,7 @@ interface MockUser {
   role: MockRole;
   name: string;
   email: string;
+  phone?: string;
 }
 
 interface AuthContextType {
@@ -29,6 +30,7 @@ interface AuthContextType {
   hydrated: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  updateProfile: (patch: { name?: string; phone?: string }) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -36,6 +38,7 @@ const AuthContext = createContext<AuthContextType>({
   hydrated: false,
   login: async () => ({ success: false }),
   logout: () => {},
+  updateProfile: () => {},
 });
 
 export function MockAuthProvider({ children }: { children: ReactNode }) {
@@ -75,6 +78,7 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
       role: mappedRole,
       name: result.user.full_name,
       email: result.user.email,
+      phone: result.user.phone ?? undefined,
     };
     setUser(newUser);
     localStorage.setItem("mrs_user", JSON.stringify(newUser));
@@ -87,8 +91,17 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("mrs_user");
   };
 
+  const updateProfile = (patch: { name?: string; phone?: string }) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, ...(patch.name !== undefined ? { name: patch.name } : {}), ...(patch.phone !== undefined ? { phone: patch.phone } : {}) };
+      localStorage.setItem("mrs_user", JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, hydrated, login, logout }}>
+    <AuthContext.Provider value={{ user, hydrated, login, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );
