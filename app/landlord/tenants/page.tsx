@@ -326,8 +326,10 @@ export default function LandlordTenants() {
 
   // Optional scheduled rent hike at tenant creation
   const [scheduleHike, setScheduleHike] = useState(false);
-  const [notifyTenant, setNotifyTenant] = useState(true);
+  const [notifyTenant, setNotifyTenant] = useState(false);
   const [showNotifyReport, setShowNotifyReport] = useState(false);
+  const [notifySelected, setNotifySelected] = useState<Set<string>>(new Set());
+  const [savingBulkNotify, setSavingBulkNotify] = useState(false);
   const [hikeForm, setHikeForm] = useState({
     hike_type: "percentage" as "percentage" | "fixed", hike_value: "", effective_date: "",
     recurring: false, frequency: "yearly" as "monthly" | "quarterly" | "half_yearly" | "yearly",
@@ -504,7 +506,7 @@ export default function LandlordTenants() {
       lease_end: tenantRec?.lease_end ?? "",
       late_fee_type: (tenantRec?.late_fee_type as "percentage" | "fixed") ?? "percentage",
       late_fee_value: tenantRec?.late_fee_value != null ? String(tenantRec.late_fee_value) : "",
-      notifications_enabled: tenantUser?.notifications_enabled ?? true,
+      notifications_enabled: tenantUser?.notifications_enabled ?? false,
     });
     setLoadingEdit(false);
   }
@@ -538,6 +540,18 @@ export default function LandlordTenants() {
 
     toast.success("Tenant updated.");
     setEditFlat(null);
+    setLoading(true);
+    await loadData();
+  }
+
+  async function handleBulkNotifyToggle(enabled: boolean) {
+    if (notifySelected.size === 0) return;
+    setSavingBulkNotify(true);
+    const { error } = await supabase.from("users").update({ notifications_enabled: enabled }).in("id", Array.from(notifySelected));
+    setSavingBulkNotify(false);
+    if (error) { toast.error("Failed to update notification status."); return; }
+    toast.success(`Notifications turned ${enabled ? "on" : "off"} for ${notifySelected.size} tenant${notifySelected.size > 1 ? "s" : ""}.`);
+    setNotifySelected(new Set());
     setLoading(true);
     await loadData();
   }
@@ -889,7 +903,7 @@ export default function LandlordTenants() {
 
     setForm({ full_name: "", email: "", phone: "", flat_id: "", monthly_rent: "", security_deposit: "", lease_start: "", lease_end: "", late_fee_type: "percentage", late_fee_value: "" });
     setScheduleHike(false);
-    setNotifyTenant(true);
+    setNotifyTenant(false);
     setHikeForm({ hike_type: "percentage", hike_value: "", effective_date: "", recurring: false, frequency: "yearly" });
     setShowForm(false);
     setLoading(true);
@@ -1048,48 +1062,79 @@ export default function LandlordTenants() {
         </div>
       </div>
 
-      {/* Notification Status Report — one place to see who's on/off */}
-      {showNotifyReport && (
+      {/* Notification Status Report — one place to see who's on/off, with bulk toggle */}
+      {showNotifyReport && (() => {
+        const notifyReportTenantIds = occupiedFlats.map(f => (f.tenant as { id: string } | null)?.id).filter(Boolean) as string[];
+        return (
         <div className="bg-white rounded-[14px] p-4 border border-border-default mb-4">
           <div className="flex justify-between items-center mb-3">
             <div className="text-sm font-bold text-ink">🔔 Tenant Notification Status</div>
-            <button onClick={() => setShowNotifyReport(false)} className="text-ink-muted text-sm cursor-pointer">✕</button>
+            <button onClick={() => { setShowNotifyReport(false); setNotifySelected(new Set()); }} className="text-ink-muted text-sm cursor-pointer">✕</button>
           </div>
           {occupiedFlats.length === 0 ? (
             <div className="text-center py-6 text-ink-muted text-sm">No tenants yet.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-warm-50">
-                  <tr>
-                    <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Tenant</th>
-                    <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Flat</th>
-                    <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Phone / Email</th>
-                    <th className="px-2 py-1.5 text-center text-ink-muted font-bold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {occupiedFlats.map(flat => {
-                    const tu = (flat.tenant as { user?: { full_name: string; phone: string; email: string; notifications_enabled?: boolean } | null } | null)?.user;
-                    if (!tu) return null;
-                    const on = tu.notifications_enabled !== false;
-                    return (
-                      <tr key={flat.id} className="border-b border-border-light hover:bg-warm-50 cursor-pointer" onClick={() => { setShowNotifyReport(false); openEdit(flat); }}>
-                        <td className="px-2 py-1.5 font-semibold text-ink">{tu.full_name}</td>
-                        <td className="px-2 py-1.5 text-ink-muted">{flat.flat_number}{flat.block ? ` (${flat.block})` : ""}</td>
-                        <td className="px-2 py-1.5 text-ink-muted">{tu.phone} · {tu.email}</td>
-                        <td className="px-2 py-1.5 text-center">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${on ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>{on ? "🔔 On" : "🔕 Off"}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {notifySelected.size > 0 && (
+                <div className="flex items-center gap-2 mb-2 bg-warm-50 rounded-xl px-3 py-2">
+                  <span className="text-[11px] font-semibold text-ink-muted">{notifySelected.size} selected</span>
+                  <button onClick={() => handleBulkNotifyToggle(true)} disabled={savingBulkNotify} className="px-2.5 py-1 rounded-lg bg-green-500 text-white text-[10px] font-bold cursor-pointer disabled:opacity-60">🔔 Turn On</button>
+                  <button onClick={() => handleBulkNotifyToggle(false)} disabled={savingBulkNotify} className="px-2.5 py-1 rounded-lg bg-gray-500 text-white text-[10px] font-bold cursor-pointer disabled:opacity-60">🔕 Turn Off</button>
+                  <button onClick={() => setNotifySelected(new Set())} className="text-[10px] text-ink-muted font-semibold cursor-pointer ml-auto">Clear</button>
+                </div>
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-warm-50">
+                    <tr>
+                      <th className="px-2 py-1.5 text-center w-8">
+                        <input
+                          type="checkbox"
+                          checked={notifyReportTenantIds.length > 0 && notifySelected.size === notifyReportTenantIds.length}
+                          onChange={() => setNotifySelected(prev => prev.size === notifyReportTenantIds.length ? new Set() : new Set(notifyReportTenantIds))}
+                          className="cursor-pointer"
+                        />
+                      </th>
+                      <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Tenant</th>
+                      <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Flat</th>
+                      <th className="px-2 py-1.5 text-left text-ink-muted font-bold">Phone / Email</th>
+                      <th className="px-2 py-1.5 text-center text-ink-muted font-bold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {occupiedFlats.map(flat => {
+                      const tenant = flat.tenant as { id: string; user?: { full_name: string; phone: string; email: string; notifications_enabled?: boolean } | null } | null;
+                      const tu = tenant?.user;
+                      if (!tu || !tenant) return null;
+                      const on = tu.notifications_enabled === true;
+                      const isSelected = notifySelected.has(tenant.id);
+                      return (
+                        <tr key={flat.id} className={`border-b border-border-light hover:bg-warm-50 ${isSelected ? "bg-brand-50" : ""}`}>
+                          <td className="px-2 py-1.5 text-center" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => setNotifySelected(prev => { const next = new Set(prev); if (next.has(tenant.id)) next.delete(tenant.id); else next.add(tenant.id); return next; })}
+                              className="cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-2 py-1.5 font-semibold text-ink cursor-pointer" onClick={() => { setShowNotifyReport(false); openEdit(flat); }}>{tu.full_name}</td>
+                          <td className="px-2 py-1.5 text-ink-muted cursor-pointer" onClick={() => { setShowNotifyReport(false); openEdit(flat); }}>{flat.flat_number}{flat.block ? ` (${flat.block})` : ""}</td>
+                          <td className="px-2 py-1.5 text-ink-muted cursor-pointer" onClick={() => { setShowNotifyReport(false); openEdit(flat); }}>{tu.phone} · {tu.email}</td>
+                          <td className="px-2 py-1.5 text-center">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${on ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>{on ? "🔔 On" : "🔕 Off"}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Bulk Results Modal */}
       {bulkResults && <BulkTenantResultsModal results={bulkResults} onClose={() => setBulkResults(null)} />}
