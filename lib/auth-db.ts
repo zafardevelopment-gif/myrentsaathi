@@ -324,8 +324,8 @@ export async function addTenant(params: {
   landlord_id: string;
   monthly_rent: number;
   security_deposit: number;
-  lease_start: string;
-  lease_end: string;
+  lease_start?: string;
+  lease_end?: string;
   late_fee_type?: "percentage" | "fixed" | null;
   late_fee_value?: number | null;
 }): Promise<{ success: boolean; error?: string; generatedPassword?: string; generatedUserId?: string; loginEmail?: string; userRecordId?: string; tenantRecordId?: string }> {
@@ -382,8 +382,8 @@ export async function addTenant(params: {
     user_id: userId,
     flat_id: params.flat_id,
     landlord_id: params.landlord_id,
-    lease_start: params.lease_start,
-    lease_end: params.lease_end,
+    lease_start: params.lease_start || null,
+    lease_end: params.lease_end || null,
     monthly_rent: params.monthly_rent,
     security_deposit: params.security_deposit,
     status: "active",
@@ -442,8 +442,8 @@ export async function updateTenant(params: {
   phone: string;
   monthly_rent: number;
   security_deposit: number;
-  lease_start: string;
-  lease_end: string;
+  lease_start?: string;
+  lease_end?: string;
   late_fee_type?: "percentage" | "fixed" | null;
   late_fee_value?: number | null;
   notifications_enabled?: boolean;
@@ -459,8 +459,8 @@ export async function updateTenant(params: {
   const { error: tenantErr } = await supabase.from("tenants").update({
     monthly_rent: params.monthly_rent,
     security_deposit: params.security_deposit,
-    lease_start: params.lease_start,
-    lease_end: params.lease_end,
+    ...(params.lease_start ? { lease_start: params.lease_start } : {}),
+    ...(params.lease_end ? { lease_end: params.lease_end } : {}),
     late_fee_type: params.late_fee_type ?? null,
     late_fee_value: params.late_fee_value ?? null,
   }).eq("id", params.tenantRecordId);

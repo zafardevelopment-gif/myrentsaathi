@@ -704,10 +704,6 @@ export default function LandlordTenants() {
           if (!upd.success) { results.push({ flat_number, block, tenant_name: full_name, status: "error", error: upd.error }); continue; }
           results.push({ flat_number, block, tenant_name: full_name, status: "updated" });
         } else {
-          if (!row.lease_start || !row.lease_end) {
-            results.push({ flat_number, block, tenant_name: full_name, status: "error", error: "Missing lease_start or lease_end" });
-            continue;
-          }
           const add = await addTenant({
             full_name,
             email: row.email || "",
@@ -717,8 +713,8 @@ export default function LandlordTenants() {
             landlord_id: landlordId,
             monthly_rent: row.monthly_rent ? Number(row.monthly_rent) : 0,
             security_deposit: row.security_deposit ? Number(row.security_deposit) : 0,
-            lease_start: row.lease_start,
-            lease_end: row.lease_end,
+            lease_start: row.lease_start || undefined,
+            lease_end: row.lease_end || undefined,
             late_fee_type,
             late_fee_value,
           });
