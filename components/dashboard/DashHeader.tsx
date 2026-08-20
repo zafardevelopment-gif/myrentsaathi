@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAuth, type MockRole } from "@/components/providers/MockAuthProvider";
+import { useTheme } from "@/components/providers/ThemeProvider";
 
 const ROLE_LABELS: Record<MockRole, { label: string; color: string; bg: string }> = {
   superadmin: { label: "Super Admin", color: "text-amber-600",  bg: "bg-amber-100"  },
@@ -18,6 +19,7 @@ interface DashHeaderProps {
 
 export default function DashHeader({ onMenuClick }: DashHeaderProps) {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
 
   if (!user) return null;
@@ -56,6 +58,15 @@ export default function DashHeader({ onMenuClick }: DashHeaderProps) {
         <span className={`px-2.5 py-1 rounded-2xl text-[10px] font-bold tracking-wide ${roleInfo.color} ${roleInfo.bg}`}>
           {roleInfo.label}
         </span>
+
+        <button
+          onClick={toggleTheme}
+          className="w-8 h-8 flex items-center justify-center rounded-xl border border-border-default text-ink-muted hover:text-ink cursor-pointer transition-colors"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          aria-label="Toggle dark mode"
+        >
+          {theme === "dark" ? "☀️" : "🌙"}
+        </button>
 
         <button
           onClick={handleLogout}
