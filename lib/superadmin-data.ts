@@ -214,7 +214,7 @@ export type UserDetail = User & {
   tenant_limit?: number;
   vacant_flats_count?: number;
   occupied_flats_count?: number;
-  tenant_list?: { id: string; full_name: string; email: string; phone: string; flat_number: string | null; block: string | null; monthly_rent: number | null; status: string }[];
+  tenant_list?: { id: string; user_id: string; flat_id: string | null; full_name: string; email: string; phone: string; flat_number: string | null; block: string | null; monthly_rent: number | null; status: string; is_active: boolean }[];
 };
 
 export async function getUserDetail(id: string): Promise<UserDetail | null> {
@@ -266,20 +266,30 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
       ? supabase.from("tenants").select("id").eq("user_id", id)
       : Promise.resolve({ data: [] }),
 
-    // Landlord: full tenant details in their flats
+    // Landlord: full tenant details for flats they own (matched by flat_id, not tenants.landlord_id
+    // which isn't reliably populated for all tenant records)
     role === "landlord"
-      ? supabase
-          .from("tenants")
-          .select("id, status, monthly_rent, user:users(full_name, email, phone), flat:flats(flat_number, block)")
-          .eq("landlord_id", id)
-          .eq("status", "active")
+      ? (async () => {
+          const { data: ownedFlats } = await supabase.from("flats").select("id").eq("owner_id", id);
+          const flatIds = (ownedFlats ?? []).map((f) => f.id);
+          if (flatIds.length === 0) return { data: [] };
+          return supabase
+            .from("tenants")
+            .select("id, user_id, flat_id, status, monthly_rent, user:users(full_name, email, phone, is_active), flat:flats(flat_number, block)")
+            .in("flat_id", flatIds)
+            .order("status", { ascending: true });
+        })()
       : Promise.resolve({ data: [] }),
   ]);
 
   const societyLandlordsRes = roleCountsRes[0] as { data: { id: string }[] | null };
   const societyTenantsRes   = roleCountsRes[1] as { data: { id: string }[] | null };
   const landlordTenantsRes  = roleCountsRes[3] as {
-    data: { id: string; status: string; monthly_rent: number | null; user: { full_name: string; email: string; phone: string } | { full_name: string; email: string; phone: string }[] | null; flat: { flat_number: string; block: string | null } | { flat_number: string; block: string | null }[] | null }[] | null
+    data: {
+      id: string; user_id: string; flat_id: string | null; status: string; monthly_rent: number | null;
+      user: { full_name: string; email: string; phone: string; is_active: boolean } | { full_name: string; email: string; phone: string; is_active: boolean }[] | null;
+      flat: { flat_number: string; block: string | null } | { flat_number: string; block: string | null }[] | null;
+    }[] | null
   };
 
   const flats = flatsRes.data ?? [];
@@ -299,6 +309,8 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
     const flat = Array.isArray(t.flat) ? t.flat[0] : t.flat;
     return {
       id: t.id,
+      user_id: t.user_id,
+      flat_id: t.flat_id,
       full_name: user?.full_name ?? "—",
       email: user?.email ?? "—",
       phone: user?.phone ?? "—",
@@ -306,6 +318,7 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
       block: flat?.block ?? null,
       monthly_rent: t.monthly_rent,
       status: t.status,
+      is_active: user?.is_active ?? true,
     };
   });
 
@@ -340,6 +353,26 @@ export async function updateTenantLimit(id: string, tenant_limit: number) {
     .update({ tenant_limit, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * End a tenancy: marks the tenant record vacated and frees up the flat.
+ * Does not delete the tenant's user account — use deleteUser() separately if needed.
+ */
+export async function vacateTenant(tenantId: string, flatId: string | null) {
+  const { error: tErr } = await supabase
+    .from("tenants")
+    .update({ status: "vacated", updated_at: new Date().toISOString() })
+    .eq("id", tenantId);
+  if (tErr) throw tErr;
+
+  if (flatId) {
+    const { error: fErr } = await supabase
+      .from("flats")
+      .update({ current_tenant_id: null, status: "vacant" })
+      .eq("id", flatId);
+    if (fErr) throw fErr;
+  }
 }
 
 export async function updateUserStatus(id: string, is_active: boolean) {

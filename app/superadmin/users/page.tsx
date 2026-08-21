@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
 import toast from "react-hot-toast";
-import { getAllUsers, updateUserStatus, deleteUser, getUserDetail, updateTenantLimit, type User, type UserDetail } from "@/lib/superadmin-data";
+import { getAllUsers, updateUserStatus, deleteUser, getUserDetail, updateTenantLimit, vacateTenant, type User, type UserDetail } from "@/lib/superadmin-data";
 
 const PAGE_SIZE = 15;
 
@@ -56,14 +56,46 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
   const [loading, setLoading] = useState(true);
   const [limitDraft, setLimitDraft] = useState<number | null>(null);
   const [savingLimit, setSavingLimit] = useState(false);
+  const [actingTenant, setActingTenant] = useState<string | null>(null);
+  const [confirmVacate, setConfirmVacate] = useState<{ id: string; flat_id: string | null; full_name: string } | null>(null);
 
-  useEffect(() => {
+  function refresh() {
     getUserDetail(userId).then((d) => {
       setDetail(d);
       setLimitDraft(d?.tenant_limit ?? 5);
       setLoading(false);
     });
-  }, [userId]);
+  }
+
+  useEffect(() => { refresh(); }, [userId]);
+
+  async function handleVacate() {
+    if (!confirmVacate) return;
+    setActingTenant(confirmVacate.id);
+    try {
+      await vacateTenant(confirmVacate.id, confirmVacate.flat_id);
+      toast.success(`${confirmVacate.full_name} vacated`);
+      setConfirmVacate(null);
+      refresh();
+    } catch {
+      toast.error("Failed to vacate tenant — check RLS policies");
+    } finally {
+      setActingTenant(null);
+    }
+  }
+
+  async function handleTenantStatus(t: NonNullable<UserDetail["tenant_list"]>[number]) {
+    setActingTenant(t.id);
+    try {
+      await updateUserStatus(t.user_id, !t.is_active);
+      toast.success(t.is_active ? "Tenant login deactivated" : "Tenant login activated");
+      refresh();
+    } catch {
+      toast.error("Failed — check RLS policies");
+    } finally {
+      setActingTenant(null);
+    }
+  }
 
   async function saveLimit(next: number) {
     if (!detail || next < 0 || savingLimit) return;
@@ -242,27 +274,65 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
             )}
 
             {/* Landlord Tenant List */}
-            {detail.role === "landlord" && detail.tenant_list && detail.tenant_list.length > 0 && (
+            {detail.role === "landlord" && (
               <div>
-                <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">Tenants</div>
-                <div className="space-y-1.5">
-                  {detail.tenant_list.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between gap-2 bg-warm-50 rounded-xl px-3 py-2 border border-border-default">
-                      <div className="min-w-0">
-                        <div className="text-[11px] font-semibold text-ink truncate">{t.full_name}</div>
-                        <div className="text-[9px] text-ink-muted truncate">{t.email} · {t.phone}</div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-[10px] font-bold text-ink">
-                          {t.flat_number ? `${t.flat_number}${t.block ? ` (${t.block})` : ""}` : "—"}
-                        </div>
-                        <div className="text-[9px] text-ink-muted">
-                          {t.monthly_rent ? `₹${t.monthly_rent}/mo` : "—"}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">
+                  Tenants ({detail.tenant_list?.length ?? 0})
                 </div>
+                {!detail.tenant_list || detail.tenant_list.length === 0 ? (
+                  <div className="text-[11px] text-ink-muted bg-warm-50 rounded-xl px-3 py-3 text-center border border-border-default">
+                    No tenants yet.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {detail.tenant_list.map((t) => (
+                      <div key={t.id} className="bg-warm-50 rounded-xl px-3 py-2 border border-border-default">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[11px] font-semibold text-ink truncate">{t.full_name}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                t.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                              }`}>{t.status}</span>
+                              {!t.is_active && (
+                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-600">login off</span>
+                              )}
+                            </div>
+                            <div className="text-[9px] text-ink-muted truncate">{t.email} · {t.phone}</div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-[10px] font-bold text-ink">
+                              {t.flat_number ? `${t.flat_number}${t.block ? ` (${t.block})` : ""}` : "—"}
+                            </div>
+                            <div className="text-[9px] text-ink-muted">
+                              {t.monthly_rent ? `₹${t.monthly_rent}/mo` : "—"}
+                            </div>
+                          </div>
+                        </div>
+                        {t.status === "active" && (
+                          <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border-light">
+                            <button
+                              onClick={() => handleTenantStatus(t)}
+                              disabled={actingTenant === t.id}
+                              className={`px-2 py-1 rounded-lg border text-[9px] font-semibold cursor-pointer disabled:opacity-50 ${
+                                t.is_active ? "border-red-200 text-red-500 hover:bg-red-50" : "border-green-200 text-green-600 hover:bg-green-50"
+                              }`}
+                            >
+                              {t.is_active ? "Deactivate Login" : "Activate Login"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmVacate({ id: t.id, flat_id: t.flat_id, full_name: t.full_name })}
+                              disabled={actingTenant === t.id}
+                              className="px-2 py-1 rounded-lg border border-amber-300 text-amber-600 text-[9px] font-semibold cursor-pointer hover:bg-amber-50 disabled:opacity-50"
+                            >
+                              Vacate / Terminate
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -311,6 +381,29 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
           </div>
         )}
       </div>
+
+      {/* Vacate confirmation */}
+      {confirmVacate && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setConfirmVacate(null)}>
+          <div className="w-full max-w-sm rounded-[18px] bg-white p-5 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="text-3xl mb-3">🚪</div>
+            <div className="text-base font-extrabold text-ink mb-1">Vacate Tenant?</div>
+            <div className="text-sm text-ink-muted mb-1">
+              <strong>{confirmVacate.full_name}</strong> will be marked vacated and the flat freed up.
+            </div>
+            <div className="text-xs text-ink-muted mb-4">
+              Their login and history are kept — this only ends the tenancy.
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmVacate(null)} className="flex-1 py-2.5 rounded-xl border border-border-default text-sm font-bold cursor-pointer">Cancel</button>
+              <button onClick={handleVacate} disabled={actingTenant === confirmVacate.id}
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-bold cursor-pointer disabled:opacity-60">
+                {actingTenant === confirmVacate.id ? "Vacating…" : "Vacate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
