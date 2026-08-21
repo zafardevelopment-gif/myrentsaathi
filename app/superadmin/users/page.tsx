@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
 import toast from "react-hot-toast";
-import { getAllUsers, updateUserStatus, deleteUser, getUserDetail, type User, type UserDetail } from "@/lib/superadmin-data";
+import { getAllUsers, updateUserStatus, deleteUser, getUserDetail, updateTenantLimit, type User, type UserDetail } from "@/lib/superadmin-data";
 
 const PAGE_SIZE = 15;
 
@@ -54,10 +54,31 @@ function PlanBadge({ sub }: { sub: User["subscription"] }) {
 function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => void }) {
   const [detail, setDetail] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [limitDraft, setLimitDraft] = useState<number | null>(null);
+  const [savingLimit, setSavingLimit] = useState(false);
 
   useEffect(() => {
-    getUserDetail(userId).then((d) => { setDetail(d); setLoading(false); });
+    getUserDetail(userId).then((d) => {
+      setDetail(d);
+      setLimitDraft(d?.tenant_limit ?? 5);
+      setLoading(false);
+    });
   }, [userId]);
+
+  async function saveLimit(next: number) {
+    if (!detail || next < 0 || savingLimit) return;
+    setSavingLimit(true);
+    try {
+      await updateTenantLimit(detail.id, next);
+      setLimitDraft(next);
+      setDetail((d) => (d ? { ...d, tenant_limit: next } : d));
+      toast.success("Tenant capacity updated");
+    } catch {
+      toast.error("Failed to update capacity — check RLS policies");
+    } finally {
+      setSavingLimit(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -155,18 +176,22 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
                   </div>
                 </div>
               ) : detail.role === "landlord" ? (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
                     <div className="text-[18px] font-extrabold text-ink">{detail.flats_count}</div>
-                    <div className="text-[9px] text-ink-muted">Flats Owned</div>
+                    <div className="text-[9px] text-ink-muted">Total Properties</div>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-2.5 text-center border border-green-100">
+                    <div className="text-[18px] font-extrabold text-green-600">{detail.occupied_flats_count ?? 0}</div>
+                    <div className="text-[9px] text-ink-muted">Occupied</div>
+                  </div>
+                  <div className="bg-amber-50 rounded-xl p-2.5 text-center border border-amber-100">
+                    <div className="text-[18px] font-extrabold text-amber-600">{detail.vacant_flats_count ?? 0}</div>
+                    <div className="text-[9px] text-ink-muted">Vacant</div>
                   </div>
                   <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
                     <div className="text-[18px] font-extrabold text-blue-600">{detail.tenants_count}</div>
                     <div className="text-[9px] text-ink-muted">Active Tenants</div>
-                  </div>
-                  <div className="bg-warm-50 rounded-xl p-2.5 text-center border border-border-default">
-                    <div className="text-[18px] font-extrabold text-ink">{detail.payments_count}</div>
-                    <div className="text-[9px] text-ink-muted">Payments</div>
                   </div>
                 </div>
               ) : (
@@ -183,6 +208,64 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
               )}
             </div>
 
+            {/* Landlord Capacity */}
+            {detail.role === "landlord" && (
+              <div className="bg-warm-50 rounded-[12px] p-3.5 border border-border-default">
+                <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">Tenant Capacity</div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] text-ink-muted">
+                    Max tenants allowed: <span className="font-bold text-ink">{limitDraft ?? detail.tenant_limit ?? 5}</span>
+                    {" · "}Using {detail.tenants_count}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => saveLimit(Math.max(0, (limitDraft ?? 5) - 1))}
+                      disabled={savingLimit || (limitDraft ?? 5) <= 0}
+                      className="w-7 h-7 rounded-lg border border-border-default text-ink font-bold text-[13px] cursor-pointer disabled:opacity-40 hover:bg-warm-100"
+                    >−</button>
+                    <input
+                      type="number"
+                      min={0}
+                      value={limitDraft ?? 5}
+                      onChange={(e) => setLimitDraft(Math.max(0, Number(e.target.value) || 0))}
+                      onBlur={(e) => saveLimit(Math.max(0, Number(e.target.value) || 0))}
+                      className="w-12 text-center px-1 py-1 rounded-lg border border-border-default text-[12px] font-bold bg-white"
+                    />
+                    <button
+                      onClick={() => saveLimit((limitDraft ?? 5) + 1)}
+                      disabled={savingLimit}
+                      className="w-7 h-7 rounded-lg border border-border-default text-ink font-bold text-[13px] cursor-pointer disabled:opacity-40 hover:bg-warm-100"
+                    >+</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Landlord Tenant List */}
+            {detail.role === "landlord" && detail.tenant_list && detail.tenant_list.length > 0 && (
+              <div>
+                <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">Tenants</div>
+                <div className="space-y-1.5">
+                  {detail.tenant_list.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between gap-2 bg-warm-50 rounded-xl px-3 py-2 border border-border-default">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-semibold text-ink truncate">{t.full_name}</div>
+                        <div className="text-[9px] text-ink-muted truncate">{t.email} · {t.phone}</div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-[10px] font-bold text-ink">
+                          {t.flat_number ? `${t.flat_number}${t.block ? ` (${t.block})` : ""}` : "—"}
+                        </div>
+                        <div className="text-[9px] text-ink-muted">
+                          {t.monthly_rent ? `₹${t.monthly_rent}/mo` : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Societies */}
             {detail.societies.length > 0 && (
               <div>
@@ -191,10 +274,19 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
                   {detail.societies.map((s) => (
                     <div key={s.id} className="flex items-center gap-2 bg-warm-50 rounded-xl px-3 py-2 border border-border-default">
                       <span className="text-[14px]">🏢</span>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <div className="text-[11px] font-semibold text-ink">{s.name}</div>
                         <div className="text-[9px] text-ink-muted">{s.city}</div>
                       </div>
+                      {(detail.role === "society_admin" || detail.role === "board_member") && (
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-[9px] text-ink-muted">
+                            Landlords {s.total_landlords ?? 0}
+                            {typeof s.landlord_limit === "number" ? ` / ${s.landlord_limit}` : ""}
+                          </div>
+                          <div className="text-[9px] text-ink-muted">Flats {s.total_flats ?? 0}</div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

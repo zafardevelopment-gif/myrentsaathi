@@ -209,26 +209,31 @@ export type UserDetail = User & {
   tenants_count: number;   // landlord: tenants in their flats | society_admin: total tenants in society
   landlords_count: number; // society_admin: total landlords in society
   payments_count: number;
-  societies: { id: string; name: string; city: string; total_flats?: number; total_landlords?: number; total_tenants?: number }[];
+  societies: { id: string; name: string; city: string; total_flats?: number; total_landlords?: number; total_tenants?: number; landlord_limit?: number }[];
+  // Landlord-only
+  tenant_limit?: number;
+  vacant_flats_count?: number;
+  occupied_flats_count?: number;
+  tenant_list?: { id: string; full_name: string; email: string; phone: string; flat_number: string | null; block: string | null; monthly_rent: number | null; status: string }[];
 };
 
 export async function getUserDetail(id: string): Promise<UserDetail | null> {
   const [userRes, societyMemberRes] = await Promise.all([
     supabase
       .from("users")
-      .select("id, full_name, email, phone, role, is_active, created_at, last_login")
+      .select("id, full_name, email, phone, role, is_active, created_at, last_login, tenant_limit")
       .eq("id", id)
       .maybeSingle(),
-    supabase.from("society_members").select("society:societies(id, name, city, total_flats)").eq("user_id", id),
+    supabase.from("society_members").select("society:societies(id, name, city, total_flats, landlord_limit)").eq("user_id", id),
   ]);
 
   if (!userRes.data) return null;
   const role = userRes.data.role;
 
   const rawSocieties = (societyMemberRes.data ?? [])
-    .flatMap((m: { society: { id: string; name: string; city: string; total_flats?: number }[] }) =>
+    .flatMap((m: { society: { id: string; name: string; city: string; total_flats?: number; landlord_limit?: number }[] }) =>
       Array.isArray(m.society) ? m.society : (m.society ? [m.society] : [])
-    ) as { id: string; name: string; city: string; total_flats?: number }[];
+    ) as { id: string; name: string; city: string; total_flats?: number; landlord_limit?: number }[];
 
   // Fetch role-specific counts in parallel
   const [subRes, flatsRes, paymentsRes, ...roleCountsRes] = await Promise.all([
@@ -241,7 +246,7 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
       .maybeSingle(),
 
     // Landlord: flats they own
-    supabase.from("flats").select("id, current_tenant_id").eq("owner_id", id),
+    supabase.from("flats").select("id, status, current_tenant_id").eq("owner_id", id),
 
     // Landlord: rent payments made to them
     supabase.from("rent_payments").select("id").eq("landlord_id", id),
@@ -260,20 +265,49 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
     role === "tenant"
       ? supabase.from("tenants").select("id").eq("user_id", id)
       : Promise.resolve({ data: [] }),
+
+    // Landlord: full tenant details in their flats
+    role === "landlord"
+      ? supabase
+          .from("tenants")
+          .select("id, status, monthly_rent, user:users(full_name, email, phone), flat:flats(flat_number, block)")
+          .eq("landlord_id", id)
+          .eq("status", "active")
+      : Promise.resolve({ data: [] }),
   ]);
 
   const societyLandlordsRes = roleCountsRes[0] as { data: { id: string }[] | null };
   const societyTenantsRes   = roleCountsRes[1] as { data: { id: string }[] | null };
+  const landlordTenantsRes  = roleCountsRes[3] as {
+    data: { id: string; status: string; monthly_rent: number | null; user: { full_name: string; email: string; phone: string } | { full_name: string; email: string; phone: string }[] | null; flat: { flat_number: string; block: string | null } | { flat_number: string; block: string | null }[] | null }[] | null
+  };
 
   const flats = flatsRes.data ?? [];
   // Landlord tenants = flats that have an active tenant
   const landlordTenantCount = flats.filter((f: { current_tenant_id: string | null }) => f.current_tenant_id).length;
+  const occupiedFlatsCount = flats.filter((f: { status: string }) => f.status === "occupied").length;
+  const vacantFlatsCount = flats.length - occupiedFlatsCount;
 
   const societies = rawSocieties.map((s) => ({
     ...s,
     total_landlords: societyLandlordsRes.data?.length ?? 0,
     total_tenants: societyTenantsRes.data?.length ?? 0,
   }));
+
+  const tenantList = (landlordTenantsRes.data ?? []).map((t) => {
+    const user = Array.isArray(t.user) ? t.user[0] : t.user;
+    const flat = Array.isArray(t.flat) ? t.flat[0] : t.flat;
+    return {
+      id: t.id,
+      full_name: user?.full_name ?? "—",
+      email: user?.email ?? "—",
+      phone: user?.phone ?? "—",
+      flat_number: flat?.flat_number ?? null,
+      block: flat?.block ?? null,
+      monthly_rent: t.monthly_rent,
+      status: t.status,
+    };
+  });
 
   return {
     ...userRes.data,
@@ -293,7 +327,19 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
     landlords_count: societyLandlordsRes.data?.length ?? 0,
     payments_count: paymentsRes.data?.length ?? 0,
     societies,
+    vacant_flats_count: vacantFlatsCount,
+    occupied_flats_count: occupiedFlatsCount,
+    tenant_list: tenantList,
   } as UserDetail;
+}
+
+/** Update a landlord's tenant capacity (max tenants their plan/account allows). */
+export async function updateTenantLimit(id: string, tenant_limit: number) {
+  const { error } = await supabase
+    .from("users")
+    .update({ tenant_limit, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
 }
 
 export async function updateUserStatus(id: string, is_active: boolean) {
