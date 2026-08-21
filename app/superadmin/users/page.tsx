@@ -51,7 +51,7 @@ function PlanBadge({ sub }: { sub: User["subscription"] }) {
   );
 }
 
-function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => void }) {
+function UserDetailModal({ userId, onClose, onNavigate }: { userId: string; onClose: () => void; onNavigate: (id: string) => void }) {
   const [detail, setDetail] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [limitDraft, setLimitDraft] = useState<number | null>(null);
@@ -73,7 +73,7 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
     if (!confirmVacate) return;
     setActingTenant(confirmVacate.id);
     try {
-      await vacateTenant(confirmVacate.id, confirmVacate.flat_id);
+      await vacateTenant(confirmVacate.flat_id);
       toast.success(`${confirmVacate.full_name} vacated`);
       setConfirmVacate(null);
       refresh();
@@ -189,6 +189,36 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
               )}
             </div>
 
+            {/* Tenant: which landlord/flat they belong to */}
+            {detail.role === "tenant" && (
+              <div className="bg-warm-50 rounded-[12px] p-3.5 border border-border-default">
+                <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">Rented Property</div>
+                {detail.flat_info ? (
+                  <div className="text-[11px] text-ink mb-2">
+                    <span className="font-bold">{detail.flat_info.flat_number}{detail.flat_info.block ? ` (${detail.flat_info.block})` : ""}</span>
+                    {detail.flat_info.society_name && <span className="text-ink-muted"> · {detail.flat_info.society_name}</span>}
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-ink-muted mb-2">No active flat found</div>
+                )}
+                {detail.landlord ? (
+                  <div
+                    className="flex items-center gap-2 bg-white rounded-xl px-3 py-2 border border-border-default cursor-pointer hover:bg-warm-100"
+                    onClick={() => onNavigate(detail.landlord!.id)}
+                    title="View landlord details"
+                  >
+                    <span className="text-[14px]">👤</span>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold text-ink truncate underline decoration-dotted">{detail.landlord.full_name}</div>
+                      <div className="text-[9px] text-ink-muted truncate">{detail.landlord.email} · {detail.landlord.phone}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-ink-muted">No landlord linked</div>
+                )}
+              </div>
+            )}
+
             {/* Activity Stats — role-specific */}
             <div>
               <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wider mb-2">Activity</div>
@@ -288,9 +318,13 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
                     {detail.tenant_list.map((t) => (
                       <div key={t.id} className="bg-warm-50 rounded-xl px-3 py-2 border border-border-default">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
+                          <div
+                            className="min-w-0 cursor-pointer hover:opacity-70"
+                            onClick={() => onNavigate(t.user_id)}
+                            title="View tenant details"
+                          >
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[11px] font-semibold text-ink truncate">{t.full_name}</span>
+                              <span className="text-[11px] font-semibold text-ink truncate underline decoration-dotted">{t.full_name}</span>
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
                                 t.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
                               }`}>{t.status}</span>
@@ -713,7 +747,11 @@ export default function SuperAdminUsers() {
 
       {/* User Detail Modal */}
       {selectedUserId && (
-        <UserDetailModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} />
+        <UserDetailModal
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+          onNavigate={(id) => setSelectedUserId(id)}
+        />
       )}
 
       {/* Delete confirmation */}

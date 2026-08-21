@@ -215,6 +215,9 @@ export type UserDetail = User & {
   vacant_flats_count?: number;
   occupied_flats_count?: number;
   tenant_list?: { id: string; user_id: string; flat_id: string | null; full_name: string; email: string; phone: string; flat_number: string | null; block: string | null; monthly_rent: number | null; status: string; is_active: boolean }[];
+  // Tenant-only: which landlord/flat this tenant belongs to
+  landlord?: { id: string; full_name: string; email: string; phone: string } | null;
+  flat_info?: { flat_number: string; block: string | null; society_name: string | null } | null;
 };
 
 export async function getUserDetail(id: string): Promise<UserDetail | null> {
@@ -246,7 +249,7 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
       .maybeSingle(),
 
     // Landlord: flats they own
-    supabase.from("flats").select("id, status, current_tenant_id").eq("owner_id", id),
+    supabase.from("flats").select("id, status, current_tenant_id, flat_number, block, monthly_rent").eq("owner_id", id),
 
     // Landlord: rent payments made to them
     supabase.from("rent_payments").select("id").eq("landlord_id", id),
@@ -261,41 +264,28 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
       ? supabase.from("society_members").select("id").eq("role", "tenant").in("society_id", rawSocieties.map((s) => s.id))
       : Promise.resolve({ data: [] }),
 
-    // Tenant: their own tenant record
+    // Tenant: their own tenant record (if one exists — legacy tenants may only have flats.current_tenant_id)
     role === "tenant"
-      ? supabase.from("tenants").select("id").eq("user_id", id)
+      ? supabase.from("tenants").select("id, flat_id, monthly_rent, status").eq("user_id", id)
       : Promise.resolve({ data: [] }),
 
-    // Landlord: full tenant details for flats they own (matched by flat_id, not tenants.landlord_id
-    // which isn't reliably populated for all tenant records)
-    role === "landlord"
-      ? (async () => {
-          const { data: ownedFlats } = await supabase.from("flats").select("id").eq("owner_id", id);
-          const flatIds = (ownedFlats ?? []).map((f) => f.id);
-          if (flatIds.length === 0) return { data: [] };
-          return supabase
-            .from("tenants")
-            .select("id, user_id, flat_id, status, monthly_rent, user:users(full_name, email, phone, is_active), flat:flats(flat_number, block)")
-            .in("flat_id", flatIds)
-            .order("status", { ascending: true });
-        })()
-      : Promise.resolve({ data: [] }),
+    // Tenant: the flat they occupy + its owner (landlord), found via flats.current_tenant_id
+    role === "tenant"
+      ? supabase.from("flats").select("id, flat_number, block, owner_id, society:societies(name)").eq("current_tenant_id", id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const societyLandlordsRes = roleCountsRes[0] as { data: { id: string }[] | null };
   const societyTenantsRes   = roleCountsRes[1] as { data: { id: string }[] | null };
-  const landlordTenantsRes  = roleCountsRes[3] as {
-    data: {
-      id: string; user_id: string; flat_id: string | null; status: string; monthly_rent: number | null;
-      user: { full_name: string; email: string; phone: string; is_active: boolean } | { full_name: string; email: string; phone: string; is_active: boolean }[] | null;
-      flat: { flat_number: string; block: string | null } | { flat_number: string; block: string | null }[] | null;
-    }[] | null
+  const tenantFlatRes = roleCountsRes[3] as {
+    data: { id: string; flat_number: string; block: string | null; owner_id: string | null; society: { name: string } | { name: string }[] | null } | null
   };
 
   const flats = flatsRes.data ?? [];
-  // Landlord tenants = flats that have an active tenant
-  const landlordTenantCount = flats.filter((f: { current_tenant_id: string | null }) => f.current_tenant_id).length;
-  const occupiedFlatsCount = flats.filter((f: { status: string }) => f.status === "occupied").length;
+  // Landlord tenants = flats that have an active tenant (current_tenant_id is the source of truth;
+  // the `tenants` table row is often missing for legacy/manually-seeded occupancies)
+  const occupiedFlatsList = flats.filter((f: { status: string; current_tenant_id: string | null }) => f.current_tenant_id || f.status === "occupied");
+  const occupiedFlatsCount = occupiedFlatsList.length;
   const vacantFlatsCount = flats.length - occupiedFlatsCount;
 
   const societies = rawSocieties.map((s) => ({
@@ -304,23 +294,59 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
     total_tenants: societyTenantsRes.data?.length ?? 0,
   }));
 
-  const tenantList = (landlordTenantsRes.data ?? []).map((t) => {
-    const user = Array.isArray(t.user) ? t.user[0] : t.user;
-    const flat = Array.isArray(t.flat) ? t.flat[0] : t.flat;
-    return {
-      id: t.id,
-      user_id: t.user_id,
-      flat_id: t.flat_id,
-      full_name: user?.full_name ?? "—",
-      email: user?.email ?? "—",
-      phone: user?.phone ?? "—",
-      flat_number: flat?.flat_number ?? null,
-      block: flat?.block ?? null,
-      monthly_rent: t.monthly_rent,
-      status: t.status,
-      is_active: user?.is_active ?? true,
-    };
-  });
+  // Landlord: build tenant list from flats.current_tenant_id (authoritative), enriching with
+  // the `tenants` table row (rent/lease/status) where one happens to exist.
+  let tenantList: NonNullable<UserDetail["tenant_list"]> = [];
+  if (role === "landlord") {
+    const tenantFlats = flats.filter((f: { current_tenant_id: string | null }) => f.current_tenant_id) as
+      { id: string; status: string; current_tenant_id: string; flat_number?: string; block?: string | null; monthly_rent?: number | null }[];
+    const tenantUserIds = tenantFlats.map((f) => f.current_tenant_id);
+
+    if (tenantUserIds.length > 0) {
+      const [tenantUsersRes, flatDetailsRes, tenantRowsRes] = await Promise.all([
+        supabase.from("users").select("id, full_name, email, phone, is_active").in("id", tenantUserIds),
+        supabase.from("flats").select("id, flat_number, block, monthly_rent, current_tenant_id").in("id", tenantFlats.map((f) => f.id)),
+        supabase.from("tenants").select("id, flat_id, status, monthly_rent").in("flat_id", tenantFlats.map((f) => f.id)),
+      ]);
+      const userById: Record<string, { full_name: string; email: string; phone: string; is_active: boolean }> = {};
+      (tenantUsersRes.data ?? []).forEach((u) => { userById[u.id] = u; });
+      const flatById: Record<string, { flat_number: string; block: string | null; monthly_rent: number | null }> = {};
+      (flatDetailsRes.data ?? []).forEach((f) => { flatById[f.id] = f; });
+      const tenantRowByFlat: Record<string, { id: string; status: string; monthly_rent: number | null }> = {};
+      (tenantRowsRes.data ?? []).forEach((t) => { if (t.flat_id) tenantRowByFlat[t.flat_id] = t; });
+
+      tenantList = tenantFlats.map((f) => {
+        const user = userById[f.current_tenant_id];
+        const flat = flatById[f.id];
+        const tenantRow = tenantRowByFlat[f.id];
+        return {
+          id: tenantRow?.id ?? f.id,
+          user_id: f.current_tenant_id,
+          flat_id: f.id,
+          full_name: user?.full_name ?? "—",
+          email: user?.email ?? "—",
+          phone: user?.phone ?? "—",
+          flat_number: flat?.flat_number ?? null,
+          block: flat?.block ?? null,
+          monthly_rent: tenantRow?.monthly_rent ?? flat?.monthly_rent ?? null,
+          status: tenantRow?.status ?? "active",
+          is_active: user?.is_active ?? true,
+        };
+      });
+    }
+  }
+
+  const tenantFlat = tenantFlatRes.data;
+  let landlordInfo: UserDetail["landlord"] = null;
+  if (role === "tenant" && tenantFlat?.owner_id) {
+    const { data: landlordUser } = await supabase
+      .from("users")
+      .select("id, full_name, email, phone")
+      .eq("id", tenantFlat.owner_id)
+      .maybeSingle();
+    landlordInfo = landlordUser ?? null;
+  }
+  const tenantSociety = Array.isArray(tenantFlat?.society) ? tenantFlat.society[0] : tenantFlat?.society;
 
   return {
     ...userRes.data,
@@ -336,13 +362,15 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
     flats_count: flats.length,
     tenants_count: role === "society_admin" || role === "board_member"
       ? (societyTenantsRes.data?.length ?? 0)
-      : landlordTenantCount,
+      : occupiedFlatsCount,
     landlords_count: societyLandlordsRes.data?.length ?? 0,
     payments_count: paymentsRes.data?.length ?? 0,
     societies,
     vacant_flats_count: vacantFlatsCount,
     occupied_flats_count: occupiedFlatsCount,
     tenant_list: tenantList,
+    landlord: landlordInfo,
+    flat_info: tenantFlat ? { flat_number: tenantFlat.flat_number, block: tenantFlat.block, society_name: tenantSociety?.name ?? null } : null,
   } as UserDetail;
 }
 
@@ -356,23 +384,26 @@ export async function updateTenantLimit(id: string, tenant_limit: number) {
 }
 
 /**
- * End a tenancy: marks the tenant record vacated and frees up the flat.
+ * End a tenancy: marks any matching tenant record vacated and frees up the flat.
+ * Matched by flat_id (not tenants.id) since many occupancies only have flats.current_tenant_id
+ * set, with no corresponding `tenants` table row.
  * Does not delete the tenant's user account — use deleteUser() separately if needed.
  */
-export async function vacateTenant(tenantId: string, flatId: string | null) {
+export async function vacateTenant(flatId: string | null) {
+  if (!flatId) throw new Error("No flat associated with this tenant");
+
   const { error: tErr } = await supabase
     .from("tenants")
     .update({ status: "vacated", updated_at: new Date().toISOString() })
-    .eq("id", tenantId);
+    .eq("flat_id", flatId)
+    .eq("status", "active");
   if (tErr) throw tErr;
 
-  if (flatId) {
-    const { error: fErr } = await supabase
-      .from("flats")
-      .update({ current_tenant_id: null, status: "vacant" })
-      .eq("id", flatId);
-    if (fErr) throw fErr;
-  }
+  const { error: fErr } = await supabase
+    .from("flats")
+    .update({ current_tenant_id: null, status: "vacant" })
+    .eq("id", flatId);
+  if (fErr) throw fErr;
 }
 
 export async function updateUserStatus(id: string, is_active: boolean) {
