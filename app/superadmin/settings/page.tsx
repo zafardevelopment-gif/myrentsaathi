@@ -100,13 +100,48 @@ const SETTING_GROUPS = [
 // ─── Field Input ──────────────────────────────────────────────
 
 function SecretField({
-  label, name, value, onChange, placeholder, hint,
+  label, name, value, onChange, placeholder, hint, configKey,
 }: {
   label: string; name: string; value: string;
   onChange: (v: string) => void; placeholder?: string; hint?: string;
+  configKey?: string;
 }) {
   const [show, setShow] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [revealedValue, setRevealedValue] = useState<string | null>(null);
   const isMasked = value.includes("••••");
+
+  async function handleToggleShow() {
+    if (show) {
+      setShow(false);
+      return;
+    }
+    if (isMasked && configKey && revealedValue === null) {
+      setRevealing(true);
+      try {
+        const res = await fetch("/api/platform-config/reveal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: configKey }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          setRevealedValue(json.value);
+        } else {
+          toast.error(json.error || "Could not reveal value");
+          return;
+        }
+      } catch {
+        toast.error("Could not reveal value");
+        return;
+      } finally {
+        setRevealing(false);
+      }
+    }
+    setShow(true);
+  }
+
+  const displayValue = show && isMasked && revealedValue !== null ? revealedValue : value;
 
   return (
     <div>
@@ -115,25 +150,29 @@ function SecretField({
         <input
           type={show ? "text" : "password"}
           name={name}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={displayValue}
+          onChange={(e) => {
+            // Editing always targets the real draft value, not the masked placeholder
+            setRevealedValue(null);
+            setShow(false);
+            onChange(e.target.value);
+          }}
           placeholder={placeholder}
           className="w-full px-3 py-2 pr-16 rounded-xl border border-border-default text-[12px] text-ink bg-white focus:outline-none focus:border-amber-400 font-mono"
         />
-        {!isMasked && (
-          <button
-            type="button"
-            onClick={() => setShow((s) => !s)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-blue-500 hover:text-blue-700"
-          >
-            {show ? "Hide" : "Show"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleToggleShow}
+          disabled={revealing}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-blue-500 hover:text-blue-700 disabled:opacity-50"
+        >
+          {revealing ? "..." : show ? "Hide" : "Show"}
+        </button>
       </div>
       {hint && <p className="text-[9px] text-ink-muted mt-1">{hint}</p>}
-      {isMasked && (
+      {isMasked && !show && (
         <p className="text-[9px] text-amber-600 mt-1">
-          Existing value saved. Type a new value to replace it.
+          Existing value saved. Type a new value to replace it, or click Show to view it.
         </p>
       )}
     </div>
@@ -296,6 +335,7 @@ export default function SuperAdminSettings() {
               <SecretField
                 label="Key Secret"
                 name="razorpay_key_secret"
+                configKey="razorpay_key_secret"
                 value={razorpayDraft.razorpay_key_secret}
                 onChange={(v) => setRazorpayDraft((d) => ({ ...d, razorpay_key_secret: v }))}
                 placeholder="Enter Razorpay Key Secret"
@@ -304,6 +344,7 @@ export default function SuperAdminSettings() {
               <SecretField
                 label="Webhook Secret"
                 name="razorpay_webhook_secret"
+                configKey="razorpay_webhook_secret"
                 value={razorpayDraft.razorpay_webhook_secret}
                 onChange={(v) => setRazorpayDraft((d) => ({ ...d, razorpay_webhook_secret: v }))}
                 placeholder="Enter Webhook Secret (optional)"
@@ -352,6 +393,7 @@ export default function SuperAdminSettings() {
               <SecretField
                 label="Access Token (Permanent)"
                 name="whatsapp_access_token"
+                configKey="whatsapp_access_token"
                 value={whatsappDraft.whatsapp_access_token}
                 onChange={(v) => setWhatsappDraft((d) => ({ ...d, whatsapp_access_token: v }))}
                 placeholder="EAAxxxxxxxxxxxxxxxxx"
@@ -574,6 +616,7 @@ export default function SuperAdminSettings() {
               <SecretField
                 label="SMTP Password / App Password"
                 name="smtp_password"
+                configKey="smtp_password"
                 value={smtpDraft.smtp_password}
                 onChange={(v) => setSmtpDraft((d) => ({ ...d, smtp_password: v }))}
                 placeholder="Gmail App Password ya SMTP password"
