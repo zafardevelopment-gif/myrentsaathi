@@ -95,6 +95,12 @@ export const KEYWORDS = [
 // ── Google Search Console verification (env-driven) ──────────────────────────
 export const GSC_VERIFICATION = process.env.NEXT_PUBLIC_GSC_VERIFICATION;
 
+// ── Bing Webmaster Tools verification (msvalidate.01) ────────────────────────
+// Env-overridable, with the current token as fallback so it survives even if
+// the env var isn't set on Vercel.
+export const BING_VERIFICATION =
+  process.env.NEXT_PUBLIC_BING_VERIFICATION ?? "A7434D03CDC8226495DE20286525CB64";
+
 // ── Crawler policy ───────────────────────────────────────────────────────────
 /** Paths that must never be indexed (authenticated / API / app surfaces). */
 export const DISALLOWED_PATHS = [

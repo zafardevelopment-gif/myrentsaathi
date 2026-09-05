@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import {
   SITE, SITE_URL, ORG, PRICING, KEYWORDS,
-  GSC_VERIFICATION, absoluteUrl,
+  GSC_VERIFICATION, BING_VERIFICATION, absoluteUrl,
 } from "@/lib/seo/config";
 import { Outfit, Playfair_Display } from "next/font/google";
 import { Toaster } from "react-hot-toast";
@@ -74,9 +74,11 @@ export const metadata: Metadata = {
   },
   // GSC verification is env-driven (NEXT_PUBLIC_GSC_VERIFICATION). When unset,
   // the meta tag is simply omitted.
-  ...(GSC_VERIFICATION
-    ? { verification: { google: GSC_VERIFICATION } }
-    : {}),
+  verification: {
+    ...(GSC_VERIFICATION ? { google: GSC_VERIFICATION } : {}),
+    // Bing / Microsoft (msvalidate.01)
+    other: { "msvalidate.01": BING_VERIFICATION },
+  },
 };
 
 export const viewport: Viewport = {
