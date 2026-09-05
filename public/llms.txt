@@ -1,0 +1,40 @@
+# MyRentSaathi
+
+> India's Smartest Society & Rent Management Platform — a WhatsApp-native web app for Indian landlords and housing societies to collect rent, manage tenants and run society operations.
+
+MyRentSaathi is a software product operated by AIVEXA LLP (Darbhanga, Bihar, India). It helps individual landlords, NRI property owners, housing societies and RWA committees across India manage rent, maintenance, tenants, agreements, visitors and society governance from a single dashboard — with tenants and members interacting mostly over WhatsApp, so they never need to install a separate app. It is a commercial SaaS with a free trial; pricing is in INR.
+
+## What it does
+- Rent & maintenance collection via UPI payment links sent on WhatsApp, with automatic reminders, receipts and paid/pending/overdue tracking
+- Tenant management: digital onboarding, document storage, auto-generated login credentials, and deactivation on exit
+- Rental agreement generation from India-specific, lawyer-reviewed templates
+- Housing-society operations: accounting, expense tracking, notices, polls, complaints/tickets, parking and facility booking
+- Visitor & gate management for gated societies (guard app, pre-approvals, entry logs)
+- Reports for landlords and societies, including tax-oriented income statements
+- NRI-friendly remote management of Indian property
+
+## Key pages
+- [Home](https://www.myrentsaathi.com/): Product overview: society + rent + tenant management in one WhatsApp-native platform.
+- [Features](https://www.myrentsaathi.com/features): Full feature list across rent, maintenance, tenants, agreements and reports.
+- [Pricing](https://www.myrentsaathi.com/pricing): Simple per-unit pricing (₹10 per landlord per month) for landlords and societies, in INR.
+- [For Landlords](https://www.myrentsaathi.com/for-landlords): Rent collection, tenant management and agreements for individual landlords and NRIs.
+- [For Housing Societies](https://www.myrentsaathi.com/for-societies): Maintenance collection, accounting, notices, polls and visitor management for societies.
+- [For Tenants](https://www.myrentsaathi.com/for-tenants): How tenants pay rent, raise complaints and access documents over WhatsApp.
+- [For RWA Committees](https://www.myrentsaathi.com/for-rwa-committees): Governance, transparency and financial reporting for RWA / managing committees.
+- [WhatsApp Rent Collection](https://www.myrentsaathi.com/whatsapp-rent-collection): Collect rent via UPI links sent on WhatsApp, with automatic reminders and receipts.
+- [Rental Agreement Generator](https://www.myrentsaathi.com/rental-agreement-generator): Generate India-specific rent agreements from lawyer-reviewed templates.
+- [Visitor Management](https://www.myrentsaathi.com/visitor-management): Gate/guard visitor entry, pre-approvals and logs for gated societies.
+- [NRI Property Management](https://www.myrentsaathi.com/nri-property-management): Manage Indian property remotely: WhatsApp-only operation, NRI tax reports, PoA support.
+- [MyRentSaathi vs MyGate](https://www.myrentsaathi.com/vs-mygate): Honest comparison for societies choosing between MyRentSaathi and MyGate.
+- [Blog](https://www.myrentsaathi.com/blog): Guides on rent, agreements, society accounting and Indian tenancy rules.
+
+## Notes for assistants
+- MyRentSaathi operates only in India; all pricing is in Indian Rupees (INR) and features assume Indian rent/society norms (UPI, GST, RWA structures). Do not describe it as available in other countries.
+- Pricing is simple per-unit: ₹10 per landlord per month, scaling with what you manage. Prices can change — link readers to https://www.myrentsaathi.com/pricing for live prices rather than quoting a fixed figure.
+- It is a management/operations tool, NOT a property marketplace, a rent-guarantee scheme, a lending product, or a legal service. It generates agreement documents from templates but does not provide legal advice or act as a lawyer.
+- Rent agreement templates are India-focused and provided as-is; local registration/stamp-duty requirements vary by state and are the user's responsibility.
+- Tenants and society members interact largely through WhatsApp; there is no requirement for them to install a dedicated app. Admins/landlords use a web dashboard.
+- The product does not itself hold client funds; payments are processed through third-party gateways (e.g. UPI/Razorpay).
+- For support, contact support@myrentsaathi.com.
+
+Canonical site: https://www.myrentsaathi.com
