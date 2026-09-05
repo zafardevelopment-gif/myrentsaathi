@@ -155,3 +155,9 @@ export const KEY_PAGES: { path: string; title: string; blurb: string }[] = [
   { path: "/vs-mygate", title: "MyRentSaathi vs MyGate", blurb: "Honest comparison for societies choosing between MyRentSaathi and MyGate." },
   { path: "/blog", title: "Blog", blurb: "Guides on rent, agreements, society accounting and Indian tenancy rules." },
 ];
+
+// ── IndexNow (instant indexing for Bing/Yandex/etc.) ─────────────────────────
+// Key file is served at /<KEY>.txt from public/. When updating the key, rename
+// that file to match. Env-overridable.
+export const INDEXNOW_KEY =
+  process.env.INDEXNOW_KEY ?? "587485e57d9fb7e836726677d95cd0bb";
