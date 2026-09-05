@@ -30,7 +30,7 @@ const faqJsonLd = {
     {
       "@type": "Question",
       name: "Is MyRentSaathi a good alternative to MyGate?",
-      acceptedAnswer: { "@type": "Answer", text: "Yes. MyRentSaathi covers everything MyGate does for society management, but adds WhatsApp-native rent collection, AI rental agreement generation, NRI property management, and transparent ₹499/month pricing. MyGate is primarily a visitor management and communication app — it lacks integrated rent collection and agreement tools." },
+      acceptedAnswer: { "@type": "Answer", text: "Yes. MyRentSaathi covers everything MyGate does for society management, but adds WhatsApp-native rent collection, AI rental agreement generation, NRI property management, and transparent per-unit pricing (₹10 per landlord/month). MyGate is primarily a visitor management and communication app — it lacks integrated rent collection and agreement tools." },
     },
     {
       "@type": "Question",
@@ -40,7 +40,7 @@ const faqJsonLd = {
     {
       "@type": "Question",
       name: "What is the pricing difference between MyGate and MyRentSaathi?",
-      acceptedAnswer: { "@type": "Answer", text: "MyGate charges per-flat fees and has opaque pricing that varies by society size. MyRentSaathi starts at ₹499/month for landlords and ₹2,999/month for societies — transparent, flat pricing with all features included. 14-day free trial, no credit card required." },
+      acceptedAnswer: { "@type": "Answer", text: "MyGate charges per-flat fees and has opaque pricing that varies by society size. MyRentSaathi uses simple, transparent per-unit pricing — ₹10 per landlord per month — with a free trial and no credit card required. See the pricing page for current plans." },
     },
     {
       "@type": "Question",
@@ -62,7 +62,7 @@ const COMPARISON = [
   { feature: "Landlord-specific dashboard", mrs: true, mygate: false, note: "Multi-property, multi-city" },
   { feature: "Tenant onboarding & KYC", mrs: true, mygate: false, note: "Aadhaar/PAN verification" },
   { feature: "Tax-ready income reports", mrs: true, mygate: false, note: "TDS, Form 26AS prep" },
-  { feature: "Transparent flat pricing", mrs: true, mygate: false, note: "₹499/mo landlord, ₹2,999/mo society" },
+  { feature: "Transparent per-unit pricing", mrs: true, mygate: false, note: "₹10 per landlord/month" },
   { feature: "14-day free trial", mrs: true, mygate: false, note: "" },
   { feature: "Guard app / intercom", mrs: false, mygate: true, note: "MyGate's core strength" },
   { feature: "Vehicle management", mrs: false, mygate: true, note: "" },
@@ -71,7 +71,7 @@ const COMPARISON = [
 const FAQS = [
   { q: "Is MyRentSaathi a good alternative to MyGate?", a: "Yes. MyRentSaathi covers everything MyGate does for society management, but adds WhatsApp-native rent collection, AI agreements, NRI management, and transparent pricing. MyGate is primarily a visitor/communication app." },
   { q: "Does MyGate have rent collection features?", a: "MyGate has basic maintenance collection but lacks WhatsApp-native payment links, AI agreement generation, landlord dashboards, or NRI support. MyRentSaathi is purpose-built for the full rent + society workflow." },
-  { q: "What is the pricing difference?", a: "MyGate has opaque per-flat pricing. MyRentSaathi: ₹499/month for landlords, ₹2,999/month for societies — all features included, 14-day free trial, no credit card." },
+  { q: "What is the pricing difference?", a: "MyGate has opaque per-flat pricing that varies by society. MyRentSaathi uses simple per-unit pricing — ₹10 per landlord per month — with a free trial and no credit card. See the pricing page for current plans." },
   { q: "Can MyRentSaathi replace MyGate completely?", a: "For most societies, yes. Only exception: guard app with physical intercom/vehicle barrier integration. For rent + society management, MyRentSaathi is significantly more capable." },
 ];
 
@@ -173,11 +173,10 @@ export default function VsMygatePage() {
               <div className="font-bold text-brand-600 text-[14px] mb-1">MyRentSaathi</div>
               <div className="text-[12px] text-ink/60 mb-4">Transparent flat pricing</div>
               <div className="space-y-2 text-[13px]">
-                <div className="flex justify-between"><span>Landlord Basic</span><strong>₹499/mo</strong></div>
-                <div className="flex justify-between"><span>Landlord Pro (10 properties)</span><strong>₹999/mo</strong></div>
-                <div className="flex justify-between"><span>NRI Plan (unlimited)</span><strong>₹1,999/mo</strong></div>
-                <div className="flex justify-between"><span>Society Starter</span><strong>₹2,999/mo</strong></div>
-                <div className="flex justify-between text-green-600"><span>Free Trial</span><strong>14 days ✓</strong></div>
+                <div className="flex justify-between"><span>Per landlord / month</span><strong>₹10</strong></div>
+                <div className="flex justify-between"><span>Scales with what you manage</span><strong>Per-unit ✓</strong></div>
+                <div className="flex justify-between"><span>All features included</span><strong>✓</strong></div>
+                <div className="flex justify-between text-green-600"><span>Free Trial</span><strong>Yes ✓</strong></div>
               </div>
             </div>
             <div className="bg-white rounded-[16px] border border-border-default p-6">

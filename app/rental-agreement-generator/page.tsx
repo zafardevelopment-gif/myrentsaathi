@@ -74,7 +74,6 @@ const softwareJsonLd = {
     { "@type": "Offer", name: "Lawyer Reviewed", price: "499", priceCurrency: "INR" },
     { "@type": "Offer", name: "Registered Agreement", price: "999", priceCurrency: "INR" },
   ],
-  aggregateRating: { "@type": "AggregateRating", ratingValue: "4.8", reviewCount: "500", bestRating: "5" },
 };
 
 const CITIES = [

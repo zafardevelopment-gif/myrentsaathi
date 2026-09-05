@@ -9,7 +9,7 @@ const BASE_URL = "https://www.myrentsaathi.com";
 export const metadata: Metadata = {
   title: "NRI Property Management India — Manage Your Indian Rentals from Abroad",
   description:
-    "NRI landlords: manage Indian rental properties remotely via WhatsApp. Collect rent via UPI, generate agreements, track tenants — no new app needed. NRI plan from ₹1,999/mo.",
+    "NRI landlords: manage Indian rental properties remotely via WhatsApp. Collect rent via UPI, generate agreements, track tenants — no new app needed. Simple per-unit pricing.",
   keywords: [
     "nri property management india", "nri landlord india", "manage indian property from abroad",
     "nri rental income india", "nri rent collection india", "property management nri",
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   alternates: { canonical: `${BASE_URL}/nri-property-management` },
   openGraph: {
     title: "NRI Property Management India — Manage Your Indian Rentals from Abroad",
-    description: "Manage Indian rental properties remotely via WhatsApp. UPI rent collection, agreements, tenant tracking. NRI plan ₹1,999/mo.",
+    description: "Manage Indian rental properties remotely via WhatsApp. UPI rent collection, agreements, tenant tracking.",
     url: `${BASE_URL}/nri-property-management`,
   },
 };
@@ -45,7 +45,7 @@ const faqJsonLd = {
     {
       "@type": "Question",
       name: "What is the NRI plan pricing?",
-      acceptedAnswer: { "@type": "Answer", text: "The NRI plan is ₹1,999/month — includes unlimited properties across all Indian cities, WhatsApp-native rent collection, NRI-specific tax reports (TDS, Form 26AS), Power of Attorney support, and a multi-city dashboard. 14-day free trial included." },
+      acceptedAnswer: { "@type": "Answer", text: "MyRentSaathi uses simple per-unit pricing (₹10 per landlord per month) that scales with how many properties you manage, and includes WhatsApp-native rent collection, NRI-specific tax reports, Power of Attorney support and a multi-city dashboard. A free trial is included — see the pricing page for current plans." },
     },
   ],
 };
@@ -63,7 +63,7 @@ const FAQS = [
   { q: "Can NRIs manage Indian rental properties remotely?", a: "Yes. MyRentSaathi is built for NRI landlords. Everything via WhatsApp — rent collection, tenant communication, receipts, notices. No new app for tenants." },
   { q: "How do NRIs collect rent from Indian tenants?", a: "Monthly UPI payment links to tenants via WhatsApp. Money to your Indian bank account (T+2 via Razorpay). Automatic receipts and confirmations wherever you are." },
   { q: "Do NRI landlords need Power of Attorney?", a: "For agreement registration: yes, a POA holder in India is needed. For day-to-day management (rent, tenant communication): no POA required. We support both workflows." },
-  { q: "What is the NRI plan pricing?", a: "₹1,999/month — unlimited properties, all cities, NRI tax reports, POA support, multi-city dashboard. 14-day free trial included." },
+  { q: "How does pricing work for NRI landlords?", a: "Simple per-unit pricing — ₹10 per landlord per month — scaling with the properties you manage, with NRI tax reports, POA support and a multi-city dashboard. A free trial is included; see the pricing page for current plans." },
 ];
 
 export default function NriPropertyManagementPage() {
@@ -93,7 +93,7 @@ export default function NriPropertyManagementPage() {
             Book Demo →
           </Link>
           <Link href="/pricing" className="px-8 py-3.5 rounded-xl border border-white/30 text-white font-bold text-[15px] hover:bg-white/10">
-            NRI Plan ₹1,999/mo
+            View Pricing
           </Link>
         </div>
         <div className="flex flex-wrap justify-center gap-6 mt-8 text-[13px] text-white/60">
@@ -125,9 +125,9 @@ export default function NriPropertyManagementPage() {
         <div className="max-w-[700px] mx-auto text-center">
           <h2 className="font-serif text-[28px] font-extrabold text-ink mb-6">NRI Landlord Plan</h2>
           <div className="bg-white rounded-[20px] border-2 border-brand-500 p-8 shadow-lg">
-            <div className="text-[13px] font-bold text-brand-500 mb-1">NRI PLAN</div>
-            <div className="font-serif text-[44px] font-extrabold text-ink mb-1">₹1,999<span className="text-[20px] text-ink/50">/mo</span></div>
-            <div className="text-[13px] text-ink/50 mb-6">14-day free trial · No credit card required</div>
+            <div className="text-[13px] font-bold text-brand-500 mb-1">NRI — PER-UNIT PRICING</div>
+            <div className="font-serif text-[44px] font-extrabold text-ink mb-1">₹10<span className="text-[20px] text-ink/50"> / landlord / mo</span></div>
+            <div className="text-[13px] text-ink/50 mb-6">Per-unit pricing · Free trial · No credit card required</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left mb-8">
               {[
                 "Unlimited properties — all Indian cities",

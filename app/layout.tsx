@@ -1,4 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import {
+  SITE, SITE_URL, ORG, PRICING, KEYWORDS,
+  GSC_VERIFICATION, absoluteUrl,
+} from "@/lib/seo/config";
 import { Outfit, Playfair_Display } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import Providers from "@/components/providers/Providers";
@@ -16,31 +20,19 @@ const playfair = Playfair_Display({
   weight: ["700", "800", "900"],
 });
 
-const BASE_URL = "https://www.myrentsaathi.com";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(BASE_URL),
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "MyRentSaathi — India's Smartest Society & Rent Management Platform",
-    template: "%s | MyRentSaathi",
+    default: `${SITE.name} — ${SITE.tagline}`,
+    template: `%s | ${SITE.name}`,
   },
-  description:
-    "Manage your housing society, collect rent, track maintenance, generate agreements — all in one place. WhatsApp-native. Trusted by landlords & societies across India.",
-  keywords: [
-    "rent management software India",
-    "society management system India",
-    "tenant management app India",
-    "rent collection app India",
-    "housing society software",
-    "online rent collection",
-    "property management India",
-    "maintenance collection app",
-    "landlord software India",
-    "NRI property management",
-  ],
-  authors: [{ name: "MyRentSaathi", url: BASE_URL }],
-  creator: "MyRentSaathi",
-  publisher: "MyRentSaathi",
+  description: SITE.description,
+  keywords: [...KEYWORDS],
+  applicationName: SITE.name,
+  authors: [{ name: SITE.name, url: SITE_URL }],
+  creator: ORG.legalName,
+  publisher: ORG.legalName,
+  category: "technology",
   robots: {
     index: true,
     follow: true,
@@ -54,106 +46,134 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    locale: "en_IN",
-    url: BASE_URL,
-    siteName: "MyRentSaathi",
-    title: "MyRentSaathi — Society + Rent + Tenant = Sab Ek Jagah",
+    locale: SITE.ogLocale,
+    url: SITE_URL,
+    siteName: SITE.name,
+    title: `${SITE.name} — ${SITE.socialTagline}`,
     description:
-      "India's #1 platform for housing society management, rent collection, tenant management & agreements. WhatsApp-native. Start free 14-day trial.",
+      "India's WhatsApp-native platform for housing society management, rent collection, tenant management & agreements. Start a free 14-day trial.",
     images: [
       {
-        url: `${BASE_URL}/og-image.png`,
+        url: absoluteUrl(SITE.ogImage),
         width: 1200,
         height: 630,
-        alt: "MyRentSaathi — Rent & Society Management Platform India",
+        alt: `${SITE.name} — Rent & Society Management Platform India`,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "MyRentSaathi — India's Smartest Rent & Society Management Platform",
+    title: `${SITE.name} — ${SITE.tagline}`,
     description:
       "Manage housing societies, collect rent, track tenants — all via WhatsApp. Start free trial.",
-    images: [`${BASE_URL}/og-image.png`],
-    creator: "@myrentsaathi",
+    images: [absoluteUrl(SITE.ogImage)],
+    creator: SITE.twitterHandle,
   },
   alternates: {
-    canonical: BASE_URL,
+    canonical: SITE_URL,
   },
-  verification: {
-    // Add your Google Search Console verification token here
-    // google: "YOUR_GSC_VERIFICATION_TOKEN",
-  },
-  category: "technology",
+  // GSC verification is env-driven (NEXT_PUBLIC_GSC_VERIFICATION). When unset,
+  // the meta tag is simply omitted.
+  ...(GSC_VERIFICATION
+    ? { verification: { google: GSC_VERIFICATION } }
+    : {}),
+};
+
+export const viewport: Viewport = {
+  themeColor: SITE.themeColor,
+  colorScheme: "light",
 };
 
 // ── Organization JSON-LD ──────────────────────────────────────
 const orgJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: "MyRentSaathi",
-  url: BASE_URL,
-  logo: `${BASE_URL}/logo.png`,
-  description:
-    "India's smartest society & rent management platform. Manage housing societies, collect rent, track maintenance, generate agreements — all in one place.",
-  foundingDate: "2024",
-  areaServed: "IN",
+  "@id": `${SITE_URL}/#organization`,
+  name: SITE.name,
+  legalName: ORG.legalName,
+  url: SITE_URL,
+  logo: absoluteUrl(SITE.logo),
+  description: SITE.description,
+  foundingDate: ORG.foundingDate,
+  areaServed: ORG.areaServed,
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: ORG.addressLocality,
+    addressRegion: ORG.addressRegion,
+    addressCountry: ORG.addressCountry,
+  },
   contactPoint: {
     "@type": "ContactPoint",
+    email: ORG.email,
     contactType: "customer support",
-    availableLanguage: ["English", "Hindi"],
+    availableLanguage: [...ORG.languages],
   },
-  sameAs: [
-    "https://twitter.com/myrentsaathi",
-    "https://www.linkedin.com/company/myrentsaathi",
-  ],
+  sameAs: [...ORG.sameAs],
+};
+
+// ── WebSite JSON-LD (with SearchAction) ───────────────────────
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": `${SITE_URL}/#website`,
+  name: SITE.name,
+  url: SITE_URL,
+  description: SITE.description,
+  inLanguage: SITE.locale,
+  publisher: { "@id": `${SITE_URL}/#organization` },
+  potentialAction: {
+    "@type": "SearchAction",
+    target: {
+      "@type": "EntryPoint",
+      urlTemplate: `${SITE_URL}/blog?q={search_term_string}`,
+    },
+    "query-input": "required name=search_term_string",
+  },
 };
 
 // ── LocalBusiness JSON-LD ─────────────────────────────────────
 const localBusinessJsonLd = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
-  name: "MyRentSaathi",
-  url: BASE_URL,
-  logo: `${BASE_URL}/logo.png`,
-  description: "India's smartest rent & society management platform. WhatsApp-native, AI-powered agreements, UPI rent collection.",
-  priceRange: "₹499–₹9,999/month",
-  serviceType: ["Society Management Software", "Rent Collection App", "Tenant Management Software", "Property Management India"],
-  areaServed: [
-    "Delhi", "Mumbai", "Bangalore", "Hyderabad", "Pune", "Chennai", "Kolkata",
-    "Ahmedabad", "Noida", "Gurgaon", "Surat", "Jaipur", "Lucknow", "Indore",
-    "Bhopal", "Kochi", "Coimbatore", "Nagpur", "Visakhapatnam", "Bhubaneswar",
-    "Chandigarh", "Vadodara", "Thane", "Navi Mumbai", "Faridabad",
-  ].map((name) => ({ "@type": "City", name })),
+  name: SITE.name,
+  url: SITE_URL,
+  logo: absoluteUrl(SITE.logo),
+  description:
+    "India's WhatsApp-native rent & society management platform — UPI rent collection, AI-generated agreements, maintenance & visitor management.",
+  priceRange: "₹₹",
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: ORG.addressLocality,
+    addressRegion: ORG.addressRegion,
+    addressCountry: ORG.addressCountry,
+  },
   contactPoint: {
     "@type": "ContactPoint",
+    email: ORG.email,
     contactType: "customer support",
-    availableLanguage: ["English", "Hindi"],
+    availableLanguage: [...ORG.languages],
   },
 };
 
-// ── SaaS Product JSON-LD ─────────────────────────────────────
+// ── SaaS Product JSON-LD ──────────────────────────────────────
+// NOTE: no aggregateRating here. Review/rating markup is only added back once
+// there are real, verifiable reviews visible on the page — inventing one is a
+// Google structured-data manual-action risk.
 const productJsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "MyRentSaathi",
+  name: SITE.name,
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web, Android, iOS",
-  url: BASE_URL,
+  url: SITE_URL,
   description:
-    "Comprehensive rent management and housing society management SaaS platform for India. Features include rent collection, maintenance tracking, tenant management, agreement generation, and WhatsApp integration.",
+    "Comprehensive rent management and housing society management SaaS for India: rent collection, maintenance tracking, tenant management, agreement generation and WhatsApp integration.",
   offers: {
-    "@type": "AggregateOffer",
-    priceCurrency: "INR",
-    lowPrice: "499",
-    highPrice: "9999",
-    offerCount: "6",
-  },
-  aggregateRating: {
-    "@type": "AggregateRating",
-    ratingValue: "4.8",
-    reviewCount: "500",
-    bestRating: "5",
+    "@type": "Offer",
+    priceCurrency: PRICING.currency,
+    price: PRICING.unitPrice,
+    description: `Pricing is ${PRICING.unitPrice} INR ${PRICING.unit}; see ${SITE_URL}/pricing for current plans.`,
+    url: `${SITE_URL}/pricing`,
   },
 };
 
@@ -164,7 +184,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en-IN"
+      lang={SITE.locale}
       className={`${outfit.variable} ${playfair.variable} h-full antialiased`}
       suppressHydrationWarning
     >
@@ -173,6 +193,12 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(orgJsonLd).replace(/</g, "\\u003c"),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(websiteJsonLd).replace(/</g, "\\u003c"),
           }}
         />
         <script

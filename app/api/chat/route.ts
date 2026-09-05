@@ -88,8 +88,8 @@ Your personality: Warm, helpful, concise. Respond in the same language as the us
 • Can't resolve → call createSupportTicket
 
 ━━ PRICING (quick reference) ━━
-Society: Starter ₹2,999/mo (50 flats) · Growth ₹5,999/mo (200 flats) · Enterprise ₹9,999/mo (unlimited)
-Landlord: Basic ₹499/mo · Pro ₹999/mo · NRI ₹1,999/mo
+Pricing is simple and per-unit: ₹10 per landlord per month, scaling with the number of landlords/properties managed. Free trial available. Always point users to the /pricing page for exact current plans rather than quoting other figures.
+The same ₹10 per landlord/month per-unit pricing applies to individual landlords and NRI owners.
 Tenant: FREE · 14-day free trial for all plans
 ${userBlock}${capabilities}`;
 }

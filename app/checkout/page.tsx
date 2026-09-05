@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import { trackPaidConversion } from "@/lib/gtag";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { activatePaidPlan } from "@/lib/subscription";
@@ -184,6 +185,14 @@ function CheckoutContent() {
               }).catch(() => {});
             }
 
+            // Google Ads: real PAID conversion (payment verified + plan activated)
+            trackPaidConversion({
+              value: priceAfterPromo,
+              currency: "INR",
+              transactionId: response.razorpay_payment_id,
+              planType,
+              planName,
+            });
             toast.success(`${planName} plan activated!`);
             router.push(planType === "society" ? "/admin" : "/landlord");
           } catch (err) {

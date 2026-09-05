@@ -23,7 +23,7 @@ export async function generateMetadata({
 
   return {
     title: `Rent Management Software in ${city.city_name} | MyRentSaathi`,
-    description: `Manage rental properties in ${city.city_name}, ${city.state} with MyRentSaathi. Automate rent collection via UPI, manage tenants, run housing societies. Plans from ₹499/mo.`,
+    description: `Manage rental properties in ${city.city_name}, ${city.state} with MyRentSaathi. Automate rent collection via UPI, manage tenants, run housing societies. Simple per-unit pricing from ₹10/landlord/month.`,
     keywords: [
       `rent management software ${city.city_name}`,
       `landlord software ${city.city_name}`,
@@ -38,14 +38,14 @@ export async function generateMetadata({
     },
     openGraph: {
       title: `Rent Management Software in ${city.city_name} | MyRentSaathi`,
-      description: `Automate rent & maintenance for ${city.city_name} properties & societies. Plans from ₹499/mo.`,
+      description: `Automate rent & maintenance for ${city.city_name} properties & societies. Per-unit pricing from ₹10/landlord/month.`,
       url: `${BASE_URL}/rent-management-software/${slug}`,
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
       title: `Rent Management Software ${city.city_name} — MyRentSaathi`,
-      description: `Automate rent collection for ${city.city_name} properties. WhatsApp-native. Plans from ₹499/mo.`,
+      description: `Automate rent collection for ${city.city_name} properties. WhatsApp-native. Per-unit pricing from ₹10/landlord/month.`,
     },
   };
 }
@@ -96,11 +96,11 @@ function getCityFaqs(city: City): { q: string; a: string }[] {
     },
     {
       q: `What is the pricing for ${city.city_name} landlords?`,
-      a: `Landlord plans start at ₹499/month (up to 3 properties) and ₹999/month (up to 10 properties). Society plans from ₹2,999/month. All plans include a 14-day free trial — no credit card needed.`,
+      a: `MyRentSaathi uses simple per-unit pricing — ₹10 per landlord per month — so you only pay for what you manage, for both individual landlords and societies. A free trial is included with no credit card needed. See the pricing page for current plans.`,
     },
     {
       q: `Can NRI landlords manage ${city.city_name} properties remotely?`,
-      a: `Yes. The NRI plan (₹1,999/month) is built for remote management — WhatsApp-only operation, NRI tax reports, Power of Attorney support, and a multi-city dashboard for all your ${city.city_name} properties.`,
+      a: `Yes. MyRentSaathi is built for remote management — WhatsApp-only operation, NRI tax reports, Power of Attorney support, and a multi-city dashboard for all your ${city.city_name} properties, on the same simple per-unit pricing.`,
     },
     {
       q: `What is the stamp duty for a rent agreement in ${city.city_name}?`,

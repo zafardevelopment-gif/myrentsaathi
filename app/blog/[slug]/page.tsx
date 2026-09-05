@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import HomePageClient from "@/components/website/HomePageClient";
 import Footer from "@/components/website/Footer";
 import { supabase } from "@/lib/supabase";
+import { SITE, SITE_URL, absoluteUrl } from "@/lib/seo/config";
 
-const BASE_URL = "https://www.myrentsaathi.com";
+const BASE_URL = SITE_URL;
 
 // ── Static post data (mirrors DB seed) ───────────────────────
 const STATIC_POSTS: Record<string, {
@@ -14,31 +15,56 @@ const STATIC_POSTS: Record<string, {
 }> = {
   "how-to-collect-rent-online-india": {
     slug: "how-to-collect-rent-online-india",
-    title: "How to Collect Rent Online in India: Complete 2025 Guide",
-    excerpt: "Learn how landlords in India can automate rent collection using UPI, WhatsApp, and property management software. Save hours every month.",
-    content: `## Introduction
+    title: "How to Collect Rent Online in India: Complete 2026 Guide",
+    excerpt: "Step-by-step guide for Indian landlords to collect rent online via UPI and WhatsApp, automate reminders and receipts, and keep tax-ready records. Includes NRI guidance.",
+    content: `## How do you collect rent online in India?
 
-Collecting rent manually in India is a major pain point for landlords. Whether you own 1 flat or 50 properties, chasing tenants, tracking payments, and issuing receipts consumes hours every month.
+To collect rent online in India, a landlord sends the tenant a UPI payment request or link, the tenant pays from any UPI app, and both sides keep a digital receipt. In practice, doing this manually every month — creating the request, following up, saving proof, writing a receipt — is what eats time. Rent-collection software automates the whole cycle so you set it up once and it runs itself.
 
-In this guide, we walk through how to set up **online rent collection in India** using modern tools — including UPI, WhatsApp, and dedicated property management software.
+This guide walks through both the manual method and the automated one, so you can decide what fits your portfolio.
 
-## Why Online Rent Collection Matters
+## Why collect rent online instead of cash or bank transfer?
 
-- **Reduced defaults**: Automated reminders reduce late payments by 60-70%
-- **Digital records**: Every payment is logged — useful for IT returns and disputes
-- **Time savings**: Eliminate manual follow-ups and cash handling
+- **Fewer late payments.** Automated reminders on the due date, and again if a tenant is late, cut down the "I forgot" defaults that manual chasing never fully solves.
+- **A clean paper trail.** Every payment is dated and logged — essential for income-tax filing, for the tenant's HRA claim, and for settling any dispute about what was paid.
+- **No cash handling.** UPI settles directly to your bank account; there is no cash to count, deposit or misplace.
+- **Time back.** For a landlord with even three or four flats, automation removes hours of monthly follow-up.
 
-## Step 1: Set Up a UPI Account
+## Step 1: Set up a UPI ID for rent
 
-Every Indian landlord should have a dedicated UPI ID for rent collection. Use Google Pay, PhonePe, or your bank app.
+Every landlord collecting rent online needs a UPI ID linked to the bank account where rent should land. Google Pay, PhonePe, Paytm or your bank's own app all work. Many landlords keep a dedicated account or UPI ID just for rent, so the records stay clean at tax time.
 
-## Step 2: Use Property Management Software
+## Step 2: Choose manual or automated collection
 
-Platforms like MyRentSaathi automate the entire cycle — bills, reminders, UPI links, receipts.
+**Manual:** each month you create a UPI collect request or send your UPI ID, message the tenant, wait, confirm, and note it down. Workable for a single flat; painful beyond that.
 
-## Step 3: Track and Report
+**Automated (software):** platforms such as MyRentSaathi let you set each tenant and rent amount once. On the due date the software sends a UPI payment link to the tenant on WhatsApp, nudges them if they are late, records the payment when it lands, and issues a receipt automatically. You see paid, pending and overdue across every property from one dashboard.
 
-Download monthly reports for your CA. All payments are tax-ready.`,
+## Step 3: Send reminders that actually get read
+
+The reason WhatsApp-based collection works in India is simple: tenants read WhatsApp, and they already have a UPI app. A payment link delivered on WhatsApp — with no new app to install and no login to remember — removes almost every excuse for a missed payment. This is why WhatsApp-native tools out-collect app-based ones in practice.
+
+## Step 4: Keep tax-ready records
+
+Download monthly or yearly income reports for your CA, and make sure receipts are stored automatically so your tenant can claim HRA without asking you to write slips by hand. Good software keeps this record for you rather than leaving you to assemble screenshots at the last minute.
+
+## How do NRI landlords collect rent in India?
+
+Because the whole flow runs over UPI and WhatsApp, an owner living abroad can collect rent on an Indian property without phone calls or visits — the tenant pays into the Indian account, and the NRI landlord sees the status from any time zone. This remote-first pattern is exactly what NRI-oriented plans are built around.
+
+## Frequently asked questions
+
+**Is it legal to collect rent via UPI in India?**
+Yes. UPI is a standard, regulated payment method; collecting rent through it is completely legal and gives you a cleaner record than cash.
+
+**Do tenants need to download an app to pay rent?**
+With WhatsApp-native software, no. They pay through the UPI app they already use; the link simply arrives on WhatsApp.
+
+**Can I automatically issue rent receipts?**
+Yes. Rent-collection software generates a dated receipt on each payment and stores it, which is what tenants need for HRA claims and you need for tax filing.
+
+**How much does rent-collection software cost?**
+Landlord plans typically start in the low hundreds of rupees per month and scale with the number of properties. Check the provider's live pricing page, and use a free trial before paying.`,
     author: "MyRentSaathi Team",
     category: "Rent Collection",
     tags: ["rent collection", "UPI", "landlord", "India"],
@@ -46,29 +72,64 @@ Download monthly reports for your CA. All payments are tax-ready.`,
   },
   "society-management-software-india": {
     slug: "society-management-software-india",
-    title: "Best Society Management Software in India (2025) — Complete Comparison",
-    excerpt: "Compare the top housing society management software available in India.",
-    content: `## Introduction
+    title: "Best Society Management Software in India (2026) — Honest Comparison",
+    excerpt: "How to choose society management software in India: the features that matter, honest category comparison, real pricing guidance, and FAQs for RWA committees.",
+    content: `## What is society management software?
 
-Managing a housing society manually is error-prone and time-consuming. **Society management software** solves this by digitizing every operation.
+Society management software is a digital platform that replaces the registers, spreadsheets and WhatsApp groups a housing society's committee uses to run day-to-day operations. In India it typically handles maintenance-fee collection, expense accounting, complaint tracking, notices, visitor entry at the gate, and online voting for AGMs — all in one dashboard the managing committee can see, instead of information living only in the treasurer's head.
 
-## What to Look for
+For a registered Co-operative Housing Society (CHS), an apartment owners' association, or an RWA, the right software turns a volunteer-run committee into something that behaves like a professionally managed property — without hiring a professional manager.
 
-### 1. Maintenance Collection
-Auto-generate bills, send reminders, collect UPI payments.
+## What should you look for in society management software in India?
 
-### 2. Expense Management
-Committee-approved expense logging with financial reports.
+Not every tool that works abroad fits an Indian society. These are the features that actually matter here:
 
-### 3. Complaint Management
-Residents raise complaints and track resolution.
+### 1. Online maintenance collection with UPI
+The core job. Good software auto-generates each flat's monthly maintenance bill, sends it with a UPI payment link, records payment automatically, and issues a receipt — so the treasurer stops matching bank SMS to a register by hand. Look for automatic **defaulter tracking**, because chasing dues is where committees lose the most time.
 
-### 4. WhatsApp Integration
-Native WhatsApp support is critical for adoption in India.
+### 2. WhatsApp-native communication
+This is the single biggest adoption factor in India. If residents have to download and log into an app, most never will, and the committee is back to manual follow-up. Software that delivers bills, reminders, notices and poll links over WhatsApp — with nothing for residents to install — sees far higher participation.
 
-## Our Recommendation
+### 3. Transparent expense accounting
+Every rupee spent should be logged with a bill photo and, ideally, a committee-approval step. At year-end you want income-and-expense summaries and balance-sheet-style reports your CA and auditor can use, so a handover to the next committee is not a leap of faith.
 
-MyRentSaathi — WhatsApp-native, automated maintenance, expense management, polls. Plans from ₹2,999/month.`,
+### 4. Complaint and facility management
+Residents should be able to raise plumbing, lift or parking complaints as trackable tickets, and book shared facilities. The committee prioritises and closes them, with a record of what happened.
+
+### 5. Online AGM voting and polls
+Physical AGMs struggle for quorum. Secret-ballot online voting for committee elections and rule changes, with an audit trail, lifts turnout and removes disputes about who voted for what.
+
+### 6. Visitor and gate management
+For gated societies, visitor pre-approval, entry logs and a guard flow keep the gate accountable and residents safe.
+
+## Which society management software is best in India?
+
+The honest answer is that "best" depends on your society's size and priority. The main categories of tool available in India are:
+
+- **Gate-and-community-first apps** (for example MyGate, ADDA): strongest at visitor management and community features, widely used in large metro complexes. Powerful, but often heavier than a small society needs, and priced for scale.
+- **Accounting-first society software**: strong on society books and audit, but frequently weak on resident communication, so adoption suffers.
+- **WhatsApp-native, all-in-one platforms** (for example MyRentSaathi): built so residents never install an app, combining maintenance collection, accounting, complaints, polls and visitor management. Best fit for the many Indian societies of 10–300 flats that want everything in one place without a heavy rollout.
+
+Rather than trust any single "top 10" list — most are affiliate rankings — shortlist two or three, run each on a free trial for one billing cycle, and judge them on the metric that actually matters: **what percentage of residents paid maintenance on time, and how little committee effort it took.**
+
+## How much does society management software cost in India?
+
+Pricing is almost always per-society and scales with flat count. Small societies can expect entry plans in the low thousands of rupees per month; larger complexes pay more for higher flat limits and advanced modules. Because prices change, check each vendor's live pricing page rather than a figure quoted in an article. Most reputable tools offer a free trial — use it before paying.
+
+## Why MyRentSaathi
+
+MyRentSaathi is a WhatsApp-native, all-in-one platform for Indian housing societies: automated maintenance collection over UPI, automatic defaulter tracking, transparent expense accounting, complaint tickets, online AGM voting, and visitor management — with nothing for residents to download. It is built by AIVEXA LLP for Indian societies specifically, from 10-flat buildings to 500+-flat complexes. You can start a free trial and run it for one full billing cycle before deciding.
+
+## Frequently asked questions
+
+**Is society management software worth it for a small society?**
+Yes, if it is priced by flat count and residents don't need to install an app. A 20-flat society benefits most from automated collection and a clean handover between committees.
+
+**Can residents use it without a smartphone app?**
+With WhatsApp-native platforms, yes — residents interact entirely over WhatsApp. Only the committee uses a dashboard.
+
+**Does it replace our CA?**
+No. It keeps clean, auditable books that make your CA's and auditor's job faster, but it does not replace professional audit or filing.`,
     author: "MyRentSaathi Team",
     category: "Society Management",
     tags: ["society management", "housing society", "CHS"],
@@ -76,28 +137,58 @@ MyRentSaathi — WhatsApp-native, automated maintenance, expense management, pol
   },
   "rent-agreement-india-guide": {
     slug: "rent-agreement-india-guide",
-    title: "Rent Agreement in India: Everything You Need to Know in 2025",
-    excerpt: "A complete guide to rental agreements in India — clauses, registration, and how to generate one online.",
-    content: `## What is a Rent Agreement?
+    title: "Rent Agreement in India: Complete 2026 Guide (Registration, Clauses, Online)",
+    excerpt: "Everything Indian landlords and tenants need to know about rent agreements in 2026: 11-month vs registered, mandatory registration rules, stamp duty, key clauses, and making one online.",
+    content: `## What is a rent agreement in India?
 
-A rent agreement is a legally binding contract between a landlord and tenant in India.
+A rent agreement is a legally binding contract between a landlord and a tenant that sets out the rent, deposit, duration and rules for using a property. In India it is the document you rely on if there is ever a dispute about rent, deposit refund, or eviction — so getting it right matters more than most first-time landlords realise.
 
-## Is Registration Mandatory?
+Most residential rentals in India use one of two forms: a **leave and licence** agreement (common in Maharashtra) or a standard **rent/lease agreement**. Both do the same job for everyday renting; the legal mechanics differ by state.
 
-For rentals exceeding 11 months — yes, registration is mandatory under the Registration Act, 1908.
+## Is a rent agreement registration mandatory in India?
 
-## Key Clauses to Include
+It depends on the term. A rent agreement for **12 months or longer** generally must be registered under the Registration Act, 1908. This is why the vast majority of Indian residential agreements are written for **11 months** — an 11-month term avoids compulsory registration while remaining fully valid, and can be renewed. That said, registration gives you stronger legal standing in a dispute, so for higher-value or longer tenancies many landlords register regardless.
 
-1. **Rent amount and due date**
-2. **Security deposit** — typically 2-3 months
-3. **Maintenance charges**
-4. **Notice period** — standard 1-2 months
-5. **Lock-in period**
-6. **Permitted use**
+Stamp duty is separate from registration and is always payable. Rates vary by state — for example, Maharashtra charges a small percentage on leave-and-licence agreements, while other states set their own slab. Always confirm the current rate for your city before finalising.
 
-## Generate Online
+## What clauses should a rent agreement include?
 
-MyRentSaathi's AI agreement generator creates legally-vetted templates for 8 Indian cities.`,
+At minimum, a sound Indian rent agreement should cover:
+
+1. **Rent amount, due date and payment method** — including any UPI/online payment arrangement.
+2. **Security deposit** — the amount (commonly one to three months' rent, higher in some cities) and the exact conditions for its refund.
+3. **Duration and renewal** — the term (usually 11 months) and how renewal or rent revision works.
+4. **Maintenance charges** — who pays society maintenance, and whether it is included in rent.
+5. **Notice period** — typically one to two months for either party to end the tenancy.
+6. **Lock-in period** — if either side is committed for a minimum term.
+7. **Permitted use** — residential only, occupancy limits, subletting rules.
+8. **Responsibilities** — repairs, utility bills, and condition of the property at handover.
+
+A missing or vague clause — especially on deposit refund and notice — is the most common cause of landlord–tenant disputes.
+
+## How do you make a rent agreement online in India?
+
+You no longer need to visit a lawyer for a standard tenancy. The typical online process is: choose a template suited to your city and state, fill in the parties, rent, deposit and clauses, pay the applicable stamp duty (many states support e-stamping), and — if registering — book a slot on the state's registration portal. Software can generate a ready, city-appropriate draft in minutes.
+
+MyRentSaathi's rent-agreement generator produces India-specific agreements from lawyer-reviewed templates, with clauses adjusted for the city, so a first-time landlord gets a sound document without drafting from scratch. It generates the document; stamp duty and any required registration remain the user's responsibility, because those steps are state-specific and legally significant.
+
+## What is the difference between an 11-month and a longer agreement?
+
+An 11-month agreement avoids the compulsory-registration requirement that kicks in at 12 months, which keeps it cheaper and simpler while staying legally valid — this is why it is the default in India. A longer, registered agreement gives the tenant stronger tenancy rights and the landlord stronger enforceability, and is worth it for premium or long-term lets. Neither is "better" universally; it depends on the tenancy.
+
+## Frequently asked questions
+
+**Is an unregistered rent agreement valid in India?**
+An 11-month unregistered agreement is valid and enforceable for most purposes. For 12 months or more, registration is generally mandatory.
+
+**Who pays the stamp duty and registration charges?**
+By custom this is usually the tenant, but it is negotiable and should be stated in the agreement itself.
+
+**Can I make a legally valid rent agreement online?**
+Yes. A properly drafted, correctly stamped online agreement is as valid as one made through a lawyer, provided the stamp-duty and registration rules for your state are followed.
+
+**How much deposit can a landlord ask for?**
+It varies by city and is a matter of agreement, commonly one to three months' rent; some states cap it. Whatever the amount, the refund conditions must be written clearly.`,
     author: "MyRentSaathi Team",
     category: "Legal",
     tags: ["rent agreement", "lease agreement", "legal"],
@@ -106,7 +197,7 @@ MyRentSaathi's AI agreement generator creates legally-vetted templates for 8 Ind
 
   "apni-property-ko-rent-par-kaise-de": {
     slug: "apni-property-ko-rent-par-kaise-de",
-    title: "Apni Property Ko Rent Par Kaise De — Complete Guide 2025",
+    title: "Apni Property Ko Rent Par Kaise De — Complete Guide 2026",
     excerpt: "Ghar ya flat rent par dene ka poora process — tenant dhundhna, rent agreement banana, advance lena, aur payment track karna. Landlords ke liye step-by-step Hindi guide.",
     content: `## Introduction
 
@@ -232,7 +323,7 @@ Apni property rent par dena mushkil nahi hai — bas sahi process follow karo:
 
   "society-maintenance-collection-online-india": {
     slug: "society-maintenance-collection-online-india",
-    title: "Society Maintenance Collection Online: Complete Guide for RWA Committees (2025)",
+    title: "Society Maintenance Collection Online: Complete Guide for RWA Committees (2026)",
     excerpt: "How housing society committees in India can collect maintenance online using UPI, WhatsApp, and society management software. Cut collection time from 15 days to 3 days.",
     content: `## Introduction
 
@@ -285,7 +376,7 @@ No more manual bill preparation every month.
 
 The most effective collection method for Indian housing societies:
 
-1. Resident gets WhatsApp message: "Maintenance due: ₹3,500 for June 2025"
+1. Resident gets WhatsApp message: "Maintenance due: ₹3,500 for June 2026"
 2. Message includes a **UPI payment link** — one tap to pay
 3. Payment goes directly to society bank account
 4. Receipt auto-generated and sent back on WhatsApp
@@ -448,7 +539,16 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
     headline: post.title,
     description: post.excerpt,
     author: { "@type": "Organization", name: post.author },
-    publisher: { "@type": "Organization", name: "MyRentSaathi", url: BASE_URL },
+    publisher: {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE.name,
+      url: SITE_URL,
+      logo: absoluteUrl(SITE.logo),
+    },
+    image: absoluteUrl(SITE.ogImage),
+    isPartOf: { "@id": `${SITE_URL}/#website` },
+    inLanguage: SITE.locale,
     datePublished: post.published_at,
     dateModified: (post as unknown as Record<string, string>).updated_at ?? post.published_at,
     wordCount,
@@ -487,19 +587,6 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
     ],
   };
 
-  const aggregateRatingJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "MyRentSaathi",
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "4.8",
-      reviewCount: "500",
-      bestRating: "5",
-      worstRating: "1",
-    },
-  };
-
   return (
     <div className="bg-background text-ink overflow-x-hidden">
       <script
@@ -509,10 +596,6 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c") }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(aggregateRatingJsonLd).replace(/</g, "\\u003c") }}
       />
       {howToJsonLd && (
         <script

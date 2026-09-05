@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import { trackTrialSignup } from "@/lib/gtag";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/providers/MockAuthProvider";
 import { getActivePricingPlans, type PricingPlan } from "@/lib/pricing-data";
@@ -69,6 +70,8 @@ function SelectPlanContent() {
       toast.error(result.error ?? "Could not start free trial.");
       return;
     }
+    // Google Ads: LEAD conversion (free-trial signup — not a paid sale)
+    trackTrialSignup({ planType, planName: plan.name });
     toast.success(`${freeTrialDays}-day free trial started! Welcome to MyRentSaathi.`);
     router.push(planType === "society" ? "/admin" : "/landlord");
   }
