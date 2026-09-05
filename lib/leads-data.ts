@@ -101,7 +101,7 @@ function nowIso() {
 export async function fetchLeads(): Promise<Lead[]> {
   try {
     const { data, error } = await supabase
-      .from("leads")
+      .from("crm_leads")
       .select("*")
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -126,7 +126,7 @@ export async function createLead(input: LeadInput): Promise<Lead> {
   };
   try {
     const { data, error } = await supabase
-      .from("leads")
+      .from("crm_leads")
       .insert(payload)
       .select("*")
       .single();
@@ -161,7 +161,7 @@ export async function updateLeadStatus(
   // Stamp last-contacted when moving out of "new".
   if (status !== "new") patch.last_contacted_at = nowIso();
   try {
-    const { error } = await supabase.from("leads").update(patch).eq("id", id);
+    const { error } = await supabase.from("crm_leads").update(patch).eq("id", id);
     if (error) throw error;
   } catch {
     const l = memory.find((x) => x.id === id);
@@ -189,7 +189,7 @@ export async function updateLead(
   if (input.followUpAt !== undefined) patch.follow_up_at = input.followUpAt || null;
   if (input.lastContactedAt !== undefined) patch.last_contacted_at = input.lastContactedAt || null;
   try {
-    const { error } = await supabase.from("leads").update(patch).eq("id", id);
+    const { error } = await supabase.from("crm_leads").update(patch).eq("id", id);
     if (error) throw error;
   } catch {
     const l = memory.find((x) => x.id === id);
@@ -199,7 +199,7 @@ export async function updateLead(
 
 export async function deleteLead(id: string): Promise<void> {
   try {
-    const { error } = await supabase.from("leads").delete().eq("id", id);
+    const { error } = await supabase.from("crm_leads").delete().eq("id", id);
     if (error) throw error;
   } catch {
     const i = memory.findIndex((x) => x.id === id);
