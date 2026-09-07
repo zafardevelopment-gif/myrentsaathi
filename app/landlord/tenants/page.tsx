@@ -38,8 +38,8 @@ function lateFeeLabel(type?: "percentage" | "fixed" | null, value?: number | nul
   return type === "percentage" ? `${value}% / day` : `${formatCurrency(value)} / day`;
 }
 
-type TenantModalTab = "payments" | "agreement" | "documents" | "complaints";
-type RentPayment = { id: string; amount: number; month_year: string; status: string; payment_date: string | null; payment_method: string | null };
+type TenantModalTab = "profile" | "payments" | "agreement" | "documents" | "complaints";
+type RentPayment = { id: string; amount: number; month_year: string; status: string; due_date?: string | null; payment_date: string | null; payment_method: string | null };
 type Document = { id: string; title?: string; file_name: string; file_url: string; file_size?: number | null; category?: string; created_at: string };
 type Complaint = { id: string; subject: string; category: string; priority: string; status: string; created_at: string };
 
@@ -298,6 +298,7 @@ export default function LandlordTenants() {
   const [agreements, setAgreements] = useState<LandlordAgreement[]>([]);
   const [landlordId, setLandlordId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reminding, setReminding] = useState<string | null>(null);
 
   // Add tenant form
   const [showForm, setShowForm] = useState(false);
@@ -353,12 +354,13 @@ export default function LandlordTenants() {
   // Agreement modal
   const [agreementFlat, setAgreementFlat] = useState<LandlordFlat | null>(null);
 
-  // Tab modal (Payments / Docs / Complaints)
+  // Tab modal (Profile / Payments / Docs / Complaints)
   const [tabFlat, setTabFlat] = useState<LandlordFlat | null>(null);
-  const [tabActive, setTabActive] = useState<TenantModalTab>("payments");
+  const [tabActive, setTabActive] = useState<TenantModalTab>("profile");
   const [tabPayments, setTabPayments] = useState<RentPayment[]>([]);
   const [tabDocuments, setTabDocuments] = useState<Document[]>([]);
   const [tabComplaints, setTabComplaints] = useState<Complaint[]>([]);
+  const [tabDetail, setTabDetail] = useState<TenantDetail | null>(null);
   const [tabLoading, setTabLoading] = useState(false);
 
   // Receipt
@@ -484,6 +486,28 @@ export default function LandlordTenants() {
     setLoadingKyc(false);
   }
 
+  async function handleRemind(flat: LandlordFlat) {
+    if (!landlordId) { toast.error("Could not identify landlord."); return; }
+    const tenantUser = (flat.tenant as { user?: { full_name: string } | null } | null)?.user;
+    const tenantName = tenantUser?.full_name ?? "Tenant";
+    const flatLabel = `Flat ${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}`;
+    const monthLabel = new Date().toLocaleString("en-IN", { month: "long", year: "numeric" });
+
+    setReminding(flat.id);
+    const { error } = await supabase.from("notices").insert({
+      ...(flat.society_id ? { society_id: flat.society_id } : {}),
+      created_by: landlordId,
+      title: `Rent Reminder — ${monthLabel}`,
+      content: `Dear ${tenantName}, this is a reminder that your rent for ${monthLabel} (${flatLabel}) is pending. Please make the payment at the earliest. Thank you.`,
+      notice_type: "reminder",
+      target_audience: "tenants",
+      is_active: true,
+    });
+    setReminding(null);
+    if (error) { toast.error("Failed to send reminder."); return; }
+    toast.success(`Reminder sent to ${tenantName}'s notices!`);
+  }
+
   async function openEdit(flat: LandlordFlat) {
     setEditFlat(flat);
     setEditTenantRecordId(null);
@@ -560,18 +584,21 @@ export default function LandlordTenants() {
     setTabFlat(flat);
     setTabActive(tab);
     setTabLoading(true);
-    setTabPayments([]); setTabDocuments([]); setTabComplaints([]);
+    setTabPayments([]); setTabDocuments([]); setTabComplaints([]); setTabDetail(null);
 
     const tenantUserId = flat.current_tenant_id;
     let tenantId: string | null = null;
-    if (tenantUserId) {
-      const { data: tr } = await supabase.from("tenants").select("id").eq("user_id", tenantUserId).eq("flat_id", flat.id).maybeSingle();
-      tenantId = tr?.id ?? null;
-    }
+    const { data: tr } = tenantUserId
+      ? await supabase.from("tenants")
+          .select("id, user_id, flat_id, landlord_id, lease_start, lease_end, monthly_rent, security_deposit, status, aadhaar_encrypted, pan_number, emergency_contact, emergency_name, late_fee_type, late_fee_value")
+          .eq("user_id", tenantUserId).eq("flat_id", flat.id).maybeSingle()
+      : { data: null };
+    tenantId = tr?.id ?? null;
+    setTabDetail(tr as TenantDetail | null);
 
     const [payments, docs, complaints] = await Promise.all([
       tenantId
-        ? supabase.from("rent_payments").select("id, amount, month_year, status, payment_date, payment_method").eq("tenant_id", tenantId).order("month_year", { ascending: false }).limit(12)
+        ? supabase.from("rent_payments").select("id, amount, month_year, status, due_date, payment_date, payment_method").eq("tenant_id", tenantId).order("month_year", { ascending: false }).limit(12)
         : Promise.resolve({ data: [] }),
       tenantUserId
         ? supabase.from("documents").select("id, title, file_name, file_url, file_size, created_at").eq("uploaded_by", tenantUserId).order("created_at", { ascending: false })
@@ -1423,10 +1450,10 @@ export default function LandlordTenants() {
               return (
                 <div key={flat.id} className="bg-white rounded-[14px] p-4 border border-border-default mb-3">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-11 h-11 rounded-full bg-brand-100 flex items-center justify-center text-base font-extrabold text-brand-500">{initials}</div>
+                    <button onClick={() => openTabModal(flat, "profile")} className="w-11 h-11 rounded-full bg-brand-100 flex items-center justify-center text-base font-extrabold text-brand-500 cursor-pointer flex-shrink-0" title="View tenant profile">{initials}</button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <div className="text-sm font-extrabold text-ink">{tenantUser.full_name}</div>
+                        <button onClick={() => openTabModal(flat, "profile")} className="text-sm font-extrabold text-ink cursor-pointer hover:underline text-left" title="View tenant profile">{tenantUser.full_name}</button>
                         {leaseBadge && <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${leaseBadge.cls}`}>{leaseBadge.label}</span>}
                         {tenantUser.notifications_enabled === false && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600" title="Email & WhatsApp notifications are off for this tenant">🔕 Notify Off</span>}
                       </div>
@@ -1458,6 +1485,10 @@ export default function LandlordTenants() {
                     <button onClick={() => setAgreementFlat(flat)} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">📄 Agreement</button>
                     <button onClick={() => { openTabModal(flat, "documents"); }} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">🗂️ Docs</button>
                     <button onClick={() => { openTabModal(flat, "complaints"); }} className="px-2.5 py-1.5 rounded-lg border border-border-default text-[10px] font-semibold text-ink-muted cursor-pointer hover:bg-warm-50 whitespace-nowrap flex-shrink-0">🚩 Complaints</button>
+                    <button onClick={() => handleRemind(flat)} disabled={reminding === flat.id}
+                      className="px-2.5 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[10px] font-bold cursor-pointer hover:bg-red-100 whitespace-nowrap flex-shrink-0 disabled:opacity-50">
+                      {reminding === flat.id ? "Sending…" : "⏰ Remind"}
+                    </button>
                     <a href={`https://wa.me/${(tenantUser.phone ?? "").replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"
                       className="px-2.5 py-1.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-[10px] font-semibold cursor-pointer whitespace-nowrap flex-shrink-0">📱 Contact</a>
                   </div>
@@ -1582,7 +1613,7 @@ export default function LandlordTenants() {
             <div className="flex justify-between items-center p-4 pb-0">
               <div>
                 <div className="text-base font-extrabold text-ink">
-                  {tabActive === "payments" ? "💰 Payments" : tabActive === "documents" ? "🗂️ Documents" : "🚩 Complaints"}
+                  {tabActive === "profile" ? "👤 Profile" : tabActive === "payments" ? "💰 Payments" : tabActive === "documents" ? "🗂️ Documents" : "🚩 Complaints"}
                   {" — "}{(tabFlat.tenant as { user?: { full_name: string } | null } | null)?.user?.full_name ?? "Tenant"}
                 </div>
                 <div className="text-xs text-ink-muted">Flat {tabFlat.flat_number}{tabFlat.block ? ` (${tabFlat.block})` : ""}</div>
@@ -1591,8 +1622,9 @@ export default function LandlordTenants() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 px-4 pt-3">
+            <div className="flex gap-1 px-4 pt-3 flex-wrap">
               {([
+                { key: "profile" as TenantModalTab, label: "👤 Profile" },
                 { key: "payments" as TenantModalTab, label: "💰 Payments" },
                 { key: "documents" as TenantModalTab, label: "🗂️ Docs" },
                 { key: "complaints" as TenantModalTab, label: "🚩 Complaints" },
@@ -1609,6 +1641,75 @@ export default function LandlordTenants() {
                 <div className="space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-10 bg-warm-100 rounded-xl animate-pulse" />)}</div>
               ) : (
                 <>
+                  {tabActive === "profile" && (() => {
+                    const tenantUser = (tabFlat.tenant as { user?: { full_name: string; phone: string; email: string } | null } | null)?.user;
+                    const latestPayment = tabPayments[0] ?? null;
+                    const overdueDaysProfile = latestPayment && latestPayment.status !== "paid" && latestPayment.due_date
+                      ? Math.max(0, Math.floor((new Date(new Date().toDateString()).getTime() - new Date(latestPayment.due_date + "T00:00:00").getTime()) / 86_400_000))
+                      : 0;
+                    return (
+                      <div className="space-y-4">
+                        <div>
+                          <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wide mb-1.5">Contact</div>
+                          <div className="bg-warm-50 rounded-xl p-3 space-y-1">
+                            <div className="text-sm font-bold text-ink">{tenantUser?.full_name ?? "—"}</div>
+                            <div className="text-xs text-ink-muted">📞 {tenantUser?.phone ?? "—"}</div>
+                            <div className="text-xs text-ink-muted">✉️ {tenantUser?.email ?? "—"}</div>
+                            {tabDetail?.emergency_name && (
+                              <div className="text-xs text-ink-muted">🆘 {tabDetail.emergency_name}{tabDetail.emergency_contact ? ` · ${tabDetail.emergency_contact}` : ""}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wide mb-1.5">Lease & Rent</div>
+                          <div className="bg-warm-50 rounded-xl p-3 grid grid-cols-2 gap-3">
+                            <div>
+                              <div className="text-[9px] text-ink-muted uppercase">Monthly Rent</div>
+                              <div className="text-sm font-extrabold text-brand-500">{formatCurrency(tabDetail?.monthly_rent ?? 0)}</div>
+                            </div>
+                            <div>
+                              <div className="text-[9px] text-ink-muted uppercase">Deposit Held</div>
+                              <div className="text-sm font-extrabold text-brand-500">{formatCurrency(tabDetail?.security_deposit ?? 0)}</div>
+                            </div>
+                            <div>
+                              <div className="text-[9px] text-ink-muted uppercase">Lease Start</div>
+                              <div className="text-xs font-semibold text-ink">{tabDetail?.lease_start ? new Date(tabDetail.lease_start).toLocaleDateString("en-IN") : "—"}</div>
+                            </div>
+                            <div>
+                              <div className="text-[9px] text-ink-muted uppercase">Lease End</div>
+                              <div className="text-xs font-semibold text-ink">{tabDetail?.lease_end ? new Date(tabDetail.lease_end).toLocaleDateString("en-IN") : "—"}</div>
+                            </div>
+                            <div className="col-span-2">
+                              <div className="text-[9px] text-ink-muted uppercase">Late Payment Fee</div>
+                              <div className="text-xs font-semibold text-ink">{lateFeeLabel(tabDetail?.late_fee_type, tabDetail?.late_fee_value)}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] font-bold text-ink-muted uppercase tracking-wide mb-1.5">Current Rent Status</div>
+                          {latestPayment ? (
+                            <div className={`rounded-xl p-3 ${latestPayment.status === "paid" ? "bg-green-50" : overdueDaysProfile > 0 ? "bg-red-50" : "bg-yellow-50"}`}>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-ink">{latestPayment.month_year}</span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${latestPayment.status === "paid" ? "bg-green-100 text-green-700" : overdueDaysProfile > 0 ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                                  {latestPayment.status === "paid" ? "Paid" : overdueDaysProfile > 0 ? "Overdue" : "Pending"}
+                                </span>
+                              </div>
+                              <div className="text-sm font-extrabold text-ink mt-1">{formatCurrency(latestPayment.amount || (tabDetail?.monthly_rent ?? 0))}</div>
+                              {overdueDaysProfile > 0 && (
+                                <div className="text-[11px] text-red-600 font-semibold mt-1">🔥 {overdueDaysProfile} day{overdueDaysProfile > 1 ? "s" : ""} overdue{tabDetail?.late_fee_value ? ` · Late fee: ${lateFeeLabel(tabDetail.late_fee_type, tabDetail.late_fee_value)}` : ""}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center py-4 text-ink-muted text-xs">No rent record for this tenant yet.</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {tabActive === "payments" && (
                     <div className="space-y-2">
                       {tabPayments.length === 0 ? (
