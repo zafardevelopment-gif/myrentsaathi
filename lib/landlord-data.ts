@@ -31,6 +31,7 @@ export type LandlordRentPayment = {
   expected_amount: number;
   month_year: string;
   status: string;
+  due_date?: string | null;
   payment_date: string | null;
   payment_method: string | null;
   created_at: string;
@@ -41,7 +42,7 @@ export type LandlordRentPayment = {
   receipt_status?: string | null; // 'pending_verification' | 'accepted' | 'rejected'
   paid_amount?: number | null;
   flat?: { flat_number: string; block: string | null; society?: { name: string; city: string } | null } | null;
-  tenant?: { user?: { full_name: string; phone?: string } | null } | null;
+  tenant?: { user?: { full_name: string; phone?: string } | null; late_fee_type?: "percentage" | "fixed" | null; late_fee_value?: number | null } | null;
 };
 
 export type LandlordAgreement = {
@@ -205,10 +206,10 @@ async function enrichPaymentsWithTenants(payments: LandlordRentPayment[]): Promi
   const tenantIds = [...new Set(payments.map(p => (p as unknown as { tenant_id: string }).tenant_id).filter(Boolean))];
   if (tenantIds.length === 0) return payments;
 
-  // Fetch tenant rows with their user info
+  // Fetch tenant rows with their user info + late fee config
   const { data: tenantRows } = await supabase
     .from("tenants")
-    .select("id, user_id")
+    .select("id, user_id, late_fee_type, late_fee_value")
     .in("id", tenantIds);
 
   if (!tenantRows || tenantRows.length === 0) return payments;
@@ -221,7 +222,11 @@ async function enrichPaymentsWithTenants(payments: LandlordRentPayment[]): Promi
     .in("id", userIds);
 
   const userMap = new Map((userRows ?? []).map(u => [u.id, u]));
-  const tenantMap = new Map(tenantRows.map(t => [t.id, { user: userMap.get(t.user_id) ?? null }]));
+  const tenantMap = new Map(tenantRows.map(t => [t.id, {
+    user: userMap.get(t.user_id) ?? null,
+    late_fee_type: t.late_fee_type as "percentage" | "fixed" | null,
+    late_fee_value: t.late_fee_value as number | null,
+  }]));
 
   return payments.map(p => ({
     ...p,
@@ -239,7 +244,7 @@ export async function getLandlordRentPayments(email: string): Promise<LandlordRe
   const currentMonth = new Date().toISOString().slice(0, 7);
   const { data, error } = await supabase
     .from("rent_payments")
-    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, tenant_id, flat_id, receipt_url, receipt_name, receipt_status, paid_amount,
+    .select(`id, amount, expected_amount, month_year, status, due_date, payment_date, payment_method, created_at, tenant_id, flat_id, receipt_url, receipt_name, receipt_status, paid_amount,
       flat:flats(flat_number, block, society:societies(name, city))`)
     .in("tenant_id", tenantIds)
     .eq("month_year", currentMonth)
@@ -257,7 +262,7 @@ export async function getAllLandlordRentPayments(email: string): Promise<Landlor
 
   const { data, error } = await supabase
     .from("rent_payments")
-    .select(`id, amount, expected_amount, month_year, status, payment_date, payment_method, created_at, tenant_id, flat_id, receipt_url, receipt_name, receipt_status, paid_amount,
+    .select(`id, amount, expected_amount, month_year, status, due_date, payment_date, payment_method, created_at, tenant_id, flat_id, receipt_url, receipt_name, receipt_status, paid_amount,
       flat:flats(flat_number, block, society:societies(name, city))`)
     .in("tenant_id", tenantIds)
     .order("month_year", { ascending: false });

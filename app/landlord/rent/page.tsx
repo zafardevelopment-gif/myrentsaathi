@@ -12,6 +12,25 @@ import toast, { Toaster } from "react-hot-toast";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
+/** Days between due_date and today (positive = overdue). Null if no due date or already paid. */
+function daysOverdue(rp: LandlordRentPayment): number | null {
+  if (!rp.due_date || rp.status === "paid") return null;
+  const due = new Date(rp.due_date + "T00:00:00");
+  const today = new Date(new Date().toDateString());
+  const diff = Math.floor((today.getTime() - due.getTime()) / 86_400_000);
+  return diff > 0 ? diff : 0;
+}
+
+/** Late fee amount per the tenant's configured rule, once overdue. Null if not applicable. */
+function computeLateFee(rp: LandlordRentPayment, overdueDays: number): number | null {
+  const type = rp.tenant?.late_fee_type;
+  const value = rp.tenant?.late_fee_value;
+  if (!type || !value || overdueDays <= 0) return null;
+  const outstanding = rp.expected_amount - (rp.paid_amount ?? 0);
+  if (type === "percentage") return Math.round((outstanding * value) / 100);
+  return value; // fixed
+}
+
 export default function LandlordRent() {
   const { user } = useAuth();
   const [payments, setPayments] = useState<LandlordRentPayment[]>([]);
@@ -288,6 +307,9 @@ export default function LandlordRent() {
           const flatLabel = flat ? `Flat ${flat.flat_number}${flat.block ? ` (${flat.block})` : ""}` : null;
           const societyLabel = flat?.society ? `${flat.society.name}, ${flat.society.city}` : null;
           const monthLabel = rp.month_year ? new Date(rp.month_year + "-01").toLocaleString("en-IN", { month: "long", year: "numeric" }) : "—";
+          const overdueDays = daysOverdue(rp);
+          const lateFee = overdueDays != null ? computeLateFee(rp, overdueDays) : null;
+          const dueDateLabel = rp.due_date ? new Date(rp.due_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : null;
 
           return (
             <div key={rp.id} className="bg-white rounded-[14px] p-4 border border-border-default mb-2">
@@ -305,6 +327,16 @@ export default function LandlordRent() {
                       {rp.paid_amount && rp.paid_amount > 0 && rp.status !== "paid" && (
                         <div className="text-yellow-600">⚡ Partial: {formatCurrency(rp.paid_amount)} paid · {formatCurrency(rp.expected_amount - rp.paid_amount)} remaining</div>
                       )}
+                      {rp.status !== "paid" && dueDateLabel && (
+                        overdueDays && overdueDays > 0 ? (
+                          <div className="text-red-600 font-semibold">⏰ Was due on {dueDateLabel} · {overdueDays} day{overdueDays > 1 ? "s" : ""} overdue</div>
+                        ) : (
+                          <div>⏰ Due on {dueDateLabel}</div>
+                        )
+                      )}
+                      {lateFee != null && lateFee > 0 && (
+                        <div className="text-red-600 font-bold">🔥 Late fee applied: {formatCurrency(lateFee)} · Total due {formatCurrency(rp.expected_amount - (rp.paid_amount ?? 0) + lateFee)}</div>
+                      )}
                       {rp.payment_date && <div>✅ Paid on {new Date(rp.payment_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}{rp.payment_method ? ` via ${rp.payment_method.toUpperCase()}` : ""}</div>}
                       {rp.receipt_status === "pending_verification" && <div className="text-yellow-600 font-semibold">🕐 Receipt awaiting verification</div>}
                       {rp.receipt_status === "accepted" && rp.status !== "paid" && <div className="text-green-600 font-semibold">✓ Receipt verified</div>}
@@ -318,7 +350,13 @@ export default function LandlordRent() {
                   {rp.status === "paid" && (
                     <span className="text-base font-extrabold text-green-700">{formatCurrency(rp.amount)}</span>
                   )}
-                  <StatusBadge status={rp.status} />
+                  {rp.status === "pending" && overdueDays && overdueDays > 0 ? (
+                    <StatusBadge status="overdue" label="Overdue" />
+                  ) : rp.status === "pending" ? (
+                    <StatusBadge status="pending" label={dueDateLabel ? `Due ${dueDateLabel}` : "Due Soon"} />
+                  ) : (
+                    <StatusBadge status={rp.status} />
+                  )}
                   {rp.status !== "paid" && (
                     <button
                       onClick={() => handleRemind(rp)}
