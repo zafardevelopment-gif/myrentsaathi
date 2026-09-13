@@ -24,6 +24,7 @@ function monthEnd(iso: string): string {
 type Rule = {
   invoice_type: string; days_before: number[]; on_due_date: boolean;
   days_after: number[]; month_end_followup: boolean; channels: string[];
+  repeat_after_days: number | null;
 };
 
 /** Create due reminder queue rows for all configured billers, for `today`. */
@@ -49,6 +50,13 @@ async function materialize(scope: BillerScope, today: string): Promise<number> {
       if (rule.days_before?.some((d) => addDays(inv.due_date, -d) === today)) triggers.push({ template: "reminder_before" });
       if (rule.on_due_date && inv.due_date === today) triggers.push({ template: "reminder_due" });
       if (rule.days_after?.some((d) => addDays(inv.due_date, d) === today)) triggers.push({ template: "reminder_after" });
+      // "Until paid" repeat: once overdue, fire again every N days for as long as the
+      // invoice stays in the unpaid/partially_paid/overdue set queried above — the
+      // moment it's marked paid it drops out of that query and reminders stop on their own.
+      if (rule.repeat_after_days && rule.repeat_after_days > 0) {
+        const daysPastDue = Math.round((new Date(today + "T00:00:00Z").getTime() - new Date(inv.due_date + "T00:00:00Z").getTime()) / 86_400_000);
+        if (daysPastDue > 0 && daysPastDue % rule.repeat_after_days === 0) triggers.push({ template: "reminder_after" });
+      }
       if (rule.month_end_followup && monthEnd(today) === today) triggers.push({ template: "month_end" });
 
       for (const t of triggers) {

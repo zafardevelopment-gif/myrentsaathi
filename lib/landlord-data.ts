@@ -183,6 +183,19 @@ export async function updateLandlordFlat(flatId: string, params: {
 }
 
 export async function deleteLandlordFlat(flatId: string): Promise<{ success: boolean; error?: string }> {
+  // Past/offboarded tenants (and their payment + ticket history) still reference
+  // this flat via foreign keys, so a plain delete fails with:
+  // 'update or delete on table "flats" violates foreign key constraint
+  //  "tenants_flat_id_fkey" on table "tenants"'.
+  // Clear the FK-linked rows first (mirrors admin deleteFlat() in lib/admin-data.ts),
+  // then delete the flat itself.
+  await supabase.from("flats").update({ current_tenant_id: null }).eq("id", flatId);
+  await supabase.from("rent_payments").delete().eq("flat_id", flatId);
+  await supabase.from("maintenance_payments").delete().eq("flat_id", flatId);
+  await supabase.from("tenants").delete().eq("flat_id", flatId);
+  await supabase.from("tickets").delete().eq("flat_id", flatId);
+  await supabase.from("parking_slots").update({ flat_id: null, status: "available", vehicle_number: null, vehicle_model: null }).eq("flat_id", flatId);
+
   const { error } = await supabase.from("flats").delete().eq("id", flatId);
   if (error) return { success: false, error: error.message };
   return { success: true };

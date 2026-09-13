@@ -124,19 +124,42 @@ export async function listReminderRules(scope: BillerScope) {
   return data ?? [];
 }
 
-export async function createReminderRule(scope: BillerScope, input: {
+export type ReminderRuleInput = {
   invoice_type?: string; days_before?: number[]; on_due_date?: boolean;
   days_after?: number[]; month_end_followup?: boolean; channels?: string[];
-}) {
+  repeat_after_days?: number | null; is_active?: boolean;
+};
+
+export async function createReminderRule(scope: BillerScope, input: ReminderRuleInput) {
   const { error } = await supabaseAdmin.from("reminder_rules").insert({
     ...scopeInsert(scope), invoice_type: input.invoice_type ?? "all",
     days_before: input.days_before ?? [], on_due_date: input.on_due_date ?? true,
     days_after: input.days_after ?? [], month_end_followup: input.month_end_followup ?? false,
     channels: input.channels ?? ["email"],
+    repeat_after_days: input.repeat_after_days ?? null,
   });
   if (error) return { success: false as const, error: error.message };
   return { success: true as const };
 }
+
+/** Update an existing reminder rule, scoped to its owner (society/landlord) so one biller can't edit another's rule. */
+export async function updateReminderRule(scope: BillerScope, id: string, input: ReminderRuleInput) {
+  const { column, value } = scopeColumn(scope);
+  const patch: Record<string, unknown> = {};
+  if (input.invoice_type !== undefined) patch.invoice_type = input.invoice_type;
+  if (input.days_before !== undefined) patch.days_before = input.days_before;
+  if (input.on_due_date !== undefined) patch.on_due_date = input.on_due_date;
+  if (input.days_after !== undefined) patch.days_after = input.days_after;
+  if (input.month_end_followup !== undefined) patch.month_end_followup = input.month_end_followup;
+  if (input.channels !== undefined) patch.channels = input.channels;
+  if (input.repeat_after_days !== undefined) patch.repeat_after_days = input.repeat_after_days;
+  if (input.is_active !== undefined) patch.is_active = input.is_active;
+
+  const { error } = await supabaseAdmin.from("reminder_rules").update(patch).eq("id", id).eq(column, value);
+  if (error) return { success: false as const, error: error.message };
+  return { success: true as const };
+}
+
 
 // ─── electricity per-unit rate (charge_rate_config) ─────────
 
