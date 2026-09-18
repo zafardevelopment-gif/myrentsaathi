@@ -13,9 +13,9 @@ export async function outstandingReport(scope: BillerScope) {
   const { column, value } = col(scope);
   const { data } = await supabaseAdmin
     .from("invoices")
-    .select("id, invoice_number, invoice_type, flat_id, recipient_user_id, total_amount, amount_paid, due_date, status")
+    .select("id, invoice_number, invoice_type, flat_id, recipient_user_id, total_amount, late_fee_total, amount_paid, due_date, status")
     .eq(column, value).neq("status", "cancelled");
-  const rows = (data ?? []).map((i) => ({ ...i, outstanding: round2(Number(i.total_amount) - Number(i.amount_paid)) }))
+  const rows = (data ?? []).map((i) => ({ ...i, outstanding: round2(Number(i.total_amount) + Number(i.late_fee_total) - Number(i.amount_paid)) }))
     .filter((i) => i.outstanding > 0);
   const total = round2(rows.reduce((a, r) => a + r.outstanding, 0));
   return { total, count: rows.length, rows };

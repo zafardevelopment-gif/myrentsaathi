@@ -14,11 +14,11 @@ export async function POST(request: NextRequest) {
 
     const { data: inv } = await supabaseAdmin
       .from("invoices")
-      .select("id, invoice_number, total_amount, amount_paid, recipient_user_id, status")
+      .select("id, invoice_number, total_amount, late_fee_total, amount_paid, recipient_user_id, status")
       .eq("id", invoice_id).maybeSingle();
     if (!inv) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     if (inv.status === "cancelled") return NextResponse.json({ error: "Invoice is cancelled" }, { status: 400 });
-    const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+    const outstanding = Number(inv.total_amount) + Number(inv.late_fee_total) - Number(inv.amount_paid);
     if (outstanding <= 0) return NextResponse.json({ error: "Nothing outstanding" }, { status: 400 });
 
     const { keyId, keySecret } = await getRazorpayKeys();

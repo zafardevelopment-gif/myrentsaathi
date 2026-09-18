@@ -53,10 +53,15 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         return NextResponse.json({ task, period, scopes: scopes.length, created, skipped });
       }
       case "apply-late-fees": {
+        const dryRun = request.nextUrl.searchParams.get("dryRun") === "1";
         const scopes = await enumerateBillerScopes();
-        let applied = 0;
-        for (const scope of scopes) applied += (await applyLateFees(scope)).applied;
-        return NextResponse.json({ task, applied });
+        let scanned = 0, applied = 0, skipped = 0, skippedByCap = 0, totalAmount = 0;
+        for (const scope of scopes) {
+          const r = await applyLateFees({ scope, dryRun });
+          scanned += r.scanned; applied += r.applied; skipped += r.skipped;
+          skippedByCap += r.skippedByCap; totalAmount += r.totalAmount;
+        }
+        return NextResponse.json({ task, dryRun, scanned, applied, skipped, skippedByCap, totalAmount });
       }
       case "mark-overdue": {
         const { data, error } = await supabaseAdmin.rpc("mark_overdue_invoices");
@@ -64,8 +69,9 @@ export async function GET(request: NextRequest, ctx: Ctx) {
         return NextResponse.json({ task, updated: data });
       }
       case "process-reminders": {
+        const lateFees = await applyLateFees();
         const result = await processReminders();
-        return NextResponse.json({ task, ...result });
+        return NextResponse.json({ task, lateFeesApplied: lateFees.applied, ...result });
       }
       case "check-agreement-expiry": {
         const result = await checkAgreementExpiry();

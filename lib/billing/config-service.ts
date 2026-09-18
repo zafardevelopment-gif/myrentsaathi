@@ -103,17 +103,55 @@ export async function listLateFeeRules(scope: BillerScope) {
   return data ?? [];
 }
 
-export async function createLateFeeRule(scope: BillerScope, input: {
-  invoice_type?: string; grace_days?: number; fee_type?: "flat" | "percent_outstanding" | "per_day";
-  fee_value: number; max_fee?: number | null; gst_applicable?: boolean;
-}) {
+export async function getLateFeeRule(scope: BillerScope, invoiceType?: string) {
+  const { column, value } = scopeColumn(scope);
+  let q = supabaseAdmin.from("late_fee_rules").select("*").eq(column, value).eq("is_active", true);
+  q = invoiceType ? q.eq("invoice_type", invoiceType) : q.is("invoice_type", null);
+  const { data } = await q.maybeSingle();
+  return data ?? null;
+}
+
+export type LateFeeRuleInput = {
+  invoice_type?: string | null; grace_days?: number; fee_type?: "flat" | "percent";
+  fee_value: number; recurrence?: "once" | "daily" | "monthly";
+  max_fee?: number | null; effective_from?: string; is_active?: boolean;
+};
+
+export async function createLateFeeRule(scope: BillerScope, input: LateFeeRuleInput) {
   const { error } = await supabaseAdmin.from("late_fee_rules").insert({
-    ...scopeInsert(scope), invoice_type: input.invoice_type ?? "all", grace_days: input.grace_days ?? 0,
-    fee_type: input.fee_type ?? "flat", fee_value: input.fee_value, max_fee: input.max_fee ?? null,
-    gst_applicable: input.gst_applicable ?? false,
+    ...scopeInsert(scope), invoice_type: input.invoice_type ?? null, grace_days: input.grace_days ?? 5,
+    fee_type: input.fee_type ?? "flat", fee_value: input.fee_value, recurrence: input.recurrence ?? "once",
+    max_fee: input.max_fee ?? null, effective_from: input.effective_from ?? new Date().toISOString().slice(0, 10),
+    is_active: input.is_active ?? true,
   });
   if (error) return { success: false as const, error: error.message };
   return { success: true as const };
+}
+
+/** Update an existing late-fee rule, scoped to its owner so one biller can't edit another's rule. */
+export async function updateLateFeeRule(scope: BillerScope, id: string, input: LateFeeRuleInput) {
+  const { column, value } = scopeColumn(scope);
+  const patch: Record<string, unknown> = {};
+  if (input.invoice_type !== undefined) patch.invoice_type = input.invoice_type;
+  if (input.grace_days !== undefined) patch.grace_days = input.grace_days;
+  if (input.fee_type !== undefined) patch.fee_type = input.fee_type;
+  if (input.fee_value !== undefined) patch.fee_value = input.fee_value;
+  if (input.recurrence !== undefined) patch.recurrence = input.recurrence;
+  if (input.max_fee !== undefined) patch.max_fee = input.max_fee;
+  if (input.effective_from !== undefined) patch.effective_from = input.effective_from;
+  if (input.is_active !== undefined) patch.is_active = input.is_active;
+  patch.updated_at = new Date().toISOString();
+
+  const { error } = await supabaseAdmin.from("late_fee_rules").update(patch).eq("id", id).eq(column, value);
+  if (error) return { success: false as const, error: error.message };
+  return { success: true as const };
+}
+
+/** Create-or-update the single rule for a scope+invoice_type (mirrors ReminderRulesCard's upsert UX). */
+export async function upsertLateFeeRule(scope: BillerScope, input: LateFeeRuleInput) {
+  const existing = await getLateFeeRule(scope, input.invoice_type ?? undefined);
+  if (existing) return updateLateFeeRule(scope, existing.id, input);
+  return createLateFeeRule(scope, input);
 }
 
 // ─── reminder_rules ──────────────────────────────────────────

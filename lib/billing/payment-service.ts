@@ -22,7 +22,7 @@ export type RecordPaymentInput = {
 };
 
 export type RecordPaymentResult =
-  | { success: true; paymentId: string; invoice: { status: string; amount_paid: number; total_amount: number; outstanding: number } }
+  | { success: true; paymentId: string; invoice: { status: string; amount_paid: number; total_amount: number; late_fee_total: number; outstanding: number } }
   | { success: false; error: string };
 
 export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentResult> {
@@ -32,7 +32,7 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
 
     // Ensure the invoice exists and isn't cancelled.
     const { data: inv } = await supabaseAdmin
-      .from("invoices").select("id, status, total_amount").eq("id", input.invoice_id).maybeSingle();
+      .from("invoices").select("id, status, total_amount, late_fee_total").eq("id", input.invoice_id).maybeSingle();
     if (!inv) return { success: false, error: "Invoice not found" };
     if (inv.status === "cancelled") return { success: false, error: "Cannot record payment on a cancelled invoice" };
 
@@ -56,16 +56,21 @@ export async function recordPayment(input: RecordPaymentInput): Promise<RecordPa
 
     // Re-read invoice (the trigger has updated amount_paid + status).
     const { data: updated } = await supabaseAdmin
-      .from("invoices").select("status, amount_paid, total_amount").eq("id", input.invoice_id).single();
+      .from("invoices").select("status, amount_paid, total_amount, late_fee_total").eq("id", input.invoice_id).single();
+
+    const totalAmount = updated?.total_amount ?? inv.total_amount;
+    const lateFeeTotal = updated?.late_fee_total ?? inv.late_fee_total;
+    const amountPaid = updated?.amount_paid ?? 0;
 
     return {
       success: true,
       paymentId: payment.id,
       invoice: {
         status: updated?.status ?? inv.status,
-        amount_paid: updated?.amount_paid ?? 0,
-        total_amount: updated?.total_amount ?? inv.total_amount,
-        outstanding: (updated?.total_amount ?? inv.total_amount) - (updated?.amount_paid ?? 0),
+        amount_paid: amountPaid,
+        total_amount: totalAmount,
+        late_fee_total: lateFeeTotal,
+        outstanding: Number(totalAmount) + Number(lateFeeTotal) - Number(amountPaid),
       },
     };
   } catch (err) {

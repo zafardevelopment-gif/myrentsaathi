@@ -10,7 +10,7 @@ const PAGE_SIZE = 10;
 
 type Invoice = {
   id: string; invoice_number: string; invoice_type: string; billing_period: string | null;
-  total_amount: number; amount_paid: number; status: string; created_at: string;
+  total_amount: number; late_fee_total?: number; amount_paid: number; status: string; created_at: string;
   issue_date?: string | null; recipient_name?: string | null;
   sub_total?: number; gst_amount?: number; cgst_total?: number; sgst_total?: number; igst_total?: number;
   flat_id: string | null; flat: { flat_number: string; block: string | null } | null;
@@ -158,7 +158,8 @@ export default function LandlordReports() {
 
   const totalBilled = active.reduce((a, i) => a + Number(i.total_amount), 0);
   const totalCollected = active.reduce((a, i) => a + Number(i.amount_paid), 0);
-  const totalOutstanding = totalBilled - totalCollected;
+  const totalLateFees = active.reduce((a, i) => a + Number(i.late_fee_total ?? 0), 0);
+  const totalOutstanding = totalBilled + totalLateFees - totalCollected;
 
   const byType = (type: string) => active.filter(i => i.invoice_type === type);
   const rentInv = byType("rent");
@@ -274,7 +275,7 @@ export default function LandlordReports() {
             {card("Total Billed", inr(totalBilled))}
             {card("Total Collected", inr(totalCollected), pct(totalCollected, totalBilled) + " collected", "text-green-700")}
             {card("Outstanding", inr(totalOutstanding), `${unpaid.length + overdue.length} invoices`, "text-brand-500")}
-            {card("Overdue", inr(overdue.reduce((a, i) => a + Number(i.total_amount) - Number(i.amount_paid), 0)), `${overdue.length} invoices`, "text-red-600")}
+            {card("Overdue", inr(overdue.reduce((a, i) => a + Number(i.total_amount) + Number(i.late_fee_total ?? 0) - Number(i.amount_paid), 0)), `${overdue.length} invoices`, "text-red-600")}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {card("Rent Collected", inr(rentCollected), `${rentInv.length} invoices`)}
@@ -356,8 +357,8 @@ export default function LandlordReports() {
                 Invoice: i.invoice_number,
                 Flat: i.flat ? `${i.flat.flat_number}${i.flat.block ? ` (${i.flat.block})` : ""}` : "—",
                 Type: i.invoice_type, Period: i.billing_period ?? "—",
-                Total: Number(i.total_amount), Collected: Number(i.amount_paid),
-                Due: Number(i.total_amount) - Number(i.amount_paid), Status: i.status,
+                Total: Number(i.total_amount), LateFee: Number(i.late_fee_total ?? 0), Collected: Number(i.amount_paid),
+                Due: Number(i.total_amount) + Number(i.late_fee_total ?? 0) - Number(i.amount_paid), Status: i.status,
               })))}
                 className="rounded-lg border border-brand-300 text-brand-600 px-2.5 py-1.5 text-xs font-semibold cursor-pointer hover:bg-brand-50">⬇ Export CSV</button>
               <span className="ml-auto text-[11px] text-ink-muted">{filteredInv.length} invoices</span>
@@ -385,7 +386,7 @@ export default function LandlordReports() {
                     <td className="px-3 py-2 text-ink-muted">{i.billing_period ?? "—"}</td>
                     <td className="px-3 py-2 text-right font-semibold text-ink">{inr(i.total_amount)}</td>
                     <td className="px-3 py-2 text-right text-green-700">{inr(i.amount_paid)}</td>
-                    <td className="px-3 py-2 text-right text-red-600">{inr(Number(i.total_amount) - Number(i.amount_paid))}</td>
+                    <td className="px-3 py-2 text-right text-red-600">{inr(Number(i.total_amount) + Number(i.late_fee_total ?? 0) - Number(i.amount_paid))}</td>
                     <td className="px-3 py-2"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLOR[i.status] ?? ""}`}>{i.status.replace("_", " ")}</span></td>
                   </tr>
                 ))}

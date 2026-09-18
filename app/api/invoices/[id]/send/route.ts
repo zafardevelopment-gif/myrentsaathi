@@ -36,7 +36,7 @@ export async function POST(_request: NextRequest, ctx: Ctx) {
     const invoiceNumber = esc(String(inv.invoice_number ?? ""));
     const viewUrl = `${APP_URL}/api/invoices/${inv.id}/pdf`;
     const payUrl = `${APP_URL}/api/payment/redirect?invoice=${inv.id}`;
-    const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+    const outstanding = Number(inv.total_amount) + Number(inv.late_fee_total ?? 0) - Number(inv.amount_paid);
     const isPaid = inv.status === "paid";
 
     // Build line items table rows for email

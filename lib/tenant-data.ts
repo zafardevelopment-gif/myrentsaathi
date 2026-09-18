@@ -49,6 +49,7 @@ export type TenantInvoice = {
   due_date: string | null;
   sub_total: number;
   gst_amount: number;
+  late_fee_total: number;
   total_amount: number;
   amount_paid: number;
   status: string;
@@ -180,7 +181,7 @@ export async function getTenantRentPayments(email: string): Promise<TenantRentPa
 export async function getTenantInvoices(userId: string): Promise<TenantInvoice[]> {
   const { data, error } = await supabase
     .from("invoices")
-    .select("id, invoice_number, invoice_type, billing_period, issue_date, due_date, sub_total, gst_amount, total_amount, amount_paid, status")
+    .select("id, invoice_number, invoice_type, billing_period, issue_date, due_date, sub_total, gst_amount, late_fee_total, total_amount, amount_paid, status")
     .eq("recipient_user_id", userId)
     .neq("status", "cancelled")
     .order("issue_date", { ascending: false });

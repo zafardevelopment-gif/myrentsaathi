@@ -174,7 +174,8 @@ export default function TenantHome() {
       {invoices.length > 0 ? (
         <div className="space-y-3 mb-4">
           {invoices.map((inv) => {
-            const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+            const lateFee = Number(inv.late_fee_total) || 0;
+            const outstanding = Number(inv.total_amount) + lateFee - Number(inv.amount_paid);
             const isPaid = inv.status === "paid" || outstanding <= 0.5;
             const open = () => window.open(`/api/invoices/${inv.id}/pdf`, "_blank");
             return (
@@ -188,7 +189,11 @@ export default function TenantHome() {
                       </div>
                       <div className="text-xs text-ink-muted mt-0.5">{inv.invoice_number} · Rent + Maintenance + Electricity</div>
                       <div className="text-xs text-ink-muted mt-0.5">
-                        Total <b className="text-ink">{formatCurrency(inv.total_amount)}</b>
+                        {lateFee > 0 ? (
+                          <>Rent {formatCurrency(inv.total_amount)} + Late fee {formatCurrency(lateFee)} = <b className="text-ink">{formatCurrency(Number(inv.total_amount) + lateFee)}</b></>
+                        ) : (
+                          <>Total <b className="text-ink">{formatCurrency(inv.total_amount)}</b></>
+                        )}
                         {Number(inv.gst_amount) > 0 ? ` (incl. GST ${formatCurrency(inv.gst_amount)})` : ""}
                         {!isPaid && ` · Outstanding ${formatCurrency(outstanding)}`}
                       </div>

@@ -41,7 +41,7 @@ export function renderInvoiceHtml(
   const billerGst = inv.biller_gst ?? parties.billerGst ?? null;
   const recipientGst = inv.recipient_gst ?? parties.recipientGst ?? null;
   const isInter = Number(inv.igst_total) > 0;
-  const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+  const outstanding = Number(inv.total_amount) + Number(inv.late_fee_total) - Number(inv.amount_paid);
   const payable = outstanding > 0 && inv.status !== "paid" && inv.status !== "cancelled";
   const payHref = `/api/payment/redirect?invoice=${inv.id}`;
 
@@ -126,7 +126,7 @@ export function renderInvoiceHtml(
       <tr><td>Sub Total</td><td style="text-align:right">${formatINR(inv.sub_total)}</td></tr>
       ${hasAnyGst ? taxRows : ""}
       ${Number(inv.late_fee_total) > 0 ? `<tr><td>Late Fee</td><td style="text-align:right">${formatINR(inv.late_fee_total)}</td></tr>` : ""}
-      <tr class="grand"><td>Total</td><td style="text-align:right">${formatINR(inv.total_amount)}</td></tr>
+      <tr class="grand"><td>Total</td><td style="text-align:right">${formatINR(Number(inv.total_amount) + Number(inv.late_fee_total))}</td></tr>
       <tr><td>Paid</td><td style="text-align:right">${formatINR(inv.amount_paid)}</td></tr>
       <tr><td>Outstanding</td><td style="text-align:right">${formatINR(outstanding)}</td></tr>
     </table>

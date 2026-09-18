@@ -252,7 +252,7 @@ export async function listInvoices(scope: BillerScope, filters: InvoiceFilters =
     : { column: "landlord_id", value: scope.landlordId };
   let q = supabaseAdmin
     .from("invoices")
-    .select("id, invoice_number, invoice_type, flat_id, recipient_type, recipient_user_id, billing_period, issue_date, due_date, sub_total, gst_amount, cgst_total, sgst_total, igst_total, total_amount, amount_paid, status, created_at, flat:flats(flat_number, block)")
+    .select("id, invoice_number, invoice_type, flat_id, recipient_type, recipient_user_id, billing_period, issue_date, due_date, sub_total, gst_amount, cgst_total, sgst_total, igst_total, late_fee_total, total_amount, amount_paid, status, created_at, flat:flats(flat_number, block)")
     .eq(column, value)
     .order("created_at", { ascending: false });
   if (filters.status) q = q.eq("status", filters.status);
@@ -388,29 +388,26 @@ export async function generateForPeriod(input: GenerateInput): Promise<GenerateR
 
 /**
  * Recompute an invoice header's money totals from its current line items.
- * Used after late fees (§21) or line edits change the set of lines.
- * late_fee lines roll into late_fee_total (not sub_total/GST).
+ * Used after line edits change the set of lines. late_fee_total is owned by
+ * the invoice_late_fees ledger + its sync trigger and is not touched here.
  */
 export async function recomputeInvoiceTotals(invoiceId: string): Promise<void> {
   const { data: lines } = await supabaseAdmin
     .from("invoice_line_items")
-    .select("line_kind, line_total, gst_amount, cgst_amount, sgst_amount, igst_amount")
+    .select("line_total, gst_amount, cgst_amount, sgst_amount, igst_amount")
     .eq("invoice_id", invoiceId);
   const rows = lines ?? [];
   const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-  const base = rows.filter((l) => l.line_kind !== "late_fee");
-  const lateFee = rows.filter((l) => l.line_kind === "late_fee");
-  const sub_total = r2(base.reduce((a, l) => a + Number(l.line_total || 0), 0));
-  const cgst = r2(base.reduce((a, l) => a + Number(l.cgst_amount || 0), 0));
-  const sgst = r2(base.reduce((a, l) => a + Number(l.sgst_amount || 0), 0));
-  const igst = r2(base.reduce((a, l) => a + Number(l.igst_amount || 0), 0));
+  const sub_total = r2(rows.reduce((a, l) => a + Number(l.line_total || 0), 0));
+  const cgst = r2(rows.reduce((a, l) => a + Number(l.cgst_amount || 0), 0));
+  const sgst = r2(rows.reduce((a, l) => a + Number(l.sgst_amount || 0), 0));
+  const igst = r2(rows.reduce((a, l) => a + Number(l.igst_amount || 0), 0));
   const gst_amount = r2(cgst + sgst + igst);
-  const late_fee_total = r2(lateFee.reduce((a, l) => a + Number(l.line_total || 0), 0));
-  const total_amount = r2(sub_total + gst_amount + late_fee_total);
+  const total_amount = r2(sub_total + gst_amount);
 
   await supabaseAdmin.from("invoices").update({
     sub_total, cgst_total: cgst, sgst_total: sgst, igst_total: igst,
-    gst_amount, gst_breakup: { cgst, sgst, igst }, late_fee_total, total_amount,
+    gst_amount, gst_breakup: { cgst, sgst, igst }, total_amount,
     updated_at: new Date().toISOString(),
   }).eq("id", invoiceId);
 }

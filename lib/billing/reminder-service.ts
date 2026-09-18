@@ -8,8 +8,8 @@
 import { supabaseAdmin } from "../supabase-admin";
 import { enumerateBillerScopes } from "./cron-service";
 import { scopeColumn, type BillerScope } from "./scope";
-import { formatINR } from "./money";
 import { emailInvoiceOverdueReminder } from "../email";
+import { sendRentDueReminder } from "../whatsapp";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com";
 
@@ -36,7 +36,7 @@ async function materialize(scope: BillerScope, today: string): Promise<number> {
 
   const { data: invoices } = await supabaseAdmin
     .from("invoices")
-    .select("id, invoice_type, due_date, recipient_user_id, total_amount, amount_paid, invoice_number")
+    .select("id, invoice_type, due_date, recipient_user_id, total_amount, late_fee_total, amount_paid, invoice_number, billing_period, flat:flats(flat_number)")
     .eq(column, value)
     .in("status", ["unpaid", "partially_paid", "overdue"])
     .not("due_date", "is", null)
@@ -59,14 +59,18 @@ async function materialize(scope: BillerScope, today: string): Promise<number> {
       }
       if (rule.month_end_followup && monthEnd(today) === today) triggers.push({ template: "month_end" });
 
+      const flatRel = inv.flat as { flat_number: string } | { flat_number: string }[] | null;
+      const flatNumber = Array.isArray(flatRel) ? flatRel[0]?.flat_number : flatRel?.flat_number;
+
       for (const t of triggers) {
         for (const channel of rule.channels) {
           const { error } = await supabaseAdmin.from("notification_queue").insert({
             channel, template: t.template, recipient_user_id: inv.recipient_user_id, invoice_id: inv.id,
             payload: {
               invoice_number: inv.invoice_number,
-              outstanding: Number(inv.total_amount) - Number(inv.amount_paid),
+              outstanding: Number(inv.total_amount) + Number(inv.late_fee_total) - Number(inv.amount_paid),
               due_date: inv.due_date, invoice_type: inv.invoice_type,
+              billing_period: inv.billing_period, flat_number: flatNumber ?? "",
             },
             scheduled_for: new Date().toISOString(),
           });
@@ -90,7 +94,6 @@ async function drain(): Promise<{ sent: number; failed: number }> {
     try {
       const { data: user } = await supabaseAdmin
         .from("users").select("full_name, email, phone, notifications_enabled").eq("id", row.recipient_user_id).maybeSingle();
-      const outstanding = formatINR(Number(row.payload?.outstanding ?? 0));
       const notifyOk = user?.notifications_enabled !== false;
 
       let ok = false;
@@ -116,12 +119,22 @@ async function drain(): Promise<{ sent: number; failed: number }> {
         });
         ok = true;
       } else if (row.channel === "whatsapp" && user?.phone) {
-        // best-effort: reuse generic whatsapp send route
-        const res = await fetch(`${APP_URL}/api/whatsapp/send`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: user.phone, template: "mrs_rent_due", params: [user.full_name ?? "", outstanding] }),
-        });
-        ok = res.ok;
+        // mrs_rent_due is a fixed Meta-approved template (6 params) — see lib/whatsapp.ts.
+        // Its copy reads "rent due 5th <month>", so wording can be slightly off for
+        // maintenance/electricity invoices or later repeat reminders; the amount and
+        // pay link are always correct.
+        try {
+          await sendRentDueReminder({
+            phone: user.phone,
+            fullName: user.full_name ?? "Tenant",
+            monthYear: (row.payload?.billing_period as string) || new Date().toISOString().slice(0, 7),
+            amount: Number(row.payload?.outstanding ?? 0),
+            flatNumber: (row.payload?.flat_number as string) || "",
+          });
+          ok = true;
+        } catch {
+          ok = false;
+        }
       } else {
         ok = true; // no destination → treat as resolved to avoid retry storms
       }

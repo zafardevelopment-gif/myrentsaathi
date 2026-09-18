@@ -10,6 +10,7 @@ type DueInvoice = {
   invoice_type: string;
   due_date: string | null;
   total_amount: number;
+  late_fee_total: number;
   amount_paid: number;
   status: string;
   recipient_user_id: string | null;
@@ -72,7 +73,7 @@ export default function RentDueReport() {
 
   useEffect(() => { if (hydrated && user) load(); }, [hydrated, user, load]);
 
-  const totalDue = rows.reduce((sum, r) => sum + (Number(r.total_amount) - Number(r.amount_paid)), 0);
+  const totalDue = rows.reduce((sum, r) => sum + (Number(r.total_amount) + Number(r.late_fee_total) - Number(r.amount_paid)), 0);
   const overdueCount = rows.filter((r) => r.daysOverdue > 0).length;
 
   return (
@@ -100,6 +101,7 @@ export default function RentDueReport() {
                 <th className="pb-2 pr-3">Flat</th>
                 <th className="pb-2 pr-3">Due date</th>
                 <th className="pb-2 pr-3">Status</th>
+                <th className="pb-2 pr-3 text-right">Late fee</th>
                 <th className="pb-2 pr-3 text-right">Amount due</th>
               </tr>
             </thead>
@@ -116,7 +118,8 @@ export default function RentDueReport() {
                       <span className="rounded-full bg-yellow-100 text-yellow-700 px-2 py-0.5 text-xs font-bold">Upcoming</span>
                     )}
                   </td>
-                  <td className="py-2 pr-3 text-right font-bold text-ink">{inr(Number(r.total_amount) - Number(r.amount_paid))}</td>
+                  <td className="py-2 pr-3 text-right text-ink-muted">{Number(r.late_fee_total) > 0 ? inr(r.late_fee_total) : "—"}</td>
+                  <td className="py-2 pr-3 text-right font-bold text-ink">{inr(Number(r.total_amount) + Number(r.late_fee_total) - Number(r.amount_paid))}</td>
                 </tr>
               ))}
             </tbody>

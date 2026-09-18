@@ -51,7 +51,7 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
 
     // QR encodes the pay URL (tenant scans → opens the payment gateway).
     let qrDataUrl: string | null = null;
-    const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+    const outstanding = Number(inv.total_amount) + Number(inv.late_fee_total ?? 0) - Number(inv.amount_paid);
     if (outstanding > 0 && inv.status !== "cancelled") {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.myrentsaathi.com";
       try { qrDataUrl = await QRCode.toDataURL(`${appUrl}/api/payment/redirect?invoice=${inv.id}`, { margin: 1, width: 240 }); } catch { qrDataUrl = null; }

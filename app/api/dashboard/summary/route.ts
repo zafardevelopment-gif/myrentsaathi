@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     // Revenue + outstanding from invoices
     const { data: invoices } = await supabaseAdmin
       .from("invoices")
-      .select("total_amount, amount_paid, status, billing_period")
+      .select("total_amount, late_fee_total, amount_paid, status, billing_period")
       .eq(billerCol, scopeVal)
       .neq("status", "cancelled");
     const invList = invoices ?? [];
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     const monthlyRevenue = invList
       .filter((i) => i.billing_period === currentMonth)
       .reduce((a, i) => a + (Number(i.amount_paid) || 0), 0);
-    const outstandingAmount = invList.reduce((a, i) => a + ((Number(i.total_amount) || 0) - (Number(i.amount_paid) || 0)), 0);
+    const outstandingAmount = invList.reduce((a, i) => a + ((Number(i.total_amount) || 0) + (Number(i.late_fee_total) || 0) - (Number(i.amount_paid) || 0)), 0);
 
     // Setup %
     const progress = await getSetupProgress({ id: userId, role });

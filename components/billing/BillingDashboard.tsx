@@ -11,7 +11,7 @@ type Summary = {
 };
 type Invoice = {
   id: string; invoice_number: string; invoice_type: string; billing_period: string | null;
-  total_amount: number; amount_paid: number; status: string; due_date: string | null;
+  total_amount: number; late_fee_total?: number; amount_paid: number; status: string; due_date: string | null;
   flat_id: string | null; landlord_id?: string | null; society_id?: string | null;
   flat: { flat_number: string; block: string | null } | null;
 };
@@ -471,7 +471,7 @@ export default function BillingDashboard() {
                   <td className="px-3 py-2 capitalize text-ink text-xs">{i.invoice_type}</td>
                   <td className="px-3 py-2 text-ink-muted text-xs">{i.billing_period ?? "—"}</td>
                   <td className="px-3 py-2 text-right font-semibold text-ink">{inr(i.total_amount)}</td>
-                  <td className="px-3 py-2 text-right text-ink">{inr(Number(i.total_amount) - Number(i.amount_paid))}</td>
+                  <td className="px-3 py-2 text-right text-ink">{inr(Number(i.total_amount) + Number(i.late_fee_total ?? 0) - Number(i.amount_paid))}</td>
                   <td className="px-3 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[i.status] ?? "bg-yellow-100 text-yellow-700"}`}>
                       {i.status.replace("_", " ")}

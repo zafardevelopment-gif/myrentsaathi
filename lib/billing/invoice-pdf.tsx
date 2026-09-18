@@ -48,7 +48,7 @@ type InvData = {
   invoice_number: string; invoice_type: string; billing_period: string | null;
   issue_date: string; due_date: string | null; status: string;
   sub_total: number; cgst_total: number; sgst_total: number; igst_total: number;
-  gst_amount: number; total_amount: number; amount_paid: number;
+  gst_amount: number; late_fee_total: number; total_amount: number; amount_paid: number;
   biller_gst: string | null; recipient_gst: string | null;
 };
 
@@ -57,7 +57,9 @@ const inr = (n: number) => "Rs." + (Number(n) || 0).toLocaleString("en-IN", { mi
 function InvoiceDoc({ inv, lines, billerName, recipientName }: {
   inv: InvData; lines: Line[]; billerName: string | null; recipientName: string | null;
 }) {
-  const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+  const lateFee = Number(inv.late_fee_total) || 0;
+  const grandTotal = Number(inv.total_amount) + lateFee;
+  const outstanding = grandTotal - Number(inv.amount_paid);
   const isPaid = inv.status === "paid";
   const hasGst = Number(inv.gst_amount) > 0;
   const isInter = Number(inv.igst_total) > 0;
@@ -144,9 +146,15 @@ function InvoiceDoc({ inv, lines, billerName, recipientName }: {
               <Text style={s.totVal}>{inr(inv.igst_total)}</Text>
             </View>
           )}
+          {lateFee > 0 && (
+            <View style={s.totRow}>
+              <Text style={s.totLabel}>Late Fee</Text>
+              <Text style={s.totVal}>{inr(lateFee)}</Text>
+            </View>
+          )}
           <View style={s.grandRow}>
             <Text style={s.grandLabel}>Total</Text>
-            <Text style={s.grandVal}>{inr(inv.total_amount)}</Text>
+            <Text style={s.grandVal}>{inr(grandTotal)}</Text>
           </View>
           <View style={s.totRow}>
             <Text style={s.totLabel}>Paid</Text>

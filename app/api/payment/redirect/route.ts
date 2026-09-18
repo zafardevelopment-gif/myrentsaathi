@@ -23,13 +23,13 @@ export async function GET(request: NextRequest) {
 
     const { data: inv } = await supabaseAdmin
       .from("invoices")
-      .select("id, invoice_number, total_amount, amount_paid, status, recipient_user_id, payment_link_id, payment_link_url, payment_link_status")
+      .select("id, invoice_number, total_amount, late_fee_total, amount_paid, status, recipient_user_id, payment_link_id, payment_link_url, payment_link_status")
       .eq("id", invoiceId).maybeSingle();
     if (!inv) return notice("Invoice not found.");
     if (inv.status === "paid") return notice("This invoice is already paid. ✓");
     if (inv.status === "cancelled") return notice("This invoice has been cancelled.");
 
-    const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+    const outstanding = Number(inv.total_amount) + Number(inv.late_fee_total) - Number(inv.amount_paid);
     if (outstanding <= 0) return notice("Nothing is outstanding on this invoice. ✓");
 
     const { keyId, keySecret } = await getRazorpayKeys();
