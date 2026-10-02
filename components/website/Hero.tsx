@@ -45,7 +45,7 @@ export default function Hero() {
               <p className="text-[12px] text-ink-muted mt-2.5">
                 Ya seedha trial shuru karein:{" "}
                 <a href="/signup" className="text-brand-500 font-semibold underline underline-offset-2">
-                  Start Free 14-Day Trial →
+                  Start Free 30-Day Trial →
                 </a>
               </p>
             </div>

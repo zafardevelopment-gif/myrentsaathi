@@ -8,7 +8,7 @@ export default function CTA() {
           Property Management?
         </h2>
         <p className="text-[17px] text-white/80 mt-4">
-          14-day free trial. No credit card. 5 minute setup.
+          30-day free trial. No credit card. 5 minute setup.
         </p>
         <div className="flex gap-3.5 justify-center mt-7 flex-wrap">
           <a

@@ -656,7 +656,7 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
             Ready to try MyRentSaathi?
           </div>
           <p className="text-[14px] text-white/70 mb-5">
-            14-day free trial. No credit card. Cancel anytime.
+            30-day free trial. No credit card. Cancel anytime.
           </p>
           <button className="px-7 py-3 rounded-xl bg-brand-500 text-white font-bold text-[14px] hover:bg-brand-600 cursor-pointer">
             Start Free Trial

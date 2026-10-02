@@ -849,7 +849,7 @@ export const WEBSITE_FAQS = [
   },
   {
     q: "Is there a free trial?",
-    a: "Yes! 14-day free trial — no credit card required. Both society and landlord plans are available for trial.",
+    a: "Yes! 30-day free trial — no credit card required. Both society and landlord plans are available for trial.",
   },
   {
     q: "Is the data secure?",

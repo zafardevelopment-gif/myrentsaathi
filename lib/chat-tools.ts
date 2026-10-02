@@ -725,11 +725,11 @@ export function getSignupGuide(userType: "society" | "landlord" | "tenant") {
   const guides: Record<string, object> = {
     society: {
       steps: ["Go to myrentsaathi.com/signup → select 'Housing Society'", "Enter society name, city, total flats", "Set up admin account", "Add flat details and invite residents", "Configure dues and maintenance fees", "Start collecting payments online!"],
-      note: "Free 14-day trial — no credit card required.",
+      note: "Free 30-day trial — no credit card required.",
     },
     landlord: {
       steps: ["Go to myrentsaathi.com/signup → select 'Landlord'", "Create account with email & phone", "Add property details and rent amount", "Add tenant details and move-in date", "Generate digital rent agreement", "Enable WhatsApp rent reminders"],
-      note: "Plans from ₹499/month. 14-day free trial.",
+      note: "Plans from ₹499/month. 30-day free trial.",
     },
     tenant: {
       steps: ["Ask your landlord or admin to add you to MyRentSaathi", "You'll receive a WhatsApp/email invitation", "Create your account via the invite link", "View dues, pay online, download receipts", "Raise complaints and access society notices"],
@@ -743,7 +743,7 @@ export function getSignupGuide(userType: "society" | "landlord" | "tenant") {
 
 export function getFAQAnswer(topic: string) {
   const faqs: Record<string, string> = {
-    trial:     "Yes! 14-day free trial with full features. No credit card required.",
+    trial:     "Yes! 30-day free trial with full features. No credit card required.",
     refund:    "7-day refund policy after first payment. Contact support@myrentsaathi.com.",
     payment:   "We accept UPI, debit/credit cards, net banking, and bank transfers. All payments secured.",
     cancel:    "Cancel anytime from account settings. Data retained 30 days after cancellation.",

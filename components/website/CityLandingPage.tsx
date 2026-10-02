@@ -201,7 +201,7 @@ export default function CityLandingPage({ city, state, slug, neighborhoods, faqs
         </h2>
         <p className="text-[15px] text-ink/60 mb-6">
           Simple per-unit pricing — <strong>₹10 per landlord/month</strong>, for landlords and societies alike.
-          All plans include a 14-day free trial.
+          All plans include a 30-day free trial.
         </p>
         <div className="flex justify-center gap-3 flex-wrap">
           <Link href="/for-landlords" className="px-6 py-3 rounded-xl bg-brand-500 text-white font-bold text-[14px] hover:bg-brand-600">

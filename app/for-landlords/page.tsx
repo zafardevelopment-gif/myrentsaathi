@@ -8,7 +8,7 @@ import { absoluteUrl } from "@/lib/seo/config";
 export const metadata: Metadata = {
   title: "Rent Collection Software for Landlords in India",
   description:
-    "Stop chasing rent on WhatsApp manually. MyRentSaathi lets Indian landlords collect rent via UPI, auto-send reminders & receipts, manage tenants and generate agreements. Free 14-day trial.",
+    "Stop chasing rent on WhatsApp manually. MyRentSaathi lets Indian landlords collect rent via UPI, auto-send reminders & receipts, manage tenants and generate agreements. Free 30-day trial.",
   keywords: [
     "rent collection software for landlords India",
     "collect rent online from tenants India",
@@ -85,7 +85,7 @@ export default function ForLandlordsPage() {
             View Pricing
           </Link>
         </div>
-        <div className="mt-6 text-[13px] text-white/50">14-day free trial · Cancel anytime · No setup fees</div>
+        <div className="mt-6 text-[13px] text-white/50">30-day free trial · Cancel anytime · No setup fees</div>
       </section>
 
       {/* Intro prose */}

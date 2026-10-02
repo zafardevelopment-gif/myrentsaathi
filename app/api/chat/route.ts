@@ -90,7 +90,7 @@ Your personality: Warm, helpful, concise. Respond in the same language as the us
 ━━ PRICING (quick reference) ━━
 Pricing is simple and per-unit: ₹10 per landlord per month, scaling with the number of landlords/properties managed. Free trial available. Always point users to the /pricing page for exact current plans rather than quoting other figures.
 The same ₹10 per landlord/month per-unit pricing applies to individual landlords and NRI owners.
-Tenant: FREE · 14-day free trial for all plans
+Tenant: FREE · 30-day free trial for all plans
 ${userBlock}${capabilities}`;
 }
 

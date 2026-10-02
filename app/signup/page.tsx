@@ -13,7 +13,7 @@ function SignupContent() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
   const [tab, setTab] = useState<Tab>(
-    searchParams.get("type") === "landlord" ? "landlord" : "society"
+    searchParams.get("type") === "society" ? "society" : "landlord"
   );
   const [loading, setLoading] = useState(false);
 
@@ -43,10 +43,6 @@ function SignupContent() {
 
   async function handleSocietySignup(e: React.FormEvent) {
     e.preventDefault();
-    if (society.password !== society.confirm_password) {
-      toast.error("Passwords do not match.");
-      return;
-    }
     if (society.password.length < 6) {
       toast.error("Password must be at least 6 characters.");
       return;
@@ -80,15 +76,14 @@ function SignupContent() {
     if (loginResult.success) {
       // Redirect to plan selection with type=society and societyId
       router.push(`/select-plan?type=society&society=${result.societyId}`);
+    } else {
+      toast("Account created — please log in to continue.");
+      router.push("/login");
     }
   }
 
   async function handleLandlordSignup(e: React.FormEvent) {
     e.preventDefault();
-    if (landlord.password !== landlord.confirm_password) {
-      toast.error("Passwords do not match.");
-      return;
-    }
     if (landlord.password.length < 6) {
       toast.error("Password must be at least 6 characters.");
       return;
@@ -116,6 +111,9 @@ function SignupContent() {
     if (loginResult.success) {
       // Redirect to plan selection with type=landlord
       router.push(`/select-plan?type=landlord`);
+    } else {
+      toast("Account created — please log in to continue.");
+      router.push("/login");
     }
   }
 
@@ -134,22 +132,13 @@ function SignupContent() {
               MyRent<span className="text-brand-500">Saathi</span>
             </span>
           </a>
-          <div className="text-sm text-ink-muted mt-1">Create your account</div>
+          <div className="text-sm text-ink-muted mt-1">Create your free account</div>
+          <div className="text-xs text-ink-muted mt-2">✓ 30-day free trial &nbsp;·&nbsp; ✓ No credit card &nbsp;·&nbsp; ✓ 2-minute setup</div>
         </div>
 
         <div className="bg-white rounded-3xl shadow-[0_8px_40px_rgba(0,0,0,0.1)] overflow-hidden">
           {/* Tabs */}
           <div className="flex border-b border-border-default">
-            <button
-              onClick={() => setTab("society")}
-              className={`flex-1 py-4 text-sm font-bold transition-colors cursor-pointer ${
-                tab === "society"
-                  ? "text-brand-500 border-b-2 border-brand-500 bg-brand-50"
-                  : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              🏢 Society Admin
-            </button>
             <button
               onClick={() => setTab("landlord")}
               className={`flex-1 py-4 text-sm font-bold transition-colors cursor-pointer ${
@@ -159,6 +148,16 @@ function SignupContent() {
               }`}
             >
               🏠 Landlord
+            </button>
+            <button
+              onClick={() => setTab("society")}
+              className={`flex-1 py-4 text-sm font-bold transition-colors cursor-pointer ${
+                tab === "society"
+                  ? "text-brand-500 border-b-2 border-brand-500 bg-brand-50"
+                  : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              🏢 Society Admin
             </button>
           </div>
 
@@ -187,17 +186,10 @@ function SignupContent() {
                     value={society.email} onChange={e => setSociety(s => ({ ...s, email: e.target.value }))} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelClass}>Password *</label>
-                    <input required className={inputClass} placeholder="Min 6 chars" type="password" autoComplete="new-password"
-                      value={society.password} onChange={e => setSociety(s => ({ ...s, password: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Confirm Password *</label>
-                    <input required className={inputClass} placeholder="Re-enter" type="password" autoComplete="new-password"
-                      value={society.confirm_password} onChange={e => setSociety(s => ({ ...s, confirm_password: e.target.value }))} />
-                  </div>
+                <div>
+                  <label className={labelClass}>Password *</label>
+                  <input required className={inputClass} placeholder="Min 6 chars" type="password" autoComplete="new-password"
+                    value={society.password} onChange={e => setSociety(s => ({ ...s, password: e.target.value }))} />
                 </div>
 
                 <div className="border-t border-border-light pt-4">
@@ -222,8 +214,8 @@ function SignupContent() {
                         value={society.society_city} onChange={e => setSociety(s => ({ ...s, society_city: e.target.value }))} />
                     </div>
                     <div>
-                      <label className={labelClass}>State *</label>
-                      <input required className={inputClass} placeholder="Maharashtra"
+                      <label className={labelClass}>State</label>
+                      <input className={inputClass} placeholder="Maharashtra"
                         value={society.society_state} onChange={e => setSociety(s => ({ ...s, society_state: e.target.value }))} />
                     </div>
                   </div>
@@ -278,17 +270,10 @@ function SignupContent() {
                     value={landlord.email} onChange={e => setLandlord(l => ({ ...l, email: e.target.value }))} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelClass}>Password *</label>
-                    <input required className={inputClass} placeholder="Min 6 chars" type="password" autoComplete="new-password"
-                      value={landlord.password} onChange={e => setLandlord(l => ({ ...l, password: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className={labelClass}>Confirm Password *</label>
-                    <input required className={inputClass} placeholder="Re-enter" type="password" autoComplete="new-password"
-                      value={landlord.confirm_password} onChange={e => setLandlord(l => ({ ...l, confirm_password: e.target.value }))} />
-                  </div>
+                <div>
+                  <label className={labelClass}>Password *</label>
+                  <input required className={inputClass} placeholder="Min 6 chars" type="password" autoComplete="new-password"
+                    value={landlord.password} onChange={e => setLandlord(l => ({ ...l, password: e.target.value }))} />
                 </div>
 
                 <button
@@ -304,7 +289,7 @@ function SignupContent() {
             <div className="mt-5 text-center">
               <span className="text-xs text-ink-muted">Already have an account? </span>
               <button
-                onClick={() => router.push("/")}
+                onClick={() => router.push("/login")}
                 className="text-xs font-bold text-brand-500 cursor-pointer hover:underline"
               >
                 Login

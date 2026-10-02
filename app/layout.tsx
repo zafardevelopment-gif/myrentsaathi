@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     siteName: SITE.name,
     title: `${SITE.name} — ${SITE.socialTagline}`,
     description:
-      "India's WhatsApp-native platform for housing society management, rent collection, tenant management & agreements. Start a free 14-day trial.",
+      "India's WhatsApp-native platform for housing society management, rent collection, tenant management & agreements. Start a free 30-day trial.",
     images: [
       {
         url: absoluteUrl(SITE.ogImage),

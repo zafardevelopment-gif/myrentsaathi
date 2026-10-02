@@ -88,7 +88,7 @@ export default function ForSocietiesPage() {
             View Pricing
           </Link>
         </div>
-        <div className="mt-6 text-[13px] text-white/60">14-day free trial · From 10 to 500+ flats · WhatsApp-native</div>
+        <div className="mt-6 text-[13px] text-white/60">30-day free trial · From 10 to 500+ flats · WhatsApp-native</div>
       </section>
 
       {/* Intro prose */}

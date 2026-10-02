@@ -2,7 +2,7 @@
 
 > India's Smartest Society & Rent Management Platform — a WhatsApp-native web app for Indian landlords and housing societies to collect rent, manage tenants and run society operations.
 
-MyRentSaathi is a software product operated by AIVEXA LLP (Darbhanga, Bihar, India). It helps individual landlords, NRI property owners, housing societies and RWA committees across India manage rent, maintenance, tenants, agreements, visitors and society governance from a single dashboard — with tenants and members interacting mostly over WhatsApp, so they never need to install a separate app. It is a commercial SaaS with a free trial; pricing is in INR.
+MyRentSaathi is a software product operated by AIVEXA LLP (Darbhanga, Bihar, India). It helps individual landlords, NRI property owners, housing societies and RWA committees across India manage rent, maintenance, tenants, agreements, visitors and society governance from a single dashboard — with tenants and members interacting mostly over WhatsApp, so they never need to install a separate app. It is a commercial SaaS with a 30-day free trial (no credit card); pricing is in INR.
 
 ## What it does
 - Rent & maintenance collection via UPI payment links sent on WhatsApp, with automatic reminders, receipts and paid/pending/overdue tracking

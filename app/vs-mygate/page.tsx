@@ -63,7 +63,7 @@ const COMPARISON = [
   { feature: "Tenant onboarding & KYC", mrs: true, mygate: false, note: "Aadhaar/PAN verification" },
   { feature: "Tax-ready income reports", mrs: true, mygate: false, note: "TDS, Form 26AS prep" },
   { feature: "Transparent per-unit pricing", mrs: true, mygate: false, note: "₹10 per landlord/month" },
-  { feature: "14-day free trial", mrs: true, mygate: false, note: "" },
+  { feature: "30-day free trial", mrs: true, mygate: false, note: "" },
   { feature: "Guard app / intercom", mrs: false, mygate: true, note: "MyGate's core strength" },
   { feature: "Vehicle management", mrs: false, mygate: true, note: "" },
 ];
