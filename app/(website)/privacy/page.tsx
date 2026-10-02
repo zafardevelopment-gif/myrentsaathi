@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import HomePageClient from "@/components/website/HomePageClient";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — MyRentSaathi",
+  title: "Privacy Policy",
   description: "How MyRentSaathi (operated by AIVEXA LLP) collects, uses and protects the personal data of landlords, society members and tenants.",
   alternates: { canonical: "https://www.myrentsaathi.com/privacy" },
 };

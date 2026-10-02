@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import HomePageClient from "@/components/website/HomePageClient";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — MyRentSaathi",
+  title: "Terms of Service",
   description: "Terms for using MyRentSaathi, the rent and housing-society management platform operated by AIVEXA LLP.",
   alternates: { canonical: "https://www.myrentsaathi.com/terms" },
 };

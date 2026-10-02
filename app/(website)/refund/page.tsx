@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import HomePageClient from "@/components/website/HomePageClient";
 
 export const metadata: Metadata = {
-  title: "Refund & Cancellation Policy — MyRentSaathi",
+  title: "Refund & Cancellation Policy",
   description: "MyRentSaathi refund and cancellation policy: 30-day free trial with no card, cancel any time to stop the next renewal, paid subscriptions are non-refundable.",
   alternates: { canonical: "https://www.myrentsaathi.com/refund" },
 };
