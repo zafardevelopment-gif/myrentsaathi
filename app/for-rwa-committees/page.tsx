@@ -121,7 +121,7 @@ export default function ForRwaCommitteesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
             { prob: "WhatsApp group chaos — 100+ daily messages", sol: "Structured notices, polls, and complaints replace group noise" },
-            { prob: "Manual maintenance collection — chasing defaulters", sol: "Auto UPI links + automated reminders = collections in 3 days, not 15" },
+            { prob: "Manual maintenance collection — chasing defaulters", sol: "Auto UPI links + automated reminders — no more door-to-door chasing" },
             { prob: "Paper expense records — auditors reject them", sol: "Digital expense log with categories — audit-ready PDF in one click" },
             { prob: "Paper ballots for AGM — fraud risk, slow counting", sol: "Online polls with tamper-proof results tallied instantly" },
             { prob: "No visibility on complaints — residents frustrated", sol: "Ticket system with status updates on WhatsApp — full audit trail" },

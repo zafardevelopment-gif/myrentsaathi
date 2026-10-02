@@ -2,7 +2,7 @@ import HeroLeadForm from "./HeroLeadForm";
 
 // Benefit-focused trust stats
 const HERO_STATS = [
-  { value: "90%", label: "Rent Collected in 3 Days" },
+  { value: "30 din", label: "Free Trial" },
   { value: "0%", label: "Commission on UPI" },
   { value: "5 min", label: "Setup Time" },
   { value: "24×7", label: "WhatsApp Updates" },

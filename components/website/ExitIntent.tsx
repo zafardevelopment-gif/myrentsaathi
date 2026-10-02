@@ -107,7 +107,7 @@ export default function ExitIntent() {
                 Wait! Get a free demo before you leave
               </h3>
               <p className="text-ink-muted text-sm mt-2">
-                See how <b>90% maintenance is collected in 3 days</b> — in a
+                See how <b>automatic WhatsApp reminders + UPI links</b> collect rent and maintenance — in a
                 quick 5-minute demo on WhatsApp.
               </p>
             </div>

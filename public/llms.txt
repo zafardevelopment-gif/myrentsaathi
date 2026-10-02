@@ -17,6 +17,7 @@ MyRentSaathi is a software product operated by AIVEXA LLP (Darbhanga, Bihar, Ind
 - [Home](https://www.myrentsaathi.com/): Product overview: society + rent + tenant management in one WhatsApp-native platform.
 - [Features](https://www.myrentsaathi.com/features): Full feature list across rent, maintenance, tenants, agreements and reports.
 - [Pricing](https://www.myrentsaathi.com/pricing): Simple per-unit pricing (₹10 per landlord per month) for landlords and societies, in INR.
+- [Refund & Cancellation Policy](https://www.myrentsaathi.com/refund): 30-day free trial, no card. Paid plans are non-refundable; cancelling stops the next renewal.
 - [For Landlords](https://www.myrentsaathi.com/for-landlords): Rent collection, tenant management and agreements for individual landlords and NRIs.
 - [For Housing Societies](https://www.myrentsaathi.com/for-societies): Maintenance collection, accounting, notices, polls and visitor management for societies.
 - [For Tenants](https://www.myrentsaathi.com/for-tenants): How tenants pay rent, raise complaints and access documents over WhatsApp.

@@ -13,7 +13,7 @@ const PERSONAS = [
     icon: "🏢",
     title: "For Societies & RWAs",
     desc: "Collect maintenance online, publish official notices, run polls & voting, track complaints with a ticket system — full transparency for residents.",
-    points: ["90% collection in 3 days", "Notices & polls", "Complaint tracking"],
+    points: ["Auto maintenance reminders", "Notices & polls", "Complaint tracking"],
     href: "/for-societies",
     cta: "Explore Society Features",
   },

@@ -289,7 +289,7 @@ Sabse badi pareshani hai rent time par lena. Iska solution hai automation:
 3. Receipt automatic generate ho jaaye
 4. Aapko Excel ya registers maintain nahi karne padte
 
-MyRentSaathi exactly yahi karta hai — **90% rent 3 din mein collect ho jaata hai** without any manual follow-up.
+MyRentSaathi exactly yahi karta hai — **reminders aur UPI links apne aap jaate hain**, manual follow-up ki zaroorat kam ho jaati hai.
 
 ---
 
@@ -324,12 +324,12 @@ Apni property rent par dena mushkil nahi hai — bas sahi process follow karo:
   "society-maintenance-collection-online-india": {
     slug: "society-maintenance-collection-online-india",
     title: "Society Maintenance Collection Online: Complete Guide for RWA Committees (2026)",
-    excerpt: "How housing society committees in India can collect maintenance online using UPI, WhatsApp, and society management software. Cut collection time from 15 days to 3 days.",
+    excerpt: "How housing society committees in India can collect maintenance online using UPI, WhatsApp, and society management software. Automate reminders and stop chasing defaulters.",
     content: `## Introduction
 
 If you're a society secretary or RWA committee member, you know the pain: maintenance collection takes 15+ days every month, residents ignore reminders, and tracking defaulters in Excel is a nightmare.
 
-In this guide, we'll show you how to **collect society maintenance online in India** — and cut your collection time from 15 days to under 3 days.
+In this guide, we'll show you how to **collect society maintenance online in India** — and stop chasing members door to door every month.
 
 ---
 
@@ -427,7 +427,7 @@ With modern society management software, setup takes less than a day:
 
 Societies using online maintenance collection report:
 
-- **90% collection in 3 days** (vs 15+ days manually)
+- **Automatic reminders** on fixed dates (no manual chasing)
 - **Zero cash handling** — completely contactless
 - **50% fewer defaulters** — automatic reminders work
 - **Secretary time saved**: 10-15 hours/month

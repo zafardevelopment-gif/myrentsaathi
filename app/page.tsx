@@ -4,7 +4,6 @@ import ProblemSolution from "@/components/website/ProblemSolution";
 import Personas from "@/components/website/Personas";
 import Features from "@/components/website/Features";
 import HowItWorks from "@/components/website/HowItWorks";
-import Testimonials from "@/components/website/Testimonials";
 import Pricing from "@/components/website/Pricing";
 import TopCities from "@/components/website/TopCities";
 import FAQ from "@/components/website/FAQ";
@@ -38,7 +37,6 @@ export default function HomePage() {
       <Personas />
       <Features />
       <HowItWorks />
-      <Testimonials />
 
       {/* Server component — fetches pricing from Supabase */}
       <Pricing />

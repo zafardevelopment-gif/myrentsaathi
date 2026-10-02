@@ -60,7 +60,7 @@ const STATIC_POSTS: BlogPost[] = [
   {
     id: "5", slug: "society-maintenance-collection-online-india",
     title: "Society Maintenance Collection Online: Complete Guide for RWA Committees (2026)",
-    excerpt: "How housing society committees in India can collect maintenance online using UPI and WhatsApp. Cut collection time from 15 days to 3 days.",
+    excerpt: "How housing society committees in India can collect maintenance online using UPI and WhatsApp. Automate reminders and stop chasing defaulters.",
     category: "Society Management", tags: ["society maintenance", "RWA", "online collection"],
     published_at: new Date().toISOString(), author: "MyRentSaathi Team",
   },

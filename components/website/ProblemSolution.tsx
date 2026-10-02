@@ -9,7 +9,7 @@ export default function ProblemSolution() {
 
   const solutions = [
     "Official notices + automatic WhatsApp reminders",
-    "90% maintenance collected in 3 days",
+    "Maintenance collected online with UPI links",
     "One dashboard for everything — real-time data",
     "Ticket system — numbers, tracking, escalation",
     "AI draft free, lawyer ₹499, registration ₹999",

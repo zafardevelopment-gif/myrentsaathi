@@ -102,7 +102,7 @@ const BENEFITS = [
   {
     icon: "⚡",
     title: "Collect in 3 Days, Not 15",
-    desc: "Manual collection takes 2 weeks of chasing. With automated WhatsApp reminders + UPI links, 90% of tenants pay within 3 days of the 1st.",
+    desc: "Manual collection takes 2 weeks of chasing. With automated WhatsApp reminders + UPI links send reminders and UPI links automatically, so tenants can pay in one tap.",
   },
   {
     icon: "📵",
@@ -159,7 +159,7 @@ export default function WhatsappRentCollectionPage() {
           Collect Rent via WhatsApp UPI — Automated Reminders, Instant Receipts
         </h1>
         <p className="text-[17px] text-white/70 mt-4 max-w-[640px] mx-auto leading-relaxed">
-          Send UPI payment links on WhatsApp. Automated reminders on 1st, 5th, 10th of every month. No new app for tenants. 90% of rent collected within 3 days.
+          Send UPI payment links on WhatsApp. Automated reminders on 1st, 5th, 10th of every month. No new app for tenants.
         </p>
         <div className="flex flex-wrap justify-center gap-3 mt-8">
           <Link href="/signup" className="px-8 py-3.5 rounded-xl bg-brand-500 text-white font-bold text-[15px] hover:bg-brand-600">
