@@ -28,6 +28,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     u("/features",                     { lastModified: now, changeFrequency: "monthly", priority: 0.8 }),
     u("/pricing",                      { lastModified: now, changeFrequency: "weekly",  priority: 0.9 }),
     u("/about",                        { lastModified: now, changeFrequency: "monthly", priority: 0.6 }),
+    u("/privacy",                      { lastModified: now, changeFrequency: "yearly",  priority: 0.2 }),
+    u("/terms",                        { lastModified: now, changeFrequency: "yearly",  priority: 0.2 }),
     u("/contact",                      { lastModified: now, changeFrequency: "yearly",  priority: 0.5 }),
     u("/blog",                         { lastModified: now, changeFrequency: "weekly",  priority: 0.7 }),
     // Persona landing pages
