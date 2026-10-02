@@ -12,7 +12,8 @@ interface Props {
 
 export default function PricingCards({ societyPlans, landlordPlans, freeTrialDays }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<"society" | "landlord">("society");
+  // All plans in ONE grid (no Society/Landlord tabs) — each card says who it is
+  // for. Landlord plans first, matching the signup page default.
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   function getQty(planId: string) {
@@ -23,10 +24,11 @@ export default function PricingCards({ societyPlans, landlordPlans, freeTrialDay
     setQuantities((prev) => ({ ...prev, [planId]: Math.max(1, Math.min(999, val)) }));
   }
 
-  const plans = tab === "society" ? societyPlans : landlordPlans;
-  // Society plan is priced per landlord; Landlord plan is priced per flat/tenant
-  const unitLabel    = tab === "society" ? "landlords" : "flats / tenants";
-  const unitLabelHindi = tab === "society" ? "landlords" : "flats / tenants";
+  type Kind = "society" | "landlord";
+  const items: { plan: PricingPlan; kind: Kind }[] = [
+    ...landlordPlans.map((plan) => ({ plan, kind: "landlord" as Kind })),
+    ...societyPlans.map((plan) => ({ plan, kind: "society" as Kind })),
+  ];
 
   function totalPrice(plan: PricingPlan) {
     return plan.price * getQty(plan.id);
@@ -34,48 +36,23 @@ export default function PricingCards({ societyPlans, landlordPlans, freeTrialDay
 
   return (
     <>
-      {/* Tab Toggle */}
-      <div className="flex justify-center gap-1 mb-9">
-        {[
-          { id: "society" as const, label: "🏢 Society Plans" },
-          { id: "landlord" as const, label: "👨‍💼 Landlord Plans" },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-all ${
-              tab === t.id
-                ? "bg-brand-500 text-white"
-                : "bg-white/[0.08] text-white/60 hover:bg-white/[0.12]"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Per-unit explainer banner */}
-      <div className="max-w-[900px] mx-auto mb-6 bg-white/[0.06] border border-white/10 rounded-2xl px-5 py-4 flex items-start gap-3">
+      {/* Per-unit explainer */}
+      <div className="max-w-[900px] mx-auto mb-8 bg-white/[0.06] border border-white/10 rounded-2xl px-5 py-4 flex items-start gap-3">
         <span className="text-2xl">💡</span>
-        <div>
-          <div className="text-white text-sm font-bold mb-0.5">Per-Unit Pricing</div>
-          <div className="text-white/60 text-[13px] leading-relaxed">
-            {tab === "society"
-              ? <>Plans are priced <strong className="text-white">per landlord</strong> in your society. Select how many landlords you manage — total updates automatically.</>
-              : <>Plans are priced <strong className="text-white">per flat or tenant</strong> you manage. Select how many you need — price updates automatically.</>
-            }
-          </div>
+        <div className="text-white/70 text-[13px] leading-relaxed">
+          <strong className="text-white">Simple per-unit pricing.</strong> Landlords pay <strong className="text-white">per flat / tenant</strong>; societies pay <strong className="text-white">per landlord</strong> in the society. Choose the quantity — the total updates automatically. {freeTrialDays}-day free trial on every plan, no credit card.
         </div>
       </div>
 
       {/* Pricing Cards — grid adapts to plan count */}
       <div className={`grid grid-cols-1 gap-5 mx-auto w-full ${
-        plans.length === 1 ? "max-w-[340px]" :
-        plans.length === 2 ? "md:grid-cols-2 max-w-[620px]" :
+        items.length === 1 ? "max-w-[340px]" :
+        items.length === 2 ? "md:grid-cols-2 max-w-[700px]" :
                              "md:grid-cols-3 max-w-[900px]"
       }`}>
-        {plans.map((plan) => {
+        {items.map(({ plan, kind }) => {
           const qty = getQty(plan.id);
+          const tab = kind;
           const total = totalPrice(plan);
 
           return (
@@ -93,6 +70,9 @@ export default function PricingCards({ societyPlans, landlordPlans, freeTrialDay
                 </div>
               )}
 
+              <div className={`inline-block mx-auto mb-2 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wide ${plan.is_popular ? "bg-white/20 text-white" : "bg-brand-500/15 text-brand-400"}`}>
+                {kind === "landlord" ? "👨‍💼 For Landlords" : "🏢 For Societies & RWAs"}
+              </div>
               <div className="text-lg font-bold mb-1">{plan.name}</div>
 
               {/* Price */}
