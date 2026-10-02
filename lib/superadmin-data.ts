@@ -608,3 +608,72 @@ export async function getOverviewStats() {
     starterSocieties: societies.filter((s) => s.subscription_plan === "starter").length,
   };
 }
+
+// ─── SUBSCRIPTION REVENUE (real, from `subscriptions`) ────────
+// MRR = sum of plan_price for paid plans that are active right now.
+// Trend = plan_price of paid plans activated in each of the last 6 months.
+
+export type SubscriptionRevenue = {
+  mrr: number;
+  activePaid: number;
+  trialing: number;
+  bySource: { source: string; amount: number; count: number }[];
+  trend: { month: string; revenue: number }[];
+};
+
+export async function getSubscriptionRevenue(): Promise<SubscriptionRevenue> {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("plan_type, plan_price, status, expires_at, activated_at");
+  if (error) throw error;
+
+  type Row = { plan_type: string; plan_price: number | string | null; status: string; expires_at: string; activated_at: string | null };
+  const rows = (data ?? []) as Row[];
+  const now = Date.now();
+  const price = (r: Row) => Number(r.plan_price) || 0;
+
+  const active = rows.filter((r) => r.status === "active" && new Date(r.expires_at).getTime() > now && price(r) > 0);
+  const mrr = active.reduce((a, r) => a + price(r), 0);
+  const trialing = rows.filter((r) => r.status === "trial" && new Date(r.expires_at).getTime() > now).length;
+
+  const label: Record<string, string> = { society: "Society Subscriptions", landlord: "Landlord Subscriptions" };
+  const src: Record<string, { amount: number; count: number }> = {};
+  for (const r of active) {
+    const k = label[r.plan_type] ?? "Other Plans";
+    src[k] = src[k] ?? { amount: 0, count: 0 };
+    src[k].amount += price(r);
+    src[k].count += 1;
+  }
+
+  const months: { key: string; month: string; revenue: number }[] = [];
+  const d = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    months.push({
+      key: `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`,
+      month: m.toLocaleString("en-IN", { month: "short" }),
+      revenue: 0,
+    });
+  }
+  for (const r of rows) {
+    if (!r.activated_at || price(r) <= 0) continue;
+    const k = r.activated_at.slice(0, 7);
+    const slot = months.find((m) => m.key === k);
+    if (slot) slot.revenue += price(r);
+  }
+
+  return {
+    mrr,
+    activePaid: active.length,
+    trialing,
+    bySource: Object.entries(src).map(([source, v]) => ({ source, ...v })).sort((a, b) => b.amount - a.amount),
+    trend: months.map(({ month, revenue }) => ({ month, revenue })),
+  };
+}
+
+export function formatInr(n: number) {
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
+  if (n >= 100000) return `₹${(n / 100000).toFixed(2)}L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
+  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+}

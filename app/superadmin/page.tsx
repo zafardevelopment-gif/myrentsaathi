@@ -7,22 +7,15 @@ import {
   getOverviewStats,
   getRecentRentPayments,
   getAllTickets,
+  getSubscriptionRevenue,
+  formatInr,
+  type SubscriptionRevenue,
   type RentPayment,
   type Ticket,
 } from "@/lib/superadmin-data";
 
-// ─── STATIC REVENUE MOCK (no revenue tables yet) ─────────────
-const REVENUE_TREND = [
-  { month: "Oct", revenue: 680000 },
-  { month: "Nov", revenue: 790000 },
-  { month: "Dec", revenue: 920000 },
-  { month: "Jan", revenue: 1050000 },
-  { month: "Feb", revenue: 1142000 },
-  { month: "Mar", revenue: 1285000 },
-];
-
 function MiniBarChart({ data }: { data: { month: string; revenue: number }[] }) {
-  const max = Math.max(...data.map((d) => d.revenue));
+  const max = Math.max(1, ...data.map((d) => d.revenue));
   return (
     <div className="flex items-end gap-1.5 h-20">
       {data.map((d, i) => (
@@ -55,6 +48,7 @@ export default function SuperAdminOverview() {
   const [stats, setStats] = useState<Awaited<ReturnType<typeof getOverviewStats>> | null>(null);
   const [recentPayments, setRecentPayments] = useState<RentPayment[]>([]);
   const [recentTickets, setRecentTickets] = useState<Ticket[]>([]);
+  const [subRev, setSubRev] = useState<SubscriptionRevenue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +63,10 @@ export default function SuperAdminOverview() {
         setStats(s);
         setRecentPayments(payments);
         setRecentTickets(tickets.slice(0, 5));
+        // Revenue is best-effort: a failure here must not blank the dashboard.
+        getSubscriptionRevenue().then(setSubRev).catch(() =>
+          setSubRev({ mrr: 0, activePaid: 0, trialing: 0, bySource: [], trend: [] })
+        );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load data");
       } finally {
@@ -157,15 +155,20 @@ export default function SuperAdminOverview() {
 
       {/* Chart + Plan Breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Revenue Trend (static until billing tables added) */}
+        {/* Revenue Trend — new paid activations per month, from subscriptions */}
         <div className="bg-white rounded-[14px] p-4 border border-border-default">
           <div className="text-[13px] font-extrabold text-ink mb-3">📊 Subscription Revenue Trend</div>
-          <MiniBarChart data={REVENUE_TREND} />
-          <div className="flex justify-between mt-2 text-[10px] text-ink-muted font-semibold">
-            <span>Oct ₹6.8L</span>
-            <span>Feb ₹11.4L</span>
-            <span className="text-amber-600 font-bold">Mar ₹12.85L ↑</span>
-          </div>
+          {subRev ? (
+            <>
+              <MiniBarChart data={subRev.trend} />
+              <div className="flex justify-between mt-2 text-[10px] text-ink-muted font-semibold">
+                <span>{subRev.activePaid} paid · {subRev.trialing} on trial</span>
+                <span className="text-amber-600 font-bold">MRR {formatInr(subRev.mrr)}</span>
+              </div>
+            </>
+          ) : (
+            <div className="h-20 bg-warm-100 rounded-xl animate-pulse" />
+          )}
         </div>
 
         {/* Plan Breakdown from real DB */}

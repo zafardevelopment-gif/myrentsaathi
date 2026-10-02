@@ -2,33 +2,15 @@
 
 import { useEffect, useState } from "react";
 import StatCard from "@/components/dashboard/StatCard";
-import { getRecentRentPayments, getRevenueStats, type RentPayment } from "@/lib/superadmin-data";
-
-// Static subscription revenue (billing tables not yet wired to real payments)
-const MONTHLY_TREND = [
-  { month: "Oct", revenue: 680000 },
-  { month: "Nov", revenue: 790000 },
-  { month: "Dec", revenue: 920000 },
-  { month: "Jan", revenue: 1050000 },
-  { month: "Feb", revenue: 1142000 },
-  { month: "Mar", revenue: 1285000 },
-];
-
-const REVENUE_SOURCES = [
-  { source: "Society Subscriptions",  amount: 720000, pct: 56, color: "bg-amber-500",  light: "bg-amber-100 text-amber-700" },
-  { source: "Landlord Subscriptions", amount: 340000, pct: 26, color: "bg-green-500",  light: "bg-green-100 text-green-700" },
-  { source: "Agreement Charges",      amount: 125000, pct: 10, color: "bg-purple-500", light: "bg-purple-100 text-purple-700" },
-  { source: "Agent Commissions (net)",amount: 65000,  pct: 5,  color: "bg-blue-500",   light: "bg-blue-100 text-blue-700" },
-  { source: "WhatsApp Markup",         amount: 35000,  pct: 3,  color: "bg-cyan-500",   light: "bg-cyan-100 text-cyan-700" },
-];
+import { getRecentRentPayments, getRevenueStats, getSubscriptionRevenue, formatInr, type RentPayment, type SubscriptionRevenue } from "@/lib/superadmin-data";
 
 function MiniBarChart({ data }: { data: { month: string; revenue: number }[] }) {
-  const max = Math.max(...data.map((d) => d.revenue));
+  const max = Math.max(1, ...data.map((d) => d.revenue));
   return (
     <div className="flex items-end gap-2 h-28">
       {data.map((d, i) => (
         <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
-          <div className="text-[9px] text-ink-muted font-bold">₹{(d.revenue / 100000).toFixed(1)}L</div>
+          <div className="text-[9px] text-ink-muted font-bold">{d.revenue ? formatInr(d.revenue) : "—"}</div>
           <div
             className="w-full rounded-t-md"
             style={{
@@ -47,17 +29,20 @@ function MiniBarChart({ data }: { data: { month: string; revenue: number }[] }) 
 export default function SuperAdminRevenue() {
   const [payments, setPayments] = useState<RentPayment[]>([]);
   const [stats, setStats] = useState<{ rentThisMonth: number; rentAllTime: number; maintTotal: number } | null>(null);
+  const [sub, setSub] = useState<SubscriptionRevenue | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [p, s] = await Promise.all([
+        const [p, s, r] = await Promise.all([
           getRecentRentPayments(20),
           getRevenueStats(),
+          getSubscriptionRevenue().catch(() => null),
         ]);
         setPayments(p);
         setStats(s);
+        setSub(r);
       } catch (e) {
         console.error(e);
       } finally {
@@ -67,7 +52,11 @@ export default function SuperAdminRevenue() {
     load();
   }, []);
 
-  const subscriptionMrr = 1285000; // static until billing tables
+  const subscriptionMrr = sub?.mrr ?? 0;
+  const trend = sub?.trend ?? [];
+  const sources = sub?.bySource ?? [];
+  const sourceTotal = sources.reduce((a, r) => a + r.amount, 0);
+  const SOURCE_COLORS = ["bg-amber-500", "bg-green-500", "bg-purple-500"];
   const paidCount = payments.filter(p => p.status === "paid").length;
   const overdueCount = payments.filter(p => p.status === "overdue").length;
 
@@ -78,15 +67,15 @@ export default function SuperAdminRevenue() {
         <StatCard
           icon="🗓️"
           label="Subscription MRR"
-          value="₹12.85L"
-          sub="+12.5% MoM growth"
+          value={loading ? "…" : formatInr(subscriptionMrr)}
+          sub={sub ? `${sub.activePaid} paid plans · ${sub.trialing} on trial` : "Active paid plans"}
           accent="text-green-600"
         />
         <StatCard
           icon="📈"
           label="ARR (Projected)"
-          value="₹1.54Cr"
-          sub="Based on current MRR"
+          value={loading ? "…" : formatInr(subscriptionMrr * 12)}
+          sub="Current MRR × 12"
           accent="text-amber-600"
         />
         <StatCard
@@ -109,20 +98,18 @@ export default function SuperAdminRevenue() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         {/* Trend Chart */}
         <div className="md:col-span-2 bg-white rounded-[14px] p-4 border border-border-default">
-          <div className="text-[13px] font-extrabold text-ink mb-4">📊 Monthly Subscription Revenue</div>
-          <MiniBarChart data={MONTHLY_TREND} />
+          <div className="text-[13px] font-extrabold text-ink mb-1">📊 New Paid Subscriptions by Month</div>
+          <div className="text-[11px] text-ink-muted mb-4">Plan price of subscriptions activated each month (from the subscriptions table).</div>
+          {loading ? (
+            <div className="h-28 bg-warm-100 rounded-xl animate-pulse" />
+          ) : (
+            <MiniBarChart data={trend} />
+          )}
           <div className="mt-3 space-y-0">
-            {MONTHLY_TREND.map((m, i) => (
+            {trend.map((m) => (
               <div key={m.month} className="flex justify-between items-center py-2 border-b border-border-light last:border-0">
-                <span className="text-[12px] text-ink-soft font-semibold">{m.month} 2025{i >= 3 ? "/26" : ""}</span>
-                <div className="flex items-center gap-4">
-                  {i > 0 && (
-                    <span className="text-[11px] font-bold text-green-600">
-                      +{(((m.revenue - MONTHLY_TREND[i-1].revenue) / MONTHLY_TREND[i-1].revenue) * 100).toFixed(1)}%
-                    </span>
-                  )}
-                  <span className="text-[13px] font-extrabold text-ink">₹{(m.revenue / 100000).toFixed(2)}L</span>
-                </div>
+                <span className="text-[12px] text-ink-soft font-semibold">{m.month}</span>
+                <span className="text-[13px] font-extrabold text-ink">{m.revenue ? formatInr(m.revenue) : "—"}</span>
               </div>
             ))}
           </div>
@@ -132,24 +119,30 @@ export default function SuperAdminRevenue() {
         <div className="bg-white rounded-[14px] p-4 border border-border-default">
           <div className="text-[13px] font-extrabold text-ink mb-3">💰 Revenue by Source</div>
           <div className="space-y-3">
-            {REVENUE_SOURCES.map((r) => (
-              <div key={r.source}>
-                <div className="flex justify-between text-[11px] mb-1">
-                  <span className="text-ink-soft">{r.source}</span>
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${r.light}`}>{r.pct}%</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-warm-100 rounded-full overflow-hidden">
-                    <div className={`h-full ${r.color} rounded-full`} style={{ width: `${r.pct}%` }} />
+            {sources.length === 0 && !loading && (
+              <div className="text-[12px] text-ink-muted">No active paid subscriptions yet.</div>
+            )}
+            {sources.map((r, i) => {
+              const pct = sourceTotal ? Math.round((r.amount / sourceTotal) * 100) : 0;
+              return (
+                <div key={r.source}>
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span className="text-ink-soft">{r.source} ({r.count})</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-warm-100 text-ink">{pct}%</span>
                   </div>
-                  <span className="text-[11px] font-bold text-ink w-14 text-right">₹{(r.amount / 1000).toFixed(0)}K</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-warm-100 rounded-full overflow-hidden">
+                      <div className={`h-full ${SOURCE_COLORS[i % SOURCE_COLORS.length]} rounded-full`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-[11px] font-bold text-ink w-16 text-right">{formatInr(r.amount)}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-4 pt-3 border-t border-border-default flex justify-between items-center">
             <span className="text-[12px] font-extrabold text-ink">TOTAL MRR</span>
-            <span className="text-[18px] font-extrabold text-amber-600">₹{(subscriptionMrr / 100000).toFixed(2)}L</span>
+            <span className="text-[18px] font-extrabold text-amber-600">{formatInr(subscriptionMrr)}</span>
           </div>
         </div>
       </div>
