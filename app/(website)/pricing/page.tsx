@@ -8,11 +8,11 @@ import Footer from "@/components/website/Footer";
 export const metadata: Metadata = {
   title: "Pricing — Affordable Rent & Society Management Plans",
   description:
-    "Simple, transparent per-unit pricing for landlords and housing societies — ₹10 per landlord/month. Free trial, no credit card. See live plans.",
+    "Simple, transparent per-unit pricing for landlords and housing societies — landlords ₹49 per flat/month, societies ₹10 per flat/month. Free trial, no credit card. See live plans.",
   alternates: { canonical: "https://www.myrentsaathi.com/pricing" },
   openGraph: {
     title: "MyRentSaathi Pricing — Society & Landlord Plans",
-    description: "Per-unit pricing from ₹10 per landlord/month. Free trial, no credit card.",
+    description: "Landlords ₹49 per flat/month, societies ₹10 per flat/month. Free trial, no credit card.",
     url: "https://www.myrentsaathi.com/pricing",
   },
 };

@@ -30,9 +30,9 @@ const FALLBACK_SOCIETY: PricingPlan[] = [
 
 const FALLBACK_LANDLORD: PricingPlan[] = [
   {
-    id: "fallback-landlord", plan_type: "landlord", name: "Landlord", price: 10, price_yearly: 100,
-    duration: "per landlord / month", property_limit: null, is_popular: true, is_active: true, sort_order: 1,
-    cta_text: "Start Free Trial", description: "₹10 per landlord per month — pay for what you manage",
+    id: "fallback-landlord", plan_type: "landlord", name: "Landlord", price: 49, price_yearly: 490,
+    duration: "per flat / month", property_limit: null, is_popular: true, is_active: true, sort_order: 1,
+    cta_text: "Start Free Trial", description: "₹49 per flat per month — pay for what you manage",
     badge_text: "PER-UNIT", created_at: "", updated_at: "",
     features: [
       { id: "lf1", plan_id: "fallback-landlord", feature_text: "Rent collection via UPI + tracking", is_highlight: true,  sort_order: 1 },

@@ -23,7 +23,7 @@ export async function generateMetadata({
 
   return {
     title: `Rent Management Software in ${city.city_name} | MyRentSaathi`,
-    description: `Manage rental properties in ${city.city_name}, ${city.state} with MyRentSaathi. Automate rent collection via UPI, manage tenants, run housing societies. Simple per-unit pricing from ₹10/landlord/month.`,
+    description: `Manage rental properties in ${city.city_name}, ${city.state} with MyRentSaathi. Automate rent collection via UPI, manage tenants, run housing societies. Simple per-unit pricing — landlords ₹49/flat/month, societies ₹10/flat/month.`,
     keywords: [
       `rent management software ${city.city_name}`,
       `landlord software ${city.city_name}`,
@@ -38,14 +38,14 @@ export async function generateMetadata({
     },
     openGraph: {
       title: `Rent Management Software in ${city.city_name} | MyRentSaathi`,
-      description: `Automate rent & maintenance for ${city.city_name} properties & societies. Per-unit pricing from ₹10/landlord/month.`,
+      description: `Automate rent & maintenance for ${city.city_name} properties & societies. Landlords ₹49/flat/month, societies ₹10/flat/month.`,
       url: `${BASE_URL}/rent-management-software/${slug}`,
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
       title: `Rent Management Software ${city.city_name} — MyRentSaathi`,
-      description: `Automate rent collection for ${city.city_name} properties. WhatsApp-native. Per-unit pricing from ₹10/landlord/month.`,
+      description: `Automate rent collection for ${city.city_name} properties. WhatsApp-native. Per-unit pricing — ₹49/flat/month.`,
     },
   };
 }
@@ -96,7 +96,7 @@ function getCityFaqs(city: City): { q: string; a: string }[] {
     },
     {
       q: `What is the pricing for ${city.city_name} landlords?`,
-      a: `MyRentSaathi uses simple per-unit pricing — ₹10 per landlord per month — so you only pay for what you manage, for both individual landlords and societies. A free trial is included with no credit card needed. See the pricing page for current plans.`,
+      a: `MyRentSaathi uses simple per-unit pricing — ₹49 per flat per month for individual landlords and ₹10 per flat per month for societies — so you only pay for what you manage. A free trial is included with no credit card needed. See the pricing page for current plans.`,
     },
     {
       q: `Can NRI landlords manage ${city.city_name} properties remotely?`,

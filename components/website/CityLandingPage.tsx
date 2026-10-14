@@ -62,7 +62,7 @@ export default function CityLandingPage({ city, state, slug, neighborhoods, faqs
         <p className="text-[17px] text-white/70 mt-4 max-w-[620px] mx-auto leading-relaxed">
           Trusted by landlords and housing societies across {city}. Collect rent via UPI,
           automate WhatsApp reminders, manage tenants, and run your society digitally.
-          Starting at just ₹10 per landlord/month.
+          Societies from ₹10 per flat/month, landlords ₹49 per flat/month.
         </p>
         <div className="flex flex-wrap justify-center gap-3 mt-8">
           <button className="px-8 py-3.5 rounded-xl bg-brand-500 text-white font-bold text-[15px] hover:bg-brand-600 cursor-pointer">
@@ -200,7 +200,7 @@ export default function CityLandingPage({ city, state, slug, neighborhoods, faqs
           Pricing for {city} Landlords & Societies
         </h2>
         <p className="text-[15px] text-ink/60 mb-6">
-          Simple per-unit pricing — <strong>₹10 per landlord/month</strong>, for landlords and societies alike.
+          Simple per-unit pricing — <strong>₹49 per flat/month</strong> for landlords and <strong>₹10 per flat/month</strong> for societies.
           All plans include a 30-day free trial.
         </p>
         <div className="flex justify-center gap-3 flex-wrap">

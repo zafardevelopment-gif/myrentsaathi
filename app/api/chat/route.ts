@@ -88,8 +88,8 @@ Your personality: Warm, helpful, concise. Respond in the same language as the us
 • Can't resolve → call createSupportTicket
 
 ━━ PRICING (quick reference) ━━
-Pricing is simple and per-unit: ₹10 per landlord per month, scaling with the number of landlords/properties managed. Free trial available. Always point users to the /pricing page for exact current plans rather than quoting other figures.
-The same ₹10 per landlord/month per-unit pricing applies to individual landlords and NRI owners.
+Pricing is simple and per-unit: landlords pay ₹49 per flat/tenant per month; housing societies pay ₹10 per landlord/flat per month. Tenants use it free. 30-day free trial, no credit card. Always point users to the /pricing page for exact current plans rather than quoting other figures.
+The landlord price (₹49 per flat/month) applies to individual landlords and NRI owners.
 Tenant: FREE · 30-day free trial for all plans
 ${userBlock}${capabilities}`;
 }

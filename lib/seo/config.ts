@@ -70,10 +70,10 @@ export const ORG = {
 // ── Pricing envelope (used in Offer / AggregateOffer schema) ─────────────────
 export const PRICING = {
   currency: "INR",
-  // Per-unit model: ₹10 per landlord per month. Kept minimal on purpose —
+  // Per-unit model: societies ₹10 per flat/month (lowest price), landlords ₹49 per flat/month. Kept minimal on purpose —
   // marketing copy should link to /pricing rather than hardcode figures.
   unitPrice: "10",
-  unit: "per landlord per month",
+  unit: "per flat per month for housing societies (landlords: ₹49 per flat per month)",
 } as const;
 
 // ── Global keyword pool (page-level keywords extend, not replace, these) ─────

@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Rent Collection Software for Landlords in India — MyRentSaathi",
     description:
-      "Collect rent via UPI, auto-send reminders and receipts, manage tenants and agreements. Simple per-unit pricing from ₹10/landlord/month.",
+      "Collect rent via UPI, auto-send reminders and receipts, manage tenants and agreements. Simple per-unit pricing — ₹49 per flat/month.",
     url: absoluteUrl("/for-landlords"),
   },
 };
@@ -37,7 +37,7 @@ const FEATURES = [
 ];
 
 const FAQS = [
-  { q: "How much does MyRentSaathi cost for landlords?", a: "Pricing is simple and per-unit — ₹10 per landlord per month — so you only pay for what you manage, and there is a free trial with no card required. See the pricing page for current, live plans." },
+  { q: "How much does MyRentSaathi cost for landlords?", a: "Pricing is simple and per-unit — ₹49 per flat per month — so you only pay for what you manage, and there is a free trial with no card required. See the pricing page for current, live plans." },
   { q: "How do I collect rent online from my tenants?", a: "You add each tenant and their rent amount once. On the due date MyRentSaathi sends a UPI payment link to the tenant on WhatsApp. They pay from any UPI app (GPay, PhonePe, Paytm), and a receipt is generated and sent automatically. You see paid, pending and overdue status on your dashboard without asking anyone." },
   { q: "Do my tenants need to download an app?", a: "No. That is the main reason landlords choose us. Tenants receive the payment link and reminders directly on WhatsApp and pay with the UPI app they already use. There is nothing for them to install or log into, which means far fewer 'I can't find the app' excuses." },
   { q: "Can it automatically remind tenants who haven't paid?", a: "Yes. Reminders go out on the due date and can repeat for overdue rent, so you stop manually messaging tenants every month. Defaulters are flagged on your dashboard, and you always have a dated record of when the reminder was sent." },
@@ -75,7 +75,7 @@ export default function ForLandlordsPage() {
         </h1>
         <p className="text-[18px] text-white/70 mt-4 max-w-[620px] mx-auto leading-relaxed">
           Stop chasing rent on WhatsApp by hand. Collect rent via UPI, auto-send reminders and
-          receipts, manage tenants and generate agreements — from just ₹10 per landlord/month.
+          receipts, manage tenants and generate agreements — for just ₹49 per flat/month.
         </p>
         <div className="flex flex-wrap justify-center gap-3 mt-8">
           <Link href="/signup" className="px-8 py-3.5 rounded-xl bg-brand-500 text-white font-bold text-[15px] hover:bg-brand-600">

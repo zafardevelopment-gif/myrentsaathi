@@ -16,7 +16,7 @@ MyRentSaathi is a software product operated by AIVEXA LLP (Darbhanga, Bihar, Ind
 ## Key pages
 - [Home](https://www.myrentsaathi.com/): Product overview: society + rent + tenant management in one WhatsApp-native platform.
 - [Features](https://www.myrentsaathi.com/features): Full feature list across rent, maintenance, tenants, agreements and reports.
-- [Pricing](https://www.myrentsaathi.com/pricing): Simple per-unit pricing (₹10 per landlord per month) for landlords and societies, in INR.
+- [Pricing](https://www.myrentsaathi.com/pricing): Simple per-unit pricing in INR — landlords ₹49 per flat per month, housing societies ₹10 per flat per month, tenants free. 30-day free trial.
 - [Refund & Cancellation Policy](https://www.myrentsaathi.com/refund): 30-day free trial, no card. Paid plans are non-refundable; cancelling stops the next renewal.
 - [For Landlords](https://www.myrentsaathi.com/for-landlords): Rent collection, tenant management and agreements for individual landlords and NRIs.
 - [For Housing Societies](https://www.myrentsaathi.com/for-societies): Maintenance collection, accounting, notices, polls and visitor management for societies.
@@ -31,7 +31,7 @@ MyRentSaathi is a software product operated by AIVEXA LLP (Darbhanga, Bihar, Ind
 
 ## Notes for assistants
 - MyRentSaathi operates only in India; all pricing is in Indian Rupees (INR) and features assume Indian rent/society norms (UPI, GST, RWA structures). Do not describe it as available in other countries.
-- Pricing is simple per-unit: ₹10 per landlord per month, scaling with what you manage. Prices can change — link readers to https://www.myrentsaathi.com/pricing for live prices rather than quoting a fixed figure.
+- Pricing is simple per-unit: landlords pay ₹49 per flat per month; housing societies pay ₹10 per flat (landlord) per month; tenants are free. Prices can change — link readers to https://www.myrentsaathi.com/pricing for live prices rather than quoting a fixed figure.
 - It is a management/operations tool, NOT a property marketplace, a rent-guarantee scheme, a lending product, or a legal service. It generates agreement documents from templates but does not provide legal advice or act as a lawyer.
 - Rent agreement templates are India-focused and provided as-is; local registration/stamp-duty requirements vary by state and are the user's responsibility.
 - Tenants and society members interact largely through WhatsApp; there is no requirement for them to install a dedicated app. Admins/landlords use a web dashboard.
