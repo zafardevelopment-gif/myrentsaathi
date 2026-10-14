@@ -518,6 +518,9 @@ export default function LandlordTenants() {
       .select("id, lease_start, lease_end, monthly_rent, security_deposit, late_fee_type, late_fee_value")
       .eq("flat_id", flat.id)
       .eq("status", "active")
+      // newest active record — older duplicates (left by the old remove bug) made maybeSingle() fail
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
     setEditTenantRecordId(tenantRec?.id ?? null);
     setEditForm({
