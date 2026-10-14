@@ -23,6 +23,7 @@ export default function LandlordPolls() {
           .from("flats")
           .select("society_id")
           .eq("owner_id", u.id)
+          .order("society_id", { ascending: true, nullsFirst: false })
           .limit(1)
           .single();
         setSocietyId(flat?.society_id ?? null);

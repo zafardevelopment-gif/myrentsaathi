@@ -379,6 +379,7 @@ export async function getResidentInfo(
     .from("flats")
     .select("id, flat_number, society_id")
     .eq("owner_id", user.id)
+    .order("society_id", { ascending: true, nullsFirst: false })
     .limit(1)
     .single();
   if (!flat) return null;

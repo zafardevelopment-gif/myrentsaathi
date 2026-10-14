@@ -177,6 +177,7 @@ export async function getMaintenanceDues(userId: string, role: string, months: n
       .from("flats")
       .select("id")
       .eq("owner_id", userId)
+      .order("society_id", { ascending: true, nullsFirst: false })
       .limit(1)
       .single();
     flatId = data?.id ?? null;
@@ -251,7 +252,7 @@ export async function getSocietyNotices(userId: string, role: string) {
     const { data } = await supabase.from("tenants").select("society_id").eq("user_id", userId).eq("status", "active").single();
     societyId = data?.society_id ?? null;
   } else if (role === "landlord") {
-    const { data } = await supabase.from("flats").select("society_id").eq("owner_id", userId).limit(1).single();
+    const { data } = await supabase.from("flats").select("society_id").eq("owner_id", userId).order("society_id", { ascending: true, nullsFirst: false }).limit(1).single();
     societyId = data?.society_id ?? null;
   } else if (role === "admin") {
     const { data } = await supabase.from("society_members").select("society_id").eq("user_id", userId).in("role", ["admin", "board", "board_member"]).single();
@@ -361,7 +362,7 @@ export async function getVisitorLog(userId: string, role: string) {
     const { data } = await supabase.from("tenants").select("flat:flat_id(flat_number)").eq("user_id", userId).eq("status", "active").single();
     flatNumber = (data?.flat as unknown as { flat_number: string } | null)?.flat_number ?? null;
   } else if (role === "landlord") {
-    const { data } = await supabase.from("flats").select("flat_number").eq("owner_id", userId).limit(1).single();
+    const { data } = await supabase.from("flats").select("flat_number").eq("owner_id", userId).order("society_id", { ascending: true, nullsFirst: false }).limit(1).single();
     flatNumber = data?.flat_number ?? null;
   }
 
@@ -397,7 +398,7 @@ export async function getSocietyStaff(userId: string, role: string) {
     const { data } = await supabase.from("tenants").select("society_id").eq("user_id", userId).eq("status", "active").single();
     societyId = data?.society_id ?? null;
   } else if (role === "landlord") {
-    const { data } = await supabase.from("flats").select("society_id").eq("owner_id", userId).limit(1).single();
+    const { data } = await supabase.from("flats").select("society_id").eq("owner_id", userId).order("society_id", { ascending: true, nullsFirst: false }).limit(1).single();
     societyId = data?.society_id ?? null;
   } else if (role === "admin") {
     const { data } = await supabase.from("society_members").select("society_id").eq("user_id", userId).in("role", ["admin", "board", "board_member"]).single();
