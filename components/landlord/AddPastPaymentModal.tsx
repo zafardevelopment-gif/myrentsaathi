@@ -36,13 +36,19 @@ const PAYMENT_METHODS = [
   { value: "other", label: "Other" },
 ];
 
+function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // Generate last 24 months options
 function generateMonthOptions(): { value: string; label: string }[] {
   const opts = [];
   const now = new Date();
   for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = d.toISOString().slice(0, 7);
+    // Build "YYYY-MM" from local date parts — toISOString() converts to UTC, which in
+    // IST turns local midnight on the 1st into the previous month (Oct → "2026-09").
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleString("en-IN", { month: "long", year: "numeric" });
     opts.push({ value, label });
   }
@@ -57,7 +63,7 @@ export default function AddPastPaymentModal({ landlordEmail, onClose, onSuccess 
   const [monthYear, setMonthYear] = useState("");
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = useState(localDateStr());
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [existingPayment, setExistingPayment] = useState<{ id: string; status: string } | null>(null);
@@ -323,7 +329,7 @@ export default function AddPastPaymentModal({ landlordEmail, onClose, onSuccess 
               type="date"
               value={paymentDate}
               onChange={e => setPaymentDate(e.target.value)}
-              max={new Date().toISOString().slice(0, 10)}
+              max={localDateStr()}
               className={inputCls}
             />
           </div>
