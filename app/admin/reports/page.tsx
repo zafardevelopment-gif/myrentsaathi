@@ -404,16 +404,19 @@ export default function AdminReportsPage() {
 
         // ── VISITORS ──────────────────────────────────────────
         case "visitors": {
+          // Gate entries live in `visits` (VMS, see migrations/vms.sql); the old visitor_logs table no longer exists.
           const { data } = await supabase
-            .from("visitor_logs")
-            .select("visitor_name, visitor_mobile, purpose, flat_number, check_in_time, check_out_time, approved_by")
+            .from("visits")
+            .select("purpose, flat_number, block, entry_time, exit_time, status, visitor:visitors(name, mobile)")
             .eq("society_id", societyId)
-            .gte("check_in_time", fromDate).lte("check_in_time", toDate + "T23:59:59")
-            .order("check_in_time", { ascending: false });
+            .gte("entry_time", fromDate).lte("entry_time", toDate + "T23:59:59")
+            .order("entry_time", { ascending: false });
 
-          const rows: string[][] = [["Visitor Name", "Mobile", "Purpose", "Flat", "Check In", "Check Out", "Approved By"]];
+          const rows: string[][] = [["Visitor Name", "Mobile", "Purpose", "Flat", "Check In", "Check Out", "Status"]];
           for (const v of (data ?? [])) {
-            rows.push([v.visitor_name, v.visitor_mobile ?? "", v.purpose ?? "", v.flat_number ?? "", fmtDate(v.check_in_time), fmtDate(v.check_out_time), v.approved_by ?? ""]);
+            const vis = v.visitor as unknown as { name: string; mobile: string } | null;
+            const flat = v.block ? `${v.flat_number} (${v.block})` : v.flat_number;
+            rows.push([vis?.name ?? "", vis?.mobile ?? "", v.purpose ?? "", flat ?? "", fmtDate(v.entry_time), fmtDate(v.exit_time), v.status ?? ""]);
           }
           downloadCSV(`${societyName}_visitors.csv`, rows);
           break;

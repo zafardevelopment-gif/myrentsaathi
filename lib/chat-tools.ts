@@ -338,20 +338,20 @@ export async function getVisitorLog(userId: string, role: string) {
     if (!membership) return { error: "Admin society not found." };
 
     const { data } = await supabase
-      .from("visitor_logs")
-      .select("visitor_name, visitor_mobile, purpose, flat_number, check_in_time, check_out_time")
+      .from("visits")
+      .select("purpose, flat_number, entry_time, exit_time, visitor:visitors(name, mobile)")
       .eq("society_id", membership.society_id)
-      .order("check_in_time", { ascending: false })
+      .order("entry_time", { ascending: false })
       .limit(10);
 
     return {
       visitors: (data ?? []).map((v) => ({
-        name: v.visitor_name,
-        mobile: v.visitor_mobile ?? "",
+        name: (v.visitor as unknown as { name: string } | null)?.name ?? "",
+        mobile: (v.visitor as unknown as { mobile: string } | null)?.mobile ?? "",
         purpose: v.purpose ?? "",
         flat: v.flat_number ?? "",
-        in: fmtDate(v.check_in_time),
-        out: fmtDate(v.check_out_time),
+        in: fmtDate(v.entry_time),
+        out: fmtDate(v.exit_time),
       })),
     };
   }
@@ -369,20 +369,20 @@ export async function getVisitorLog(userId: string, role: string) {
   if (!flatNumber) return { error: "Flat not found." };
 
   const { data } = await supabase
-    .from("visitor_logs")
-    .select("visitor_name, visitor_mobile, purpose, check_in_time, check_out_time")
+    .from("visits")
+    .select("purpose, entry_time, exit_time, visitor:visitors(name, mobile)")
     .eq("flat_number", flatNumber)
-    .order("check_in_time", { ascending: false })
+    .order("entry_time", { ascending: false })
     .limit(10);
 
   return {
     flat: flatNumber,
     visitors: (data ?? []).map((v) => ({
-      name: v.visitor_name,
-      mobile: v.visitor_mobile ?? "",
+      name: (v.visitor as unknown as { name: string } | null)?.name ?? "",
+      mobile: (v.visitor as unknown as { mobile: string } | null)?.mobile ?? "",
       purpose: v.purpose ?? "",
-      in: fmtDate(v.check_in_time),
-      out: fmtDate(v.check_out_time),
+      in: fmtDate(v.entry_time),
+      out: fmtDate(v.exit_time),
     })),
   };
 }
