@@ -618,9 +618,9 @@ export default function LandlordTenants() {
   async function handleRemoveTenant() {
     if (!removeFlat || !removeFlat.current_tenant_id) return;
     setRemoving(true);
-    // "vacated" is the status the tenants check constraint accepts (same as superadmin vacateTenant);
+    // tenants_status_check allows active / notice / deactivated / … — "deactivated" marks a removed tenant;
     // the old "inactive" value was rejected silently, leaving the tenant record active.
-    const { error: tErr } = await supabase.from("tenants").update({ status: "vacated", updated_at: new Date().toISOString() }).eq("flat_id", removeFlat.id).eq("status", "active");
+    const { error: tErr } = await supabase.from("tenants").update({ status: "deactivated", updated_at: new Date().toISOString() }).eq("flat_id", removeFlat.id).eq("status", "active");
     if (tErr) { setRemoving(false); toast.error("Could not remove tenant: " + tErr.message); return; }
     // End the tenancy's active agreement too, so it doesn't stay "Active" for an empty flat.
     await supabase.from("agreements").update({ status: "terminated" }).eq("flat_id", removeFlat.id).eq("status", "active");

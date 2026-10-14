@@ -394,7 +394,7 @@ export async function vacateTenant(flatId: string | null) {
 
   const { error: tErr } = await supabase
     .from("tenants")
-    .update({ status: "vacated", updated_at: new Date().toISOString() })
+    .update({ status: "deactivated", updated_at: new Date().toISOString() })
     .eq("flat_id", flatId)
     .eq("status", "active");
   if (tErr) throw tErr;
