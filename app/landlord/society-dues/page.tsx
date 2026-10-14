@@ -70,7 +70,7 @@ export default function LandlordSocietyDues() {
     setFlats(f);
     setLandlordId(lid);
 
-    const sid = f[0]?.society_id;
+    const sid = f.find(fl => fl.society_id)?.society_id;
     if (sid) {
       const [{ data: se }, { data: soc }, { count: activeCount }] = await Promise.all([
         supabase

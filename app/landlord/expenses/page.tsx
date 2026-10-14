@@ -89,8 +89,8 @@ export default function MaintenanceExpensesPage() {
         .order("expense_date", { ascending: false });
       setExpenses(data ?? []);
 
-      // Load society expenses from the first flat's society
-      const societyId = f[0].society_id;
+      // Load society expenses from the first society-linked flat
+      const societyId = f.find(fl => fl.society_id)?.society_id ?? null;
       if (societyId) {
         const [{ data: se }, { data: socData }, { count: actCount }] = await Promise.all([
           supabase

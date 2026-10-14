@@ -115,7 +115,7 @@ export async function getUserDashboard(userId: string, role: string) {
       const { data: society } = await supabase
         .from("societies")
         .select("name, city")
-        .eq("id", flats[0].society_id)
+        .eq("id", (flats.find(f => f.society_id) ?? flats[0]).society_id)
         .single();
       result.society = society?.name ?? "";
     }
