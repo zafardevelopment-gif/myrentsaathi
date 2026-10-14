@@ -499,7 +499,7 @@ export default function LandlordTenants() {
       created_by: landlordId,
       title: `Rent Reminder — ${monthLabel}`,
       content: `Dear ${tenantName}, this is a reminder that your rent for ${monthLabel} (${flatLabel}) is pending. Please make the payment at the earliest. Thank you.`,
-      notice_type: "reminder",
+      notice_type: "financial",
       target_audience: "tenants",
       is_active: true,
     });
